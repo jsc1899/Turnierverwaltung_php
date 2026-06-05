@@ -43,16 +43,16 @@ function init_db(): void {
         CREATE TABLE IF NOT EXISTS tournament (
             id                  INT AUTO_INCREMENT PRIMARY KEY,
             name                TEXT NOT NULL,
-            event_date          TEXT DEFAULT '',
+            event_date          VARCHAR(100) DEFAULT '',
             max_competitions    INT DEFAULT 1,
-            ausschreibung       TEXT DEFAULT '',
+            ausschreibung       VARCHAR(5000) DEFAULT '',
             registrations_open  TINYINT(1) DEFAULT 1,
             is_public           TINYINT(1) DEFAULT 1,
             is_done             TINYINT(1) DEFAULT 0,
-            banner_image        TEXT DEFAULT '',
-            organizer           TEXT DEFAULT '',
-            sport               TEXT DEFAULT '',
-            info_url            TEXT DEFAULT ''
+            banner_image        VARCHAR(500) DEFAULT '',
+            organizer           VARCHAR(255) DEFAULT '',
+            sport               VARCHAR(100) DEFAULT '',
+            info_url            VARCHAR(500) DEFAULT ''
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
         CREATE TABLE IF NOT EXISTS competition (
@@ -62,8 +62,8 @@ function init_db(): void {
             group_size    INT DEFAULT 4,
             advance_count INT DEFAULT 1,
             third_place   TINYINT(1) DEFAULT 0,
-            phase         TEXT DEFAULT 'setup',
-            mode          TEXT DEFAULT 'groups_ko',
+            phase         VARCHAR(50) DEFAULT 'setup',
+            mode          VARCHAR(50) DEFAULT 'groups_ko',
             max_players   INT DEFAULT 0,
             registrations_open TINYINT(1) DEFAULT 1,
             FOREIGN KEY (tournament_id) REFERENCES tournament(id) ON DELETE CASCADE
@@ -72,20 +72,20 @@ function init_db(): void {
         CREATE TABLE IF NOT EXISTS player (
             id        INT AUTO_INCREMENT PRIMARY KEY,
             name      TEXT NOT NULL,
-            firstname TEXT DEFAULT '',
-            club      TEXT DEFAULT '',
-            gender    TEXT DEFAULT '',
+            firstname VARCHAR(255) DEFAULT '',
+            club      VARCHAR(255) DEFAULT '',
+            gender    VARCHAR(20) DEFAULT '',
             skill     INT DEFAULT 0,
-            pass_nr   TEXT DEFAULT '',
-            email     TEXT DEFAULT ''
+            pass_nr   VARCHAR(100) DEFAULT '',
+            email     VARCHAR(255) DEFAULT ''
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
         CREATE TABLE IF NOT EXISTS player_skill (
             player_id  INT NOT NULL,
-            sport      TEXT NOT NULL DEFAULT '',
+            sport      VARCHAR(100) NOT NULL DEFAULT '',
             skill      INT NOT NULL DEFAULT 0,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (player_id, sport(50)),
+            PRIMARY KEY (player_id, sport),
             FOREIGN KEY (player_id) REFERENCES player(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -93,7 +93,7 @@ function init_db(): void {
             competition_id INT NOT NULL,
             player_id      INT NOT NULL,
             skill          INT DEFAULT 0,
-            created_at     TEXT DEFAULT '',
+            created_at     VARCHAR(50) DEFAULT '',
             PRIMARY KEY (competition_id, player_id),
             FOREIGN KEY (competition_id) REFERENCES competition(id) ON DELETE CASCADE,
             FOREIGN KEY (player_id)      REFERENCES player(id)      ON DELETE CASCADE
@@ -137,12 +137,12 @@ function init_db(): void {
             tournament_id INT NOT NULL,
             lastname      TEXT NOT NULL,
             firstname     TEXT NOT NULL,
-            club          TEXT DEFAULT '',
-            gender        TEXT DEFAULT '',
-            pass_nr       TEXT DEFAULT '',
+            club          VARCHAR(255) DEFAULT '',
+            gender        VARCHAR(20) DEFAULT '',
+            pass_nr       VARCHAR(100) DEFAULT '',
             skill         INT DEFAULT 0,
-            email         TEXT DEFAULT '',
-            status        TEXT DEFAULT 'pending',
+            email         VARCHAR(255) DEFAULT '',
+            status        VARCHAR(20) DEFAULT 'pending',
             created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (tournament_id) REFERENCES tournament(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -150,7 +150,7 @@ function init_db(): void {
         CREATE TABLE IF NOT EXISTS registration_competition (
             registration_id INT NOT NULL,
             competition_id  INT NOT NULL,
-            status          TEXT DEFAULT 'pending',
+            status          VARCHAR(20) DEFAULT 'pending',
             PRIMARY KEY (registration_id, competition_id),
             FOREIGN KEY (registration_id) REFERENCES registration(id)  ON DELETE CASCADE,
             FOREIGN KEY (competition_id)  REFERENCES competition(id)   ON DELETE CASCADE
@@ -160,8 +160,8 @@ function init_db(): void {
             id              INT AUTO_INCREMENT PRIMARY KEY,
             registration_id INT NOT NULL,
             request_type    TEXT NOT NULL,
-            new_competitions TEXT DEFAULT '',
-            status          TEXT DEFAULT 'pending',
+            new_competitions VARCHAR(2000) DEFAULT '',
+            status          VARCHAR(20) DEFAULT 'pending',
             created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (registration_id) REFERENCES registration(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -169,8 +169,8 @@ function init_db(): void {
         CREATE TABLE IF NOT EXISTS registration_change_competition (
             change_request_id INT NOT NULL,
             competition_id    INT NOT NULL,
-            action            TEXT DEFAULT 'add',
-            status            TEXT DEFAULT 'pending',
+            action            VARCHAR(20) DEFAULT 'add',
+            status            VARCHAR(20) DEFAULT 'pending',
             PRIMARY KEY (change_request_id, competition_id),
             FOREIGN KEY (change_request_id) REFERENCES registration_change_request(id) ON DELETE CASCADE,
             FOREIGN KEY (competition_id)    REFERENCES competition(id)                  ON DELETE CASCADE
@@ -182,7 +182,7 @@ function init_db(): void {
             email         VARCHAR(255) NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
             confirmed     TINYINT(1) DEFAULT 0,
-            role          TEXT DEFAULT 'viewer',
+            role          VARCHAR(20) DEFAULT 'viewer',
             created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
