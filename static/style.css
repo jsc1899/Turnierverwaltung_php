@@ -1,0 +1,270 @@
+/* ── General ─────────────────────────────────────────────────────────────── */
+body { background: #f4f6f9; }
+
+/* ── Sortierbare Tabellen ────────────────────────────────────────────────── */
+.sortable-col { cursor: pointer; user-select: none; white-space: nowrap; }
+.sortable-col:hover { background: rgba(0,0,0,.05); }
+.sortable-col::after { content: ' ⇅'; font-size: .7em; opacity: .35; }
+.sortable-col.sort-asc::after  { content: ' ▲'; opacity: .75; }
+.sortable-col.sort-desc::after { content: ' ▼'; opacity: .75; }
+
+.card { border: none; border-radius: 12px; }
+.card-header { border-radius: 12px 12px 0 0 !important; }
+
+/* ── Match rows (group phase) ────────────────────────────────────────────── */
+.match-row {
+  border-radius: 6px;
+  font-size: .9rem;
+}
+.match-row:hover { background: #f0f4ff; }
+.match-played { background: #fafafa; }
+
+.player-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+.score-badge {
+  background: #e9ecef;
+  border-radius: 20px;
+  padding: 2px 12px;
+  font-weight: 600;
+  font-size: .95rem;
+  white-space: nowrap;
+  min-width: 64px;
+  text-align: center;
+}
+
+.score-input {
+  width: 52px !important;
+  text-align: center;
+  padding: 2px 4px;
+}
+
+/* ── KO Bracket ─────────────────────────────────────────────────────────── */
+.bracket-container {
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  padding: 16px 0 24px;
+}
+
+.bracket-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.bracket-col-header {
+  font-weight: 600;
+  font-size: .85rem;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: #6c757d;
+  text-align: center;
+  padding: 6px 12px;
+  background: #e9ecef;
+  margin-right: 1px;
+}
+
+.bracket-col-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  flex: 1;
+  padding: 8px 0;
+  min-height: calc(var(--first-count, 1) * 100px);
+}
+
+.bracket-match {
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  margin: 4px 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,.07);
+  position: relative;
+}
+
+.bracket-match::after {
+  content: '';
+  position: absolute;
+  right: -9px;
+  top: 50%;
+  width: 9px;
+  height: 1px;
+  background: #adb5bd;
+}
+
+.bracket-col:last-child .bracket-match::after {
+  display: none;
+}
+
+.bracket-player {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: .88rem;
+  gap: 6px;
+  min-height: 34px;
+}
+.bracket-player:last-of-type { border-bottom: none; }
+
+.bracket-player.winner {
+  background: #d1e7dd;
+  font-weight: 700;
+}
+.bracket-player.loser {
+  background: #f8f9fa;
+  color: #adb5bd;
+  text-decoration: line-through;
+}
+
+.bracket-player-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.bracket-score {
+  font-weight: 700;
+  font-size: .95rem;
+  min-width: 20px;
+  text-align: right;
+  color: #0d6efd;
+}
+
+/* ── Group drag editor ───────────────────────────────────────────────────── */
+.group-drag-card {
+  min-width: 160px;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+.group-drag-header {
+  background: #e9ecef;
+  padding: 6px 10px;
+  font-weight: 600;
+  font-size: .85rem;
+  text-align: center;
+}
+.group-player-list {
+  min-height: 48px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.drag-player-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 5px;
+  cursor: grab;
+  font-size: .88rem;
+  user-select: none;
+}
+.drag-player-item:active { cursor: grabbing; }
+.drag-player-item.sortable-chosen { background: #e7f1ff; border-color: #0d6efd; }
+.drag-player-item.sortable-ghost  { opacity: .35; }
+
+/* ── KO drag editor ─────────────────────────────────────────────────────── */
+.ko-sortable { display: flex; flex-direction: column; gap: 4px; max-width: 500px; }
+
+.ko-drag-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  cursor: grab;
+  user-select: none;
+}
+.ko-drag-row:active { cursor: grabbing; }
+.ko-drag-row.sortable-chosen { background: #e7f1ff; border-color: #0d6efd; }
+.ko-drag-row.sortable-ghost  { opacity: .4; }
+
+.drag-handle { font-size: 1.1rem; flex-shrink: 0; }
+.ko-drag-p1  { flex: 1; font-weight: 600; }
+.ko-drag-vs  { color: #6c757d; font-size: .8rem; flex-shrink: 0; }
+.ko-drag-p2  { flex: 1; font-weight: 600; }
+
+/* ── Spiel um Platz 3 (standalone below bracket) ────────────────────────── */
+.third-place-standalone {
+  display: inline-flex;
+  flex-direction: column;
+  min-width: 220px;
+  max-width: 280px;
+  border-top: 2px dashed #dee2e6;
+  padding-top: 4px;
+}
+.third-place-standalone-header {
+  font-weight: 600;
+  font-size: .85rem;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: #6c757d;
+  text-align: center;
+  padding: 6px 12px;
+  background: #e9ecef;
+  margin-bottom: 0;
+}
+.third-place-standalone .bracket-match::after {
+  display: none;
+}
+
+.bracket-edit-row {
+  border-top: 1px dashed #dee2e6;
+  padding: 2px 6px;
+  background: #fafafa;
+}
+
+.bracket-form {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: #f8f9fa;
+  border-top: 1px solid #e9ecef;
+}
+
+/* ── Connector lines between rounds ─────────────────────────────────────── */
+.bracket-col:not(:last-child) .bracket-col-body::after {
+  /* No JS needed — pure visual separation */
+}
+
+/* ── Place cards (final standings) ─────────────────────────────────────── */
+.place-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 20px;
+  border-radius: 12px;
+  min-width: 120px;
+  text-align: center;
+  border: 2px solid #dee2e6;
+  background: #fff;
+}
+.place-card.place-1 { border-color: #ffc107; background: #fffde7; }
+.place-card.place-2 { border-color: #adb5bd; background: #f8f9fa; }
+.place-card.place-3 { border-color: #cd7f32; background: #fff3e0; }
+.place-card.place-4 { border-color: #dee2e6; background: #fff; }
+
+.place-rank { font-size: 2rem; line-height: 1; margin-bottom: 6px; }
+.place-num  { font-size: 1.4rem; font-weight: 700; color: #6c757d; }
+.place-name { font-weight: 700; font-size: 1rem; }
+.place-club { font-size: .8rem; color: #6c757d; margin-top: 2px; }
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 576px) {
+  .bracket-col { min-width: 170px; }
+  .player-name { max-width: 110px; }
+}

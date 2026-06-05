@@ -1,0 +1,8 @@
+.env
+uploads/*
+!uploads/.gitkeep
+vendor/
+*.db
+composer.phar
+php-server.log
+.claude/
