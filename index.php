@@ -1,12 +1,6 @@
 <?php
 declare(strict_types=1);
-error_reporting(E_ALL);
-$_dbg = __DIR__ . '/uploads/debug.txt';
-file_put_contents($_dbg, date('H:i:s') . " START dir=" . __DIR__ . "\n", FILE_APPEND);
-register_shutdown_function(function() use ($_dbg) {
-    $e = error_get_last();
-    file_put_contents($_dbg, date('H:i:s') . " SHUTDOWN error=" . json_encode($e) . "\n", FILE_APPEND);
-});
+phpinfo();
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
