@@ -1,6 +1,5 @@
 <?php
 declare(strict_types=1);
-phpinfo();
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
