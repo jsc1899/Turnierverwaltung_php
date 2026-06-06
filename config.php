@@ -20,9 +20,13 @@ if (is_file($_env_file)) {
 
 // Konfiguration — auf dem Server anpassen
 $_sk = getenv('SECRET_KEY') ?: 'change-me-in-production';
-if ($_sk === 'change-me-in-production' && php_sapi_name() !== 'cli') {
-    // Unsicherer Default-Key — in Produktion SECRET_KEY-Umgebungsvariable setzen
+if ($_sk === 'change-me-in-production') {
+    $_app_url = getenv('APP_URL') ?: '';
+    if ($_app_url && strpos($_app_url, 'localhost') === false && php_sapi_name() !== 'cli') {
+        die('Konfigurationsfehler: SECRET_KEY muss als Umgebungsvariable gesetzt werden.');
+    }
     error_log('WARNING: SECRET_KEY is set to the insecure default value.');
+    unset($_app_url);
 }
 define('SECRET_KEY', $_sk);
 unset($_sk);

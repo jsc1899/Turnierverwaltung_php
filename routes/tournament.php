@@ -152,20 +152,26 @@ function settings(array $p): void {
 
     $ausschreibung = $t['ausschreibung'] ?? '';
     if (post('remove_ausschreibung')) {
-        if ($ausschreibung) @unlink(UPLOAD_DIR . $ausschreibung);
+        if ($ausschreibung && file_exists(UPLOAD_DIR . $ausschreibung)) unlink(UPLOAD_DIR . $ausschreibung);
         $ausschreibung = '';
     } else {
         $f = upload_file('ausschreibung_file', ['pdf']);
-        if ($f) { if ($ausschreibung) @unlink(UPLOAD_DIR . $ausschreibung); $ausschreibung = $f; }
+        if ($f) {
+            if ($ausschreibung && file_exists(UPLOAD_DIR . $ausschreibung)) unlink(UPLOAD_DIR . $ausschreibung);
+            $ausschreibung = $f;
+        }
     }
 
     $banner_image = $t['banner_image'] ?? '';
     if (post('remove_banner')) {
-        if ($banner_image) @unlink(UPLOAD_DIR . $banner_image);
+        if ($banner_image && file_exists(UPLOAD_DIR . $banner_image)) unlink(UPLOAD_DIR . $banner_image);
         $banner_image = '';
     } else {
         $fb = upload_file('banner_file', ['jpg', 'jpeg', 'png', 'gif', 'webp']);
-        if ($fb) { if ($banner_image) @unlink(UPLOAD_DIR . $banner_image); $banner_image = $fb; }
+        if ($fb) {
+            if ($banner_image && file_exists(UPLOAD_DIR . $banner_image)) unlink(UPLOAD_DIR . $banner_image);
+            $banner_image = $fb;
+        }
     }
 
     db_execute(

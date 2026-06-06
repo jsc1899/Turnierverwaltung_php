@@ -1,9 +1,12 @@
 <?php
 declare(strict_types=1);
-ini_set('display_errors', '1');
-error_reporting(E_ALL);
-
 require_once __DIR__ . '/config.php';
+
+$_dev = str_contains(APP_URL, 'localhost');
+ini_set('display_errors', $_dev ? '1' : '0');
+error_reporting($_dev ? E_ALL : E_ALL & ~E_DEPRECATED);
+unset($_dev);
+
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/auth.php';
@@ -22,6 +25,7 @@ session_start();
 // Security-Header
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
+header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; img-src 'self' data: blob:");
 
 // DB initialisieren
 init_db();

@@ -83,23 +83,4 @@ function clear_result(array $p): void {
     redirect('competition/' . $m['competition_id']);
 }
 
-function _maybe_set_done(int $cid): void {
-    $c = db_fetch("SELECT phase FROM competition WHERE id=?", [$cid]);
-    if (!$c || !in_array($c['phase'], ['group', 'ko'], true)) return;
-    if ($c['phase'] === 'ko') {
-        $final = db_fetch(
-            "SELECT id FROM `match` WHERE competition_id=? AND ko_round=2 AND played=1", [$cid]
-        );
-        if ($final) db_execute("UPDATE competition SET phase='done' WHERE id=?", [$cid]);
-    } elseif ($c['phase'] === 'group') {
-        $unplayed = db_fetch(
-            "SELECT COUNT(*) as n FROM `match` WHERE competition_id=? AND played=0", [$cid]
-        )['n'];
-        if ($unplayed == 0) {
-            $adv = db_fetch("SELECT advance_count FROM competition WHERE id=?", [$cid]);
-            if ($adv && (int)$adv['advance_count'] === 0) {
-                db_execute("UPDATE competition SET phase='done' WHERE id=?", [$cid]);
-            }
-        }
-    }
-}
+// _maybe_set_done() is defined in lib/ko_bracket.php (required above)

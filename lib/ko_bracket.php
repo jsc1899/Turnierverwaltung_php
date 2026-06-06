@@ -37,8 +37,11 @@ function advance_ko_winner(array $match): void {
         [$match['competition_id'], $next_round, $next_pos]
     );
     if ($next_match) {
-        $col = $slot === 1 ? 'player1_id' : 'player2_id';
-        db_execute("UPDATE `match` SET $col = ? WHERE id = ?", [$winner_id, $next_match['id']]);
+        if ($slot === 1) {
+            db_execute("UPDATE `match` SET player1_id=? WHERE id=?", [$winner_id, $next_match['id']]);
+        } else {
+            db_execute("UPDATE `match` SET player2_id=? WHERE id=?", [$winner_id, $next_match['id']]);
+        }
     }
 }
 
@@ -71,8 +74,11 @@ function recompute_ko_from(int $cid, int $from_ko_round): void {
                         "SELECT * FROM `match` WHERE competition_id=? AND ko_round=3", [$cid]
                     );
                     if ($third_m) {
-                        $col = $m['ko_position'] === 0 ? 'player1_id' : 'player2_id';
-                        db_execute("UPDATE `match` SET $col=? WHERE id=?", [$loser_id, $third_m['id']]);
+                        if ($m['ko_position'] === 0) {
+                            db_execute("UPDATE `match` SET player1_id=? WHERE id=?", [$loser_id, $third_m['id']]);
+                        } else {
+                            db_execute("UPDATE `match` SET player2_id=? WHERE id=?", [$loser_id, $third_m['id']]);
+                        }
                     }
                 }
             }
@@ -149,4 +155,22 @@ function draw_ko_bracket(int $cid, array $seedings, bool $third_place): void {
         }
     }
     db_execute("UPDATE competition SET phase='ko' WHERE id=?", [$cid]);
+}
+
+function _maybe_set_done(int $cid): void {
+    $c = db_fetch("SELECT phase, advance_count FROM competition WHERE id=?", [$cid]);
+    if (!$c || !in_array($c['phase'], ['group', 'ko'], true)) return;
+    if ($c['phase'] === 'ko') {
+        $final = db_fetch(
+            "SELECT id FROM `match` WHERE competition_id=? AND ko_round=2 AND played=1", [$cid]
+        );
+        if ($final) db_execute("UPDATE competition SET phase='done' WHERE id=?", [$cid]);
+    } elseif ($c['phase'] === 'group') {
+        $unplayed = db_fetch(
+            "SELECT COUNT(*) as n FROM `match` WHERE competition_id=? AND played=0", [$cid]
+        )['n'];
+        if ((int)$unplayed === 0 && (int)$c['advance_count'] === 0) {
+            db_execute("UPDATE competition SET phase='done' WHERE id=?", [$cid]);
+        }
+    }
 }

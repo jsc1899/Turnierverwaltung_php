@@ -3,6 +3,8 @@ require_once __DIR__ . '/../lib/standings.php';
 require_once __DIR__ . '/../lib/round_robin.php';
 require_once __DIR__ . '/../lib/ko_bracket.php';
 
+// _maybe_set_done() is defined in lib/ko_bracket.php (required above)
+
 function _get_player_skill(int $pid, string $sport): float {
     if ($sport) {
         $row = db_fetch(
@@ -12,30 +14,6 @@ function _get_player_skill(int $pid, string $sport): float {
     }
     $row = db_fetch("SELECT skill FROM player WHERE id=?", [$pid]);
     return $row ? (float)$row['skill'] : 0.0;
-}
-
-function _maybe_set_done(int $cid): void {
-    $c = db_fetch("SELECT phase FROM competition WHERE id=?", [$cid]);
-    if (!$c || !in_array($c['phase'], ['group', 'ko'], true)) return;
-
-    if ($c['phase'] === 'ko') {
-        $final = db_fetch(
-            "SELECT * FROM `match` WHERE competition_id=? AND ko_round=2 AND played=1", [$cid]
-        );
-        if ($final) {
-            db_execute("UPDATE competition SET phase='done' WHERE id=?", [$cid]);
-        }
-    } elseif ($c['phase'] === 'group') {
-        $unplayed = db_fetch(
-            "SELECT COUNT(*) as n FROM `match` WHERE competition_id=? AND played=0", [$cid]
-        )['n'];
-        if ($unplayed == 0) {
-            $adv = db_fetch("SELECT advance_count FROM competition WHERE id=?", [$cid]);
-            if ($adv && (int)$adv['advance_count'] === 0) {
-                db_execute("UPDATE competition SET phase='done' WHERE id=?", [$cid]);
-            }
-        }
-    }
 }
 
 function new_competition(array $p): void {
@@ -131,7 +109,7 @@ function show(array $p): void {
                         16=>'Achtelfinale', 32=>'Runde der 32', 64=>'Runde der 64'];
         krsort($rounds_dict);
         foreach ($rounds_dict as $r => $rmatches) {
-            if ($r === 3 || $r === '3') {
+            if ((int)$r === 3) {
                 $third_place_match = ['round' => 3, 'name' => 'Spiel um Platz 3', 'matches' => $rmatches];
             } else {
                 $ko_rounds[] = ['round' => (int)$r, 'name' => $round_names[(int)$r] ?? "Runde $r", 'matches' => $rmatches];
@@ -182,7 +160,7 @@ function show(array $p): void {
         }
     }
 
-    if ((int)$c['advance_count'] === 0 && $unplayed_group == 0 && $groups) {
+    if ((int)$c['advance_count'] === 0 && (int)$unplayed_group === 0 && $groups) {
         $all_rows = [];
         foreach ($groups as $gi) {
             $all_rows = array_merge($all_rows, $gi['standings']);
@@ -199,7 +177,7 @@ function show(array $p): void {
             "SELECT COUNT(*) as n FROM `match` WHERE competition_id=? AND group_id IS NOT NULL AND played=1",
             [$cid]
         )['n'];
-        $group_no_results = ($played_group == 0);
+        $group_no_results = ((int)$played_group === 0);
     }
     $ko_no_results = false;
     if ($c['phase'] === 'ko') {
@@ -208,7 +186,7 @@ function show(array $p): void {
              AND player1_id IS NOT NULL AND player2_id IS NOT NULL AND played=1",
             [$cid]
         )['n'];
-        $ko_no_results = ($played_ko == 0);
+        $ko_no_results = ((int)$played_ko === 0);
     }
 
     render('competition/show', [
@@ -256,6 +234,7 @@ function settings(array $p): void {
     $max_players       = max(0, (int)post('max_players', 0));
 
     $c = db_fetch("SELECT phase, mode FROM competition WHERE id=?", [$cid]);
+    if (!$c) { redirect('competition/' . $cid); return; }
     if ($c['mode'] === 'ko_only') {
         db_execute("UPDATE competition SET third_place=?, registrations_open=?, max_players=? WHERE id=?",
             [$third_place, $registrations_open, $max_players, $cid]);
@@ -325,49 +304,58 @@ function draw_groups(array $p): void {
     if ($n < 3) { flash('danger', 'Mindestens 3 Spieler erforderlich.'); redirect('competition/'.$cid); return; }
     if ($n > 64) { flash('danger', 'Maximal 64 Spieler erlaubt.'); redirect('competition/'.$cid); return; }
 
-    db_execute("DELETE FROM `match` WHERE competition_id=?", [$cid]);
-    db_execute("DELETE FROM grp WHERE competition_id=?", [$cid]);
-
     $group_size = (int)$c['group_size'];
     $num_groups = max(1, (int)round($n / $group_size));
     while ($num_groups > 1 && $n / $num_groups < 3) $num_groups--;
     while ($n / $num_groups > 6) $num_groups++;
 
-    $group_ids = [];
-    for ($i = 0; $i < $num_groups; $i++) {
-        $group_ids[] = db_insert(
-            "INSERT INTO grp (competition_id, name) VALUES (?,?)",
-            [$cid, 'Gruppe ' . chr(65 + $i)]
-        );
-    }
+    $pdo = get_db();
+    $pdo->beginTransaction();
+    try {
+        db_execute("DELETE FROM `match` WHERE competition_id=?", [$cid]);
+        db_execute("DELETE FROM grp WHERE competition_id=?", [$cid]);
 
-    // Seeded draw: distribute players in buckets of num_groups (randomized within bucket)
-    $player_ids = array_column($rows, 'player_id');
-    for ($start = 0; $start < $n; $start += $num_groups) {
-        $bucket = array_slice($player_ids, $start, $num_groups);
-        shuffle($bucket);
-        foreach ($bucket as $j => $pid) {
-            if (isset($group_ids[$j])) {
-                db_execute("INSERT INTO group_player (group_id, player_id) VALUES (?,?)",
-                    [$group_ids[$j], $pid]);
-            }
-        }
-    }
-
-    foreach ($group_ids as $gid) {
-        $pids = array_column(
-            db_fetchall("SELECT player_id FROM group_player WHERE group_id=?", [$gid]),
-            'player_id'
-        );
-        $pairs = round_robin_schedule($pids);
-        foreach ($pairs as $order => [$p1, $p2]) {
-            db_execute(
-                "INSERT INTO `match` (competition_id, group_id, player1_id, player2_id, match_order) VALUES (?,?,?,?,?)",
-                [$cid, $gid, $p1, $p2, $order + 1]
+        $group_ids = [];
+        for ($i = 0; $i < $num_groups; $i++) {
+            $group_ids[] = db_insert(
+                "INSERT INTO grp (competition_id, name) VALUES (?,?)",
+                [$cid, 'Gruppe ' . chr(65 + $i)]
             );
         }
+
+        // Seeded draw: distribute players in buckets of num_groups (randomized within bucket)
+        $player_ids = array_column($rows, 'player_id');
+        for ($start = 0; $start < $n; $start += $num_groups) {
+            $bucket = array_slice($player_ids, $start, $num_groups);
+            shuffle($bucket);
+            foreach ($bucket as $j => $pid) {
+                if (isset($group_ids[$j])) {
+                    db_execute("INSERT INTO group_player (group_id, player_id) VALUES (?,?)",
+                        [$group_ids[$j], $pid]);
+                }
+            }
+        }
+
+        foreach ($group_ids as $gid) {
+            $pids = array_column(
+                db_fetchall("SELECT player_id FROM group_player WHERE group_id=?", [$gid]),
+                'player_id'
+            );
+            $pairs = round_robin_schedule($pids);
+            foreach ($pairs as $order => [$p1, $p2]) {
+                db_execute(
+                    "INSERT INTO `match` (competition_id, group_id, player1_id, player2_id, match_order) VALUES (?,?,?,?,?)",
+                    [$cid, $gid, $p1, $p2, $order + 1]
+                );
+            }
+        }
+        db_execute("UPDATE competition SET phase='group', registrations_open=0 WHERE id=?", [$cid]);
+        $pdo->commit();
+    } catch (\Throwable $e) {
+        $pdo->rollBack();
+        flash('danger', 'Fehler beim Auslosen der Gruppen.');
+        redirect('competition/' . $cid); return;
     }
-    db_execute("UPDATE competition SET phase='group', registrations_open=0 WHERE id=?", [$cid]);
     flash('success', 'Gruppen wurden ausgelost!');
     redirect('competition/' . $cid);
 }
@@ -540,32 +528,40 @@ function groups_reorder(array $p): void {
         'player_id'
     );
 
-    db_execute("DELETE FROM `match` WHERE competition_id=? AND group_id IS NOT NULL", [$cid]);
-    if ($valid_gids) {
-        $ph = implode(',', array_fill(0, count($valid_gids), '?'));
-        db_execute("DELETE FROM group_player WHERE group_id IN ($ph)", $valid_gids);
-    }
-
     $groups_post = $_POST['groups'] ?? [];
-    foreach ($groups_post as $gid_str => $pids) {
-        $gid = (int)$gid_str;
-        if (!in_array($gid, $valid_gids)) continue;
-        foreach ((array)$pids as $pid) {
-            $pid = (int)$pid;
-            if (!in_array($pid, $valid_pids)) continue;
-            db_execute("INSERT IGNORE INTO group_player (group_id, player_id) VALUES (?,?)", [$gid, $pid]);
+    $pdo = get_db();
+    $pdo->beginTransaction();
+    try {
+        db_execute("DELETE FROM `match` WHERE competition_id=? AND group_id IS NOT NULL", [$cid]);
+        if ($valid_gids) {
+            $ph = implode(',', array_fill(0, count($valid_gids), '?'));
+            db_execute("DELETE FROM group_player WHERE group_id IN ($ph)", $valid_gids);
         }
-        $pids_arr = array_column(
-            db_fetchall("SELECT player_id FROM group_player WHERE group_id=?", [$gid]),
-            'player_id'
-        );
-        $pairs = round_robin_schedule($pids_arr);
-        foreach ($pairs as $order => [$p1, $p2]) {
-            db_execute(
-                "INSERT INTO `match` (competition_id, group_id, player1_id, player2_id, match_order) VALUES (?,?,?,?,?)",
-                [$cid, $gid, $p1, $p2, $order + 1]
+        foreach ($groups_post as $gid_str => $pids) {
+            $gid = (int)$gid_str;
+            if (!in_array($gid, $valid_gids)) continue;
+            foreach ((array)$pids as $pid) {
+                $pid = (int)$pid;
+                if (!in_array($pid, $valid_pids)) continue;
+                db_execute("INSERT IGNORE INTO group_player (group_id, player_id) VALUES (?,?)", [$gid, $pid]);
+            }
+            $pids_arr = array_column(
+                db_fetchall("SELECT player_id FROM group_player WHERE group_id=?", [$gid]),
+                'player_id'
             );
+            $pairs = round_robin_schedule($pids_arr);
+            foreach ($pairs as $order => [$p1, $p2]) {
+                db_execute(
+                    "INSERT INTO `match` (competition_id, group_id, player1_id, player2_id, match_order) VALUES (?,?,?,?,?)",
+                    [$cid, $gid, $p1, $p2, $order + 1]
+                );
+            }
         }
+        $pdo->commit();
+    } catch (\Throwable $e) {
+        $pdo->rollBack();
+        flash('danger', 'Fehler beim Umstellen der Gruppen.');
+        redirect('competition/' . $cid); return;
     }
     flash('success', 'Gruppen neu eingeteilt.');
     redirect('competition/' . $cid);
