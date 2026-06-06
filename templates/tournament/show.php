@@ -218,7 +218,7 @@ ob_start(); ?>
               <i class="bi bi-people me-1"></i><?= $ci['player_count'] ?><?= $c['max_players'] ? '/' . $c['max_players'] : '' ?> Spieler
               &nbsp;·&nbsp;
               <?php if ($c['mode'] === 'ko_only'): ?>
-              Nur KO
+              KO-Runde
               <?php elseif ($c['mode'] === 'double_ko'): ?>
               Doppel-KO
               <?php else: ?>
@@ -292,7 +292,7 @@ ob_start(); ?>
             <label class="form-label">Modus</label>
             <select name="mode" class="form-select" id="comp-mode-select" onchange="toggleGroupSettings()">
               <option value="groups_ko" selected>Gruppenphase + KO</option>
-              <option value="ko_only">Nur KO-Runde</option>
+              <option value="ko_only">KO-Runde</option>
               <option value="double_ko">Doppel-KO (mit Loser-Bracket)</option>
             </select>
           </div>
@@ -310,8 +310,8 @@ ob_start(); ?>
               <label class="form-label">KO-Aufstieg</label>
               <select name="advance_count" class="form-select">
                 <option value="0">Nur Gruppenphase</option>
-                <option value="1" selected>Gruppenerste → KO</option>
-                <option value="2">Erste &amp; Zweite → KO</option>
+                <option value="1">Gruppenerste → KO</option>
+                <option value="2" selected>Erste &amp; Zweite → KO</option>
               </select>
             </div>
           </div>
