@@ -196,12 +196,17 @@ function init_db(): void {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ");
 
-    // Migrations für bestehende Datenbanken
-    $pdo->exec("ALTER TABLE tournament ADD COLUMN IF NOT EXISTS show_skill TINYINT(1) DEFAULT 0");
-    $pdo->exec("ALTER TABLE player          MODIFY COLUMN skill DECIMAL(8,1) DEFAULT 0");
-    $pdo->exec("ALTER TABLE player_skill    MODIFY COLUMN skill DECIMAL(8,1) NOT NULL DEFAULT 0");
-    $pdo->exec("ALTER TABLE competition_player MODIFY COLUMN skill DECIMAL(8,1) DEFAULT 0");
-    $pdo->exec("ALTER TABLE registration    MODIFY COLUMN skill DECIMAL(8,1) DEFAULT 0");
+    // Migrations für bestehende Datenbanken (try-catch: Spalte existiert ggf. schon)
+    $migrations = [
+        "ALTER TABLE tournament ADD COLUMN show_skill TINYINT(1) DEFAULT 0",
+        "ALTER TABLE player          MODIFY COLUMN skill DECIMAL(8,1) DEFAULT 0",
+        "ALTER TABLE player_skill    MODIFY COLUMN skill DECIMAL(8,1) NOT NULL DEFAULT 0",
+        "ALTER TABLE competition_player MODIFY COLUMN skill DECIMAL(8,1) DEFAULT 0",
+        "ALTER TABLE registration    MODIFY COLUMN skill DECIMAL(8,1) DEFAULT 0",
+    ];
+    foreach ($migrations as $sql) {
+        try { $pdo->exec($sql); } catch (\PDOException $e) { /* Spalte/Typ bereits korrekt */ }
+    }
 
     // Admin-Rolle sicherstellen
     db_execute("UPDATE user SET role = 'admin' WHERE email = ?", [ADMIN_EMAIL]);
