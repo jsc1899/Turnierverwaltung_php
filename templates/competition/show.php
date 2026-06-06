@@ -577,6 +577,14 @@ ob_start(); ?>
 
 <?php if ($c['mode'] === 'double_ko' && ($dko_wb || $dko_lb || $dko_gf)): ?>
 <!-- ═══ Doppel-KO-Bracket ════════════════════════════════════════════════════ -->
+<div class="d-flex gap-2 align-items-center mb-3">
+  <a href="<?= url('competition/'.$c['id'].'/pdf/ko') ?>" class="btn btn-outline-danger btn-sm" target="_blank">
+    <i class="bi bi-file-earmark-pdf me-1"></i>KO PDF
+  </a>
+  <a href="<?= url('competition/'.$c['id'].'/pdf/match-cards') ?>" class="btn btn-outline-secondary btn-sm" target="_blank">
+    <i class="bi bi-card-text me-1"></i>Match-Cards
+  </a>
+</div>
 <?php $wb_num_map = []; // wird im WB-Block befüllt; hier vorbelegen für LB-Block
 
 // Helper: render one DKO match card

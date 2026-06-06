@@ -186,6 +186,12 @@ function generate_ko_pdf(int $cid): void {
     if (!$c) { http_response_code(404); exit; }
     $t = db_fetch("SELECT name FROM tournament WHERE id=?", [$c['tournament_id']]);
 
+    if ($c['mode'] === 'double_ko') {
+        require_once __DIR__ . '/double_ko_bracket.php';
+        _generate_dko_bracket_pdf($c, $t);
+        return;
+    }
+
     $matches = db_fetchall(
         "SELECT m.*,
          TRIM(CONCAT(p1.name,IF(COALESCE(p1.firstname,'')!='',CONCAT(' ',p1.firstname),''))) as p1name,
@@ -230,12 +236,139 @@ function generate_ko_pdf(int $cid): void {
     exit;
 }
 
+function _generate_dko_bracket_pdf(array $c, ?array $t): void {
+    $cid = (int)$c['id'];
+    $cap = _dko_cap($cid);
+    $k   = $cap > 0 ? (int)log($cap, 2) : 0;
+    $lb_total = max(0, 2 * ($k - 1));
+
+    $wb_names = [];
+    for ($r = 1; $r <= $k; $r++) {
+        $wb_names[$r] = match ($k - $r) {
+            0 => 'WB Finale', 1 => 'WB Halbfinale', 2 => 'WB Viertelfinale',
+            3 => 'WB Achtelfinale', default => 'WB Runde ' . $r,
+        };
+    }
+    $lb_names = [];
+    for ($r = 1; $r <= $lb_total; $r++) {
+        $lb_names[$r] = $r === $lb_total ? 'LB Finale'
+            : ($r === $lb_total - 1 ? 'LB Halbfinale' : 'LB Runde ' . $r);
+    }
+
+    $matches = db_fetchall(
+        "SELECT m.*,
+         TRIM(CONCAT(p1.name,IF(COALESCE(p1.firstname,'')!='',CONCAT(' ',p1.firstname),''))) as p1name,
+         TRIM(CONCAT(p2.name,IF(COALESCE(p2.firstname,'')!='',CONCAT(' ',p2.firstname),''))) as p2name
+         FROM `match` m
+         LEFT JOIN player p1 ON p1.id=m.player1_id
+         LEFT JOIN player p2 ON p2.id=m.player2_id
+         WHERE m.competition_id=? AND m.group_id IS NULL
+         ORDER BY FIELD(m.bracket,'W','L','GF'), m.ko_round, m.ko_position",
+        [$cid]
+    );
+
+    $wb_rounds = []; $lb_rounds = []; $gf = null;
+    foreach ($matches as $m) {
+        $r = (int)$m['ko_round'];
+        if ($m['bracket'] === 'W')       $wb_rounds[$r][] = $m;
+        elseif ($m['bracket'] === 'L')   $lb_rounds[$r][] = $m;
+        elseif ($m['bracket'] === 'GF')  $gf = $m;
+    }
+    ksort($wb_rounds); ksort($lb_rounds);
+
+    $html  = pdf_css();
+    $html .= '<h2 style="margin-top:0">' . e($c['name']) . ' — Doppel-KO</h2>';
+    if ($t) $html .= '<div class="meta">' . e($t['name']) . '</div>';
+
+    $row_html = function(array $m, int $i) use (&$html): void {
+        $odd = $i % 2 === 1 ? ' class="odd"' : '';
+        $s   = $m['played'] ? $m['score1'] . ' : ' . $m['score2'] : '— : —';
+        $c1  = ($m['played'] && $m['score1'] > $m['score2']) ? ' class="winner"' : '';
+        $c2  = ($m['played'] && $m['score2'] > $m['score1']) ? ' class="winner"' : '';
+        $html .= "<tr$odd><td$c1>" . e($m['p1name'] ?: '—') . "</td>"
+               . "<td style='text-align:center'>$s</td>"
+               . "<td$c2>" . e($m['p2name'] ?: '—') . "</td></tr>";
+    };
+    $tbl_open  = '<table><tr><th>Spieler 1</th><th style="width:20mm;text-align:center">Ergebnis</th><th>Spieler 2</th></tr>';
+    $tbl_close = '</table>';
+
+    if ($wb_rounds) {
+        $html .= '<h3>Winners Bracket</h3>';
+        foreach ($wb_rounds as $r => $rmatches) {
+            $html .= '<h4 style="margin:.5em 0 .3em">' . ($wb_names[$r] ?? 'WB Runde ' . $r) . '</h4>' . $tbl_open;
+            foreach ($rmatches as $i => $m) $row_html($m, $i);
+            $html .= $tbl_close;
+        }
+    }
+    if ($lb_rounds) {
+        $html .= '<h3 style="margin-top:8mm">Losers Bracket</h3>';
+        foreach ($lb_rounds as $r => $rmatches) {
+            $html .= '<h4 style="margin:.5em 0 .3em">' . ($lb_names[$r] ?? 'LB Runde ' . $r) . '</h4>' . $tbl_open;
+            foreach ($rmatches as $i => $m) $row_html($m, $i);
+            $html .= $tbl_close;
+        }
+    }
+    if ($gf) {
+        $html .= '<h3 style="margin-top:8mm">Großes Finale</h3>' . $tbl_open;
+        $row_html($gf, 0);
+        $html .= $tbl_close;
+    }
+
+    $pdf = mpdf();
+    $pdf->WriteHTML($html);
+    $pdf->Output('Doppel-KO.pdf', \Mpdf\Output\Destination::INLINE);
+    exit;
+}
+
 // ── Match-Cards (zum Ausdrucken) ──────────────────────────────────────────────
 
 function generate_match_cards_pdf(int $cid): void {
     $c = db_fetch("SELECT * FROM competition WHERE id=?", [$cid]);
     if (!$c) { http_response_code(404); exit; }
 
+    $is_dko = ($c['mode'] === 'double_ko');
+
+    // Für DKO: sequentielle Spielnummern + Rundenbezeichnungen vorberechnen
+    $dko_seq    = [];
+    $dko_labels = [];
+    if ($is_dko) {
+        require_once __DIR__ . '/double_ko_bracket.php';
+        $cap      = _dko_cap($cid);
+        $k        = $cap > 0 ? (int)log($cap, 2) : 0;
+        $lb_total = max(0, 2 * ($k - 1));
+        $wb_names = [];
+        for ($r = 1; $r <= $k; $r++) {
+            $wb_names[$r] = match ($k - $r) {
+                0 => 'WB Finale', 1 => 'WB Halbfinale', 2 => 'WB Viertelfinale',
+                3 => 'WB Achtelfinale', default => 'WB Runde ' . $r,
+            };
+        }
+        $lb_names = [];
+        for ($r = 1; $r <= $lb_total; $r++) {
+            $lb_names[$r] = $r === $lb_total ? 'LB Finale'
+                : ($r === $lb_total - 1 ? 'LB Halbfinale' : 'LB Runde ' . $r);
+        }
+        $seq = 0;
+        foreach (db_fetchall(
+            "SELECT id, bracket, ko_round FROM `match`
+             WHERE competition_id=? AND group_id IS NULL
+             ORDER BY FIELD(bracket,'W','L','GF'), ko_round, ko_position",
+            [$cid]
+        ) as $am) {
+            $seq++;
+            $dko_seq[$am['id']] = $seq;
+            $r = (int)$am['ko_round'];
+            $dko_labels[$am['id']] = match ($am['bracket']) {
+                'W'  => $wb_names[$r] ?? 'WB Runde ' . $r,
+                'L'  => $lb_names[$r] ?? 'LB Runde ' . $r,
+                default => 'Großes Finale',
+            };
+        }
+    }
+
+    $order   = $is_dko
+        ? "FIELD(m.bracket,'W','L','GF'), m.ko_round, m.ko_position"
+        : "g.name, m.match_order, m.id";
     $matches = db_fetchall(
         "SELECT m.*,
          TRIM(CONCAT(p1.name,IF(COALESCE(p1.firstname,'')!='',CONCAT(' ',p1.firstname),''))) as p1name, p1.club as p1club,
@@ -247,7 +380,7 @@ function generate_match_cards_pdf(int $cid): void {
          LEFT JOIN grp g ON g.id=m.group_id
          WHERE m.competition_id=? AND m.player1_id IS NOT NULL AND m.player2_id IS NOT NULL
            AND m.played=0
-         ORDER BY g.name, m.match_order, m.id",
+         ORDER BY $order",
         [$cid]
     );
 
@@ -276,6 +409,9 @@ function generate_match_cards_pdf(int $cid): void {
             $group_counters[$key] = ($group_counters[$key] ?? 0) + 1;
             $label = e($m['group_name']);
             $game_nr = $group_counters[$key];
+        } elseif ($is_dko && isset($dko_labels[$m['id']])) {
+            $label   = e($dko_labels[$m['id']]);
+            $game_nr = $dko_seq[$m['id']] ?? ((int)$m['ko_position'] + 1);
         } else {
             $ko_round = (int)$m['ko_round'];
             $label = match($ko_round) {
