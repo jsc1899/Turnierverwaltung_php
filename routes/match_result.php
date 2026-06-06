@@ -1,6 +1,28 @@
 <?php
 require_once __DIR__ . '/../lib/ko_bracket.php';
 
+function _is_double_ko(int $cid): bool {
+    $c = db_fetch("SELECT mode FROM competition WHERE id=?", [$cid]);
+    return $c && $c['mode'] === 'double_ko';
+}
+
+function _propagate_result(int $cid, array $m): void {
+    if ($m['group_id'] !== null) {
+        _maybe_set_done($cid);
+        return;
+    }
+    if (_is_double_ko($cid)) {
+        require_once __DIR__ . '/../lib/double_ko_bracket.php';
+        recompute_double_ko($cid);
+        _maybe_set_done_dko($cid);
+    } else {
+        if ((int)$m['ko_round'] !== 3) {
+            recompute_ko_from($cid, (int)$m['ko_round']);
+        }
+        _maybe_set_done($cid);
+    }
+}
+
 function save(array $p): void {
     require_edit();
     csrf_verify();
@@ -23,11 +45,7 @@ function save(array $p): void {
     }
 
     db_execute("UPDATE `match` SET score1=?, score2=?, played=1 WHERE id=?", [$score1, $score2, $mid]);
-
-    if ($m['group_id'] === null && (int)$m['ko_round'] !== 3) {
-        recompute_ko_from((int)$m['competition_id'], (int)$m['ko_round']);
-    }
-    _maybe_set_done((int)$m['competition_id']);
+    _propagate_result((int)$m['competition_id'], $m);
     redirect('competition/' . $m['competition_id']);
 }
 
@@ -60,12 +78,9 @@ function save_bulk(array $p): void {
             continue;
         }
         db_execute("UPDATE `match` SET score1=?, score2=?, played=1 WHERE id=?", [$score1, $score2, $mid]);
-        if ($m['group_id'] === null && (int)$m['ko_round'] !== 3) {
-            recompute_ko_from($cid, (int)$m['ko_round']);
-        }
+        _propagate_result($cid, $m);
     }
 
-    _maybe_set_done($cid);
     if ($errors) flash('warning', implode('<br>', $errors));
     redirect('competition/' . $cid);
 }
@@ -77,8 +92,8 @@ function clear_result(array $p): void {
     $m   = db_fetch("SELECT * FROM `match` WHERE id=?", [$mid]);
     if (!$m) { redirect(''); return; }
     db_execute("UPDATE `match` SET score1=NULL, score2=NULL, played=0 WHERE id=?", [$mid]);
-    if ($m['group_id'] === null && (int)$m['ko_round'] !== 3) {
-        recompute_ko_from((int)$m['competition_id'], (int)$m['ko_round']);
+    if ($m['group_id'] === null) {
+        _propagate_result((int)$m['competition_id'], $m);
     }
     redirect('competition/' . $m['competition_id']);
 }

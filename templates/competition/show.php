@@ -107,7 +107,7 @@ ob_start(); ?>
   <div class="tab-pane fade<?= $settings_active ? ' show active' : '' ?> p-3" id="tab-settings" role="tabpanel">
     <form method="post" action="<?= url('competition/'.$c['id'].'/settings') ?>" class="row g-3 align-items-end">
       <?= csrf_field() ?>
-      <?php if ($c['mode'] !== 'ko_only'): ?>
+      <?php if (!in_array($c['mode'], ['ko_only', 'double_ko'])): ?>
       <?php if ($c['phase'] === 'setup'): ?>
       <div class="col-auto">
         <label class="form-label">Gruppengröße</label>
@@ -151,7 +151,7 @@ ob_start(); ?>
       </div>
     </form>
     <?php if ($c['phase'] === 'setup'): ?>
-    <?php if ($c['mode'] !== 'ko_only' && count($assigned) >= 3): ?>
+    <?php if (!in_array($c['mode'], ['ko_only','double_ko']) && count($assigned) >= 3): ?>
     <hr class="my-3">
     <form method="post" action="<?= url('competition/'.$c['id'].'/draw/groups') ?>">
       <?= csrf_field() ?>
@@ -163,6 +163,13 @@ ob_start(); ?>
     <form method="post" action="<?= url('competition/'.$c['id'].'/draw/ko-direct') ?>">
       <?= csrf_field() ?>
       <button class="btn btn-primary btn-sm"><i class="bi bi-shuffle me-1"></i>KO-Bracket auslosen</button>
+    </form>
+    <?php endif; ?>
+    <?php if ($c['mode'] === 'double_ko' && count($assigned) >= 2): ?>
+    <hr class="my-3">
+    <form method="post" action="<?= url('competition/'.$c['id'].'/draw/ko-direct') ?>">
+      <?= csrf_field() ?>
+      <button class="btn btn-primary btn-sm"><i class="bi bi-shuffle me-1"></i>Doppel-KO auslosen</button>
     </form>
     <?php endif; ?>
     <?php endif; ?>
@@ -583,6 +590,159 @@ ob_start(); ?>
     </div>
     <?php endif; ?>
     <?php endif; ?>
+
+<?php if ($c['mode'] === 'double_ko' && ($dko_wb || $dko_lb || $dko_gf)): ?>
+<!-- ═══ Doppel-KO-Bracket ════════════════════════════════════════════════════ -->
+<?php
+
+// Helper: render one DKO match card
+function _dko_match_card(array $m, string $form_id, bool $editable): string {
+    $p1 = $m['p1name'] ?? null;
+    $p2 = $m['p2name'] ?? null;
+    $has_both = $m['player1_id'] && $m['player2_id'];
+    $p1win = $m['played'] && $m['score1'] > $m['score2'];
+    $p2win = $m['played'] && $m['score2'] > $m['score1'];
+    $o = '<div class="ko-match" style="border:1px solid #dee2e6;border-radius:6px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.07);overflow:hidden;min-width:150px">';
+    foreach ([1,2] as $slot) {
+        $name  = $slot === 1 ? $p1 : $p2;
+        $score = $slot === 1 ? $m['score1'] : $m['score2'];
+        $won   = $slot === 1 ? $p1win : $p2win;
+        $sid   = $slot === 1 ? $m['player1_id'] : $m['player2_id'];
+        $border = $slot === 1 ? 'border-bottom:1px solid #f0f0f0;' : '';
+        $bg = $won ? 'background:#d1fae5;' : '';
+        $fw = $won ? 'font-weight:600;' : '';
+        $o .= "<div class=\"d-flex align-items-center gap-1 px-2\" style=\"min-height:30px;{$border}{$bg}\">";
+        $o .= '<span class="flex-grow-1 small text-truncate" style="max-width:110px;' . $fw . '" title="' . e($name ?? '') . '">'
+            . e($name ?? '—') . '</span>';
+        if ($editable && $has_both && !$m['played']) {
+            $o .= '<input type="number" name="matches[' . $m['id'] . '][score' . $slot . ']" min="0" form="' . e($form_id) . '"'
+                . ' class="form-control form-control-sm text-center" style="width:38px;height:24px;padding:0 2px;font-size:.8rem">';
+        } elseif ($editable && $has_both && $m['played']) {
+            $o .= '<input type="number" name="matches[' . $m['id'] . '][score' . $slot . ']" min="0" form="' . e($form_id) . '"'
+                . ' class="form-control form-control-sm text-center" style="width:38px;height:24px;padding:0 2px;font-size:.8rem"'
+                . ' value="' . (int)$score . '">';
+        } elseif ($m['played'] && $sid) {
+            $o .= '<span class="fw-bold small">' . (int)$score . '</span>';
+        }
+        $o .= '</div>';
+    }
+    if ($editable && $m['played'] && $has_both) {
+        $o .= '<div style="border-top:1px solid #f0f0f0;padding:0 4px 1px;text-align:right">'
+            . '<form method="post" action="' . url('match/' . $m['id'] . '/result/clear') . '" style="display:inline">'
+            . csrf_field()
+            . '<button class="btn btn-link text-danger p-0" style="font-size:.7rem" title="Ergebnis löschen"><i class="bi bi-x-circle"></i></button>'
+            . '</form></div>';
+    }
+    $o .= '</div>';
+    return $o;
+}
+?>
+
+<?php if ($dko_wb): ?>
+<div class="card shadow-sm mb-4">
+  <div class="card-header fw-semibold"><i class="bi bi-trophy me-1 text-warning"></i>Winners Bracket</div>
+  <div class="card-body p-3">
+    <?php if (can_edit()): ?>
+    <form id="dko-wb-form" method="post" action="<?= url('competition/'.$c['id'].'/results/bulk') ?>">
+      <?= csrf_field() ?>
+    </form>
+    <?php endif; ?>
+    <div style="overflow-x:auto">
+      <div class="d-flex gap-4 align-items-start" style="min-width:max-content">
+        <?php foreach ($dko_wb as $rd): ?>
+        <div style="min-width:160px">
+          <div class="fw-semibold small text-muted mb-2 text-nowrap"><?= e($rd['name']) ?></div>
+          <div class="d-flex flex-column gap-2">
+            <?php foreach ($rd['matches'] as $m): ?>
+            <?= _dko_match_card($m, 'dko-wb-form', can_edit()) ?>
+            <?php endforeach; ?>
+          </div>
+        </div>
+        <?php endforeach; ?>
+      </div>
+    </div>
+    <?php if (can_edit()): ?>
+    <div class="mt-3">
+      <button form="dko-wb-form" type="submit" class="btn btn-primary btn-sm">
+        <i class="bi bi-save me-1"></i>WB Ergebnisse speichern
+      </button>
+    </div>
+    <?php endif; ?>
+  </div>
+</div>
+<?php endif; ?>
+
+<?php if ($dko_lb): ?>
+<div class="card shadow-sm mb-4">
+  <div class="card-header fw-semibold"><i class="bi bi-arrow-down-circle me-1 text-danger"></i>Losers Bracket</div>
+  <div class="card-body p-3">
+    <?php if (can_edit()): ?>
+    <form id="dko-lb-form" method="post" action="<?= url('competition/'.$c['id'].'/results/bulk') ?>">
+      <?= csrf_field() ?>
+    </form>
+    <?php endif; ?>
+    <div style="overflow-x:auto">
+      <div class="d-flex gap-4 align-items-start" style="min-width:max-content">
+        <?php foreach ($dko_lb as $rd): ?>
+        <div style="min-width:160px">
+          <div class="fw-semibold small text-muted mb-2 text-nowrap"><?= e($rd['name']) ?></div>
+          <div class="d-flex flex-column gap-2">
+            <?php foreach ($rd['matches'] as $m): ?>
+            <?= _dko_match_card($m, 'dko-lb-form', can_edit()) ?>
+            <?php endforeach; ?>
+          </div>
+        </div>
+        <?php endforeach; ?>
+      </div>
+    </div>
+    <?php if (can_edit()): ?>
+    <div class="mt-3">
+      <button form="dko-lb-form" type="submit" class="btn btn-primary btn-sm">
+        <i class="bi bi-save me-1"></i>LB Ergebnisse speichern
+      </button>
+    </div>
+    <?php endif; ?>
+  </div>
+</div>
+<?php endif; ?>
+
+<?php if ($dko_gf): ?>
+<div class="card shadow-sm mb-4 border-primary">
+  <div class="card-header fw-semibold text-primary"><i class="bi bi-star-fill me-1 text-warning"></i>Großes Finale</div>
+  <div class="card-body p-3">
+    <?php if (can_edit()): ?>
+    <form id="dko-gf-form" method="post" action="<?= url('competition/'.$c['id'].'/results/bulk') ?>">
+      <?= csrf_field() ?>
+    </form>
+    <?php endif; ?>
+    <div class="d-flex gap-3 align-items-start">
+      <div style="min-width:200px;max-width:300px">
+        <?= _dko_match_card($dko_gf, 'dko-gf-form', can_edit()) ?>
+      </div>
+      <div class="small text-muted align-self-center">
+        <div><strong>Spieler 1:</strong> WB-Sieger (ungeschlagen)</div>
+        <div><strong>Spieler 2:</strong> LB-Sieger (1 Niederlage)</div>
+      </div>
+    </div>
+    <?php if (can_edit()): ?>
+    <div class="mt-3">
+      <button form="dko-gf-form" type="submit" class="btn btn-primary btn-sm">
+        <i class="bi bi-save me-1"></i>Finale speichern
+      </button>
+    </div>
+    <?php endif; ?>
+  </div>
+</div>
+<?php endif; ?>
+
+<?php elseif ($c['mode'] === 'double_ko' && $c['phase'] === 'setup'): ?>
+<!-- DKO: noch nicht ausgelost -->
+<div class="alert alert-info">
+  <i class="bi bi-info-circle me-1"></i>
+  Doppel-KO-Bracket noch nicht ausgelost. Spieler hinzufügen und im Tab <strong>Einstellungen</strong> auslosen.
+</div>
+<?php endif; ?>
+
 <?php
 $extra_js = <<<'JS'
 <script>

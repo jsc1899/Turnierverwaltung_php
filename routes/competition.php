@@ -22,7 +22,7 @@ function new_competition(array $p): void {
     $name          = trim(post('name'));
     $group_size    = max(3, min(6, (int)post('group_size', 4)));
     $advance_count = max(0, min(2, (int)post('advance_count', 1)));
-    $mode          = in_array(post('mode'), ['groups_ko', 'ko_only']) ? post('mode') : 'groups_ko';
+    $mode          = in_array(post('mode'), ['groups_ko', 'ko_only', 'double_ko']) ? post('mode') : 'groups_ko';
 
     if (!$name) {
         flash('danger', 'Name erforderlich.');
@@ -87,74 +87,133 @@ function show(array $p): void {
     $ko_rounds         = [];
     $third_place_match = null;
     $places            = [];
+    $dko_wb            = [];
+    $dko_lb            = [];
+    $dko_gf            = null;
 
     if (in_array($c['phase'], ['ko', 'done'], true)) {
-        $ko_matches = db_fetchall(
-            "SELECT m.*,
-             TRIM(CONCAT(p1.name, IF(COALESCE(p1.firstname,'') != '', CONCAT(' ', p1.firstname), ''))) as p1name,
-             TRIM(CONCAT(p2.name, IF(COALESCE(p2.firstname,'') != '', CONCAT(' ', p2.firstname), ''))) as p2name,
-             p1.club as p1club, p2.club as p2club
-             FROM `match` m
-             LEFT JOIN player p1 ON p1.id = m.player1_id
-             LEFT JOIN player p2 ON p2.id = m.player2_id
-             WHERE m.competition_id = ? AND m.group_id IS NULL
-             ORDER BY m.ko_round DESC, m.ko_position",
-            [$cid]
-        );
-        $rounds_dict = [];
-        foreach ($ko_matches as $m) {
-            $rounds_dict[$m['ko_round']][] = $m;
-        }
-        $round_names = [2=>'Finale', 4=>'Halbfinale', 8=>'Viertelfinale',
-                        16=>'Achtelfinale', 32=>'Runde der 32', 64=>'Runde der 64'];
-        krsort($rounds_dict);
-        foreach ($rounds_dict as $r => $rmatches) {
-            if ((int)$r === 3) {
-                $third_place_match = ['round' => 3, 'name' => 'Spiel um Platz 3', 'matches' => $rmatches];
-            } else {
-                $ko_rounds[] = ['round' => (int)$r, 'name' => $round_names[(int)$r] ?? "Runde $r", 'matches' => $rmatches];
+        if ($c['mode'] === 'double_ko') {
+            require_once __DIR__ . '/../lib/double_ko_bracket.php';
+            $cap = _dko_cap($cid);
+            $k   = $cap > 0 ? (int)log($cap, 2) : 0;
+            $lb_total = max(0, 2 * ($k - 1));
+            $wb_names = [];
+            for ($r = 1; $r <= $k; $r++) {
+                $wb_names[$r] = match ($k - $r) {
+                    0 => 'WB Finale', 1 => 'WB Halbfinale', 2 => 'WB Viertelfinale',
+                    3 => 'WB Achtelfinale', default => 'WB Runde ' . $r,
+                };
             }
-        }
-
-        $final = db_fetch(
-            "SELECT m.*,
-             TRIM(CONCAT(p1.name, IF(COALESCE(p1.firstname,'')!='',CONCAT(' ',p1.firstname),''))) as p1name, p1.club as p1club,
-             TRIM(CONCAT(p2.name, IF(COALESCE(p2.firstname,'')!='',CONCAT(' ',p2.firstname),''))) as p2name, p2.club as p2club
-             FROM `match` m
-             LEFT JOIN player p1 ON p1.id=m.player1_id
-             LEFT JOIN player p2 ON p2.id=m.player2_id
-             WHERE m.competition_id=? AND m.ko_round=2 AND m.played=1",
-            [$cid]
-        );
-        if ($final) {
-            if ($final['score1'] > $final['score2']) {
-                $places = [
-                    ['rank'=>1,'name'=>$final['p1name'],'club'=>$final['p1club']],
-                    ['rank'=>2,'name'=>$final['p2name'],'club'=>$final['p2club']],
-                ];
-            } else {
-                $places = [
-                    ['rank'=>1,'name'=>$final['p2name'],'club'=>$final['p2club']],
-                    ['rank'=>2,'name'=>$final['p1name'],'club'=>$final['p1club']],
-                ];
+            $lb_names = [];
+            for ($r = 1; $r <= $lb_total; $r++) {
+                $lb_names[$r] = $r === $lb_total ? 'LB Finale'
+                    : ($r === $lb_total - 1 ? 'LB Halbfinale' : 'LB Runde ' . $r);
             }
-            $third = db_fetch(
+            $sql = "SELECT m.*,
+                    TRIM(CONCAT(p1.name,IF(COALESCE(p1.firstname,'')!='',CONCAT(' ',p1.firstname),''))) as p1name,
+                    TRIM(CONCAT(p2.name,IF(COALESCE(p2.firstname,'')!='',CONCAT(' ',p2.firstname),''))) as p2name,
+                    p1.club as p1club, p2.club as p2club
+                    FROM `match` m
+                    LEFT JOIN player p1 ON p1.id=m.player1_id
+                    LEFT JOIN player p2 ON p2.id=m.player2_id
+                    WHERE m.competition_id=? AND m.group_id IS NULL
+                    ORDER BY bracket, ko_round, ko_position";
+            foreach (db_fetchall($sql, [$cid]) as $m) {
+                if ($m['bracket'] === 'W') {
+                    $r = (int)$m['ko_round'];
+                    $dko_wb[$r]['name']      = $wb_names[$r] ?? 'WB R' . $r;
+                    $dko_wb[$r]['matches'][] = $m;
+                } elseif ($m['bracket'] === 'L') {
+                    $r = (int)$m['ko_round'];
+                    $dko_lb[$r]['name']      = $lb_names[$r] ?? 'LB R' . $r;
+                    $dko_lb[$r]['matches'][] = $m;
+                } elseif ($m['bracket'] === 'GF') {
+                    $dko_gf = $m;
+                }
+            }
+            ksort($dko_wb);
+            ksort($dko_lb);
+            // Places
+            if ($dko_gf && $dko_gf['played']) {
+                if ($dko_gf['score1'] > $dko_gf['score2']) {
+                    $places = [
+                        ['rank'=>1,'name'=>$dko_gf['p1name'],'club'=>$dko_gf['p1club']],
+                        ['rank'=>2,'name'=>$dko_gf['p2name'],'club'=>$dko_gf['p2club']],
+                    ];
+                } else {
+                    $places = [
+                        ['rank'=>1,'name'=>$dko_gf['p2name'],'club'=>$dko_gf['p2club']],
+                        ['rank'=>2,'name'=>$dko_gf['p1name'],'club'=>$dko_gf['p1club']],
+                    ];
+                }
+            }
+        } else {
+            $ko_matches = db_fetchall(
                 "SELECT m.*,
-                 TRIM(CONCAT(p1.name,IF(COALESCE(p1.firstname,'')!='',CONCAT(' ',p1.firstname),''))) as p1name, p1.club as p1club,
-                 TRIM(CONCAT(p2.name,IF(COALESCE(p2.firstname,'')!='',CONCAT(' ',p2.firstname),''))) as p2name, p2.club as p2club
+                 TRIM(CONCAT(p1.name, IF(COALESCE(p1.firstname,'') != '', CONCAT(' ', p1.firstname), ''))) as p1name,
+                 TRIM(CONCAT(p2.name, IF(COALESCE(p2.firstname,'') != '', CONCAT(' ', p2.firstname), ''))) as p2name,
+                 p1.club as p1club, p2.club as p2club
+                 FROM `match` m
+                 LEFT JOIN player p1 ON p1.id = m.player1_id
+                 LEFT JOIN player p2 ON p2.id = m.player2_id
+                 WHERE m.competition_id = ? AND m.group_id IS NULL
+                 ORDER BY m.ko_round DESC, m.ko_position",
+                [$cid]
+            );
+            $rounds_dict = [];
+            foreach ($ko_matches as $m) {
+                $rounds_dict[$m['ko_round']][] = $m;
+            }
+            $round_names = [2=>'Finale', 4=>'Halbfinale', 8=>'Viertelfinale',
+                            16=>'Achtelfinale', 32=>'Runde der 32', 64=>'Runde der 64'];
+            krsort($rounds_dict);
+            foreach ($rounds_dict as $r => $rmatches) {
+                if ((int)$r === 3) {
+                    $third_place_match = ['round' => 3, 'name' => 'Spiel um Platz 3', 'matches' => $rmatches];
+                } else {
+                    $ko_rounds[] = ['round' => (int)$r, 'name' => $round_names[(int)$r] ?? "Runde $r", 'matches' => $rmatches];
+                }
+            }
+            $final = db_fetch(
+                "SELECT m.*,
+                 TRIM(CONCAT(p1.name, IF(COALESCE(p1.firstname,'')!='',CONCAT(' ',p1.firstname),''))) as p1name, p1.club as p1club,
+                 TRIM(CONCAT(p2.name, IF(COALESCE(p2.firstname,'')!='',CONCAT(' ',p2.firstname),''))) as p2name, p2.club as p2club
                  FROM `match` m
                  LEFT JOIN player p1 ON p1.id=m.player1_id
                  LEFT JOIN player p2 ON p2.id=m.player2_id
-                 WHERE m.competition_id=? AND m.ko_round=3 AND m.played=1",
+                 WHERE m.competition_id=? AND m.ko_round=2 AND m.played=1 AND m.bracket IS NULL",
                 [$cid]
             );
-            if ($third) {
-                if ($third['score1'] > $third['score2']) {
-                    $places[] = ['rank'=>3,'name'=>$third['p1name'],'club'=>$third['p1club']];
-                    $places[] = ['rank'=>4,'name'=>$third['p2name'],'club'=>$third['p2club']];
+            if ($final) {
+                if ($final['score1'] > $final['score2']) {
+                    $places = [
+                        ['rank'=>1,'name'=>$final['p1name'],'club'=>$final['p1club']],
+                        ['rank'=>2,'name'=>$final['p2name'],'club'=>$final['p2club']],
+                    ];
                 } else {
-                    $places[] = ['rank'=>3,'name'=>$third['p2name'],'club'=>$third['p2club']];
-                    $places[] = ['rank'=>4,'name'=>$third['p1name'],'club'=>$third['p1club']];
+                    $places = [
+                        ['rank'=>1,'name'=>$final['p2name'],'club'=>$final['p2club']],
+                        ['rank'=>2,'name'=>$final['p1name'],'club'=>$final['p1club']],
+                    ];
+                }
+                $third = db_fetch(
+                    "SELECT m.*,
+                     TRIM(CONCAT(p1.name,IF(COALESCE(p1.firstname,'')!='',CONCAT(' ',p1.firstname),''))) as p1name, p1.club as p1club,
+                     TRIM(CONCAT(p2.name,IF(COALESCE(p2.firstname,'')!='',CONCAT(' ',p2.firstname),''))) as p2name, p2.club as p2club
+                     FROM `match` m
+                     LEFT JOIN player p1 ON p1.id=m.player1_id
+                     LEFT JOIN player p2 ON p2.id=m.player2_id
+                     WHERE m.competition_id=? AND m.ko_round=3 AND m.played=1",
+                    [$cid]
+                );
+                if ($third) {
+                    if ($third['score1'] > $third['score2']) {
+                        $places[] = ['rank'=>3,'name'=>$third['p1name'],'club'=>$third['p1club']];
+                        $places[] = ['rank'=>4,'name'=>$third['p2name'],'club'=>$third['p2club']];
+                    } else {
+                        $places[] = ['rank'=>3,'name'=>$third['p2name'],'club'=>$third['p2club']];
+                        $places[] = ['rank'=>4,'name'=>$third['p1name'],'club'=>$third['p1club']];
+                    }
                 }
             }
         }
@@ -198,6 +257,7 @@ function show(array $p): void {
         'third_place_match' => $third_place_match,
         'unplayed_group' => $unplayed_group, 'places' => $places,
         'ko_no_results' => $ko_no_results, 'group_no_results' => $group_no_results,
+        'dko_wb' => $dko_wb, 'dko_lb' => $dko_lb, 'dko_gf' => $dko_gf,
     ]);
 }
 
@@ -235,7 +295,7 @@ function settings(array $p): void {
 
     $c = db_fetch("SELECT phase, mode FROM competition WHERE id=?", [$cid]);
     if (!$c) { redirect('competition/' . $cid); return; }
-    if ($c['mode'] === 'ko_only') {
+    if (in_array($c['mode'], ['ko_only', 'double_ko'], true)) {
         db_execute("UPDATE competition SET third_place=?, registrations_open=?, max_players=? WHERE id=?",
             [$third_place, $registrations_open, $max_players, $cid]);
     } elseif ($c && $c['phase'] === 'setup') {
@@ -468,7 +528,16 @@ function draw_ko_direct(array $p): void {
     if ($n < 2) { flash('danger', 'Mindestens 2 Spieler erforderlich.'); redirect('competition/'.$cid); return; }
     if ($n > 64) { flash('danger', 'Maximal 64 Spieler erlaubt.'); redirect('competition/'.$cid); return; }
 
-    $players       = array_column($rows, 'player_id');
+    $players = array_column($rows, 'player_id');
+
+    if ($c['mode'] === 'double_ko') {
+        require_once __DIR__ . '/../lib/double_ko_bracket.php';
+        draw_double_ko($cid, $players);
+        flash('success', 'Doppel-KO-Bracket wurde ausgelost!');
+        redirect('competition/' . $cid);
+        return;
+    }
+
     $bracket_total = next_power_of_2($n);
     $num_byes      = $bracket_total - $n;
     $num_matches   = $bracket_total / 2;

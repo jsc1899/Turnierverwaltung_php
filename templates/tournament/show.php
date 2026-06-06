@@ -219,6 +219,8 @@ ob_start(); ?>
               &nbsp;·&nbsp;
               <?php if ($c['mode'] === 'ko_only'): ?>
               Nur KO
+              <?php elseif ($c['mode'] === 'double_ko'): ?>
+              Doppel-KO
               <?php else: ?>
               Gruppen à <?= $c['group_size'] ?>
               &nbsp;·&nbsp;
@@ -291,6 +293,7 @@ ob_start(); ?>
             <select name="mode" class="form-select" id="comp-mode-select" onchange="toggleGroupSettings()">
               <option value="groups_ko" selected>Gruppenphase + KO</option>
               <option value="ko_only">Nur KO-Runde</option>
+              <option value="double_ko">Doppel-KO (mit Loser-Bracket)</option>
             </select>
           </div>
           <div id="group-settings">
@@ -354,7 +357,7 @@ function copyRegLink() {
 function toggleGroupSettings() {
   var sel = document.getElementById('comp-mode-select');
   var grp = document.getElementById('group-settings');
-  if (grp) grp.style.display = (sel && sel.value === 'ko_only') ? 'none' : '';
+  if (grp) grp.style.display = (sel && (sel.value === 'ko_only' || sel.value === 'double_ko')) ? 'none' : '';
 }
 function setSport(btn) {
   var picker = btn.closest('.sport-picker');

@@ -162,7 +162,8 @@ function _maybe_set_done(int $cid): void {
     if (!$c || !in_array($c['phase'], ['group', 'ko'], true)) return;
     if ($c['phase'] === 'ko') {
         $final = db_fetch(
-            "SELECT id FROM `match` WHERE competition_id=? AND ko_round=2 AND played=1", [$cid]
+            "SELECT id FROM `match` WHERE competition_id=? AND ko_round=2 AND played=1 AND bracket IS NULL",
+            [$cid]
         );
         if ($final) db_execute("UPDATE competition SET phase='done' WHERE id=?", [$cid]);
     } elseif ($c['phase'] === 'group') {

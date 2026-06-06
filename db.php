@@ -203,6 +203,7 @@ function init_db(): void {
         "ALTER TABLE player_skill    MODIFY COLUMN skill DECIMAL(8,1) NOT NULL DEFAULT 0",
         "ALTER TABLE competition_player MODIFY COLUMN skill DECIMAL(8,1) DEFAULT 0",
         "ALTER TABLE registration    MODIFY COLUMN skill DECIMAL(8,1) DEFAULT 0",
+        "ALTER TABLE `match` ADD COLUMN bracket VARCHAR(3) NULL DEFAULT NULL",
     ];
     foreach ($migrations as $sql) {
         try { $pdo->exec($sql); } catch (\PDOException $e) { /* Spalte/Typ bereits korrekt */ }
