@@ -324,36 +324,35 @@ function _xlsx_parse(string $path): array {
     $zip = new ZipArchive();
     if ($zip->open($path) !== true) return [];
 
-    // Shared strings
+    // Shared strings — strip default namespace so xpath works without prefix
     $ss = [];
     $ssRaw = $zip->getFromName('xl/sharedStrings.xml');
     if ($ssRaw) {
+        $ssRaw = _xml_strip_ns($ssRaw);
         libxml_use_internal_errors(true);
         $ssXml = simplexml_load_string($ssRaw);
         if ($ssXml) {
-            $ssXml->registerXPathNamespace('s', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
-            foreach ($ssXml->xpath('//s:si') as $si) {
+            foreach ($ssXml->xpath('//si') as $si) {
                 $t = '';
-                foreach ($si->xpath('.//s:t') as $tEl) { $t .= (string)$tEl; }
+                foreach ($si->xpath('.//t') as $tEl) { $t .= (string)$tEl; }
                 $ss[] = $t;
             }
         }
     }
 
-    // Worksheet — try sheet1 or first available
     $sheetRaw = $zip->getFromName('xl/worksheets/sheet1.xml');
     $zip->close();
     if (!$sheetRaw) return [];
 
+    $sheetRaw = _xml_strip_ns($sheetRaw);
     libxml_use_internal_errors(true);
     $sheet = simplexml_load_string($sheetRaw);
     if (!$sheet) return [];
-    $sheet->registerXPathNamespace('s', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
 
     $rows = [];
-    foreach ($sheet->xpath('//s:row') as $rowEl) {
+    foreach ($sheet->xpath('//row') as $rowEl) {
         $rowData = []; $prevCol = -1;
-        foreach ($rowEl->xpath('s:c') as $cell) {
+        foreach ($rowEl->xpath('c') as $cell) {
             preg_match('/^([A-Z]+)/', (string)$cell['r'], $m);
             $col = 0;
             foreach (str_split($m[1]) as $ch) { $col = $col * 26 + (ord($ch) - ord('A') + 1); }
@@ -375,6 +374,11 @@ function _xlsx_parse(string $path): array {
         }
     }
     return $rows;
+}
+
+function _xml_strip_ns(string $xml): string {
+    // Remove default namespace declarations so SimpleXML xpath works without prefix
+    return preg_replace('/\s+xmlns(?::[a-z0-9]+)?="[^"]*"/i', '', $xml) ?? $xml;
 }
 
 function _csv_parse(string $path): array {
