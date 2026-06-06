@@ -83,18 +83,35 @@ ob_start(); ?>
 </div>
 <?php endif; ?>
 
+<?php $settings_active = true; ?>
 <?php if (can_edit()): ?>
-<!-- Einstellungen -->
-<div class="card shadow-sm mb-4">
-  <div class="card-header fw-semibold"><i class="bi bi-gear me-1"></i>Einstellungen</div>
-  <div class="card-body">
+<!-- ═══ Registerkarten: Einstellungen + Spielerliste ════════════════════════ -->
+<ul class="nav nav-tabs mb-0" id="comp-tabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link<?= $settings_active ? ' active' : '' ?>" id="tab-settings-btn"
+            data-bs-toggle="tab" data-bs-target="#tab-settings" type="button" role="tab">
+      <i class="bi bi-gear me-1"></i>Einstellungen
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link<?= !$settings_active ? ' active' : '' ?>" id="tab-players-btn"
+            data-bs-toggle="tab" data-bs-target="#tab-players" type="button" role="tab">
+      <i class="bi bi-people me-1"></i>Spieler (<?= count($assigned) ?>)
+      <?php if ($c['max_players']): ?><span class="text-muted small">/ <?= (int)$c['max_players'] ?></span><?php endif; ?>
+    </button>
+  </li>
+</ul>
+<div class="tab-content border border-top-0 rounded-bottom mb-4">
+
+  <!-- Tab: Einstellungen -->
+  <div class="tab-pane fade<?= $settings_active ? ' show active' : '' ?> p-3" id="tab-settings" role="tabpanel">
     <form method="post" action="<?= url('competition/'.$c['id'].'/settings') ?>" class="row g-3 align-items-end">
       <?= csrf_field() ?>
       <?php if ($c['mode'] !== 'ko_only'): ?>
       <?php if ($c['phase'] === 'setup'): ?>
       <div class="col-auto">
         <label class="form-label">Gruppengröße</label>
-        <select name="group_size" class="form-select">
+        <select name="group_size" class="form-select form-select-sm">
           <?php foreach ([3,4,5,6] as $s): ?>
           <option value="<?= $s ?>"<?= (int)$c['group_size'] === $s ? ' selected' : '' ?>><?= $s ?> Spieler</option>
           <?php endforeach; ?>
@@ -103,7 +120,7 @@ ob_start(); ?>
       <?php endif; ?>
       <div class="col-auto">
         <label class="form-label">KO-Aufstieg</label>
-        <select name="advance_count" class="form-select">
+        <select name="advance_count" class="form-select form-select-sm">
           <option value="0"<?= (int)$c['advance_count'] === 0 ? ' selected' : '' ?>>Nur Gruppenphase</option>
           <option value="1"<?= (int)$c['advance_count'] === 1 ? ' selected' : '' ?>>Gruppenerste → KO</option>
           <option value="2"<?= (int)$c['advance_count'] === 2 ? ' selected' : '' ?>>Erste &amp; Zweite → KO</option>
@@ -126,22 +143,114 @@ ob_start(); ?>
       </div>
       <div class="col-auto">
         <label class="form-label">Max. Spieler</label>
-        <input type="number" name="max_players" class="form-control" style="width:90px"
+        <input type="number" name="max_players" class="form-control form-control-sm" style="width:90px"
                value="<?= (int)$c['max_players'] ?>" min="0">
       </div>
       <div class="col-auto">
         <button class="btn btn-primary btn-sm">Speichern</button>
       </div>
     </form>
+    <?php if ($c['phase'] === 'setup'): ?>
+    <?php if ($c['mode'] !== 'ko_only' && count($assigned) >= 3): ?>
+    <hr class="my-3">
+    <form method="post" action="<?= url('competition/'.$c['id'].'/draw/groups') ?>">
+      <?= csrf_field() ?>
+      <button class="btn btn-primary btn-sm"><i class="bi bi-shuffle me-1"></i>Gruppen auslosen</button>
+    </form>
+    <?php endif; ?>
+    <?php if ($c['mode'] === 'ko_only' && count($assigned) >= 2): ?>
+    <hr class="my-3">
+    <form method="post" action="<?= url('competition/'.$c['id'].'/draw/ko-direct') ?>">
+      <?= csrf_field() ?>
+      <button class="btn btn-primary btn-sm"><i class="bi bi-shuffle me-1"></i>KO-Bracket auslosen</button>
+    </form>
+    <?php endif; ?>
+    <?php endif; ?>
+  </div>
+
+  <!-- Tab: Spielerliste -->
+  <div class="tab-pane fade<?= !$settings_active ? ' show active' : '' ?> p-3" id="tab-players" role="tabpanel">
+    <?php if ($assigned): ?>
+    <div class="btn-group btn-group-sm mb-3">
+      <a href="<?= url('competition/'.$c['id'].'/players/pdf') ?>" class="btn btn-outline-danger" target="_blank" title="PDF">
+        <i class="bi bi-file-earmark-pdf"></i>
+      </a>
+      <a href="<?= url('competition/'.$c['id'].'/players/csv') ?>" class="btn btn-outline-success" title="CSV">
+        <i class="bi bi-filetype-csv"></i>
+      </a>
+    </div>
+    <?php endif; ?>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle mb-0" data-sortable>
+        <thead class="table-light">
+          <tr>
+            <th>Name</th><th>Verein</th><th>Angemeldet</th><th class="text-center">St.</th>
+            <?php if ($c['phase'] === 'setup'): ?><th class="no-sort"></th><?php endif; ?>
+          </tr>
+        </thead>
+        <tbody>
+        <?php foreach ($assigned as $pl): ?>
+        <tr>
+          <td class="small fw-semibold"><?= e(trim($pl['name'] . ' ' . ($pl['firstname'] ?? ''))) ?></td>
+          <td class="small text-muted"><?= e($pl['club'] ?? '') ?></td>
+          <td class="small text-muted text-nowrap" data-sort="<?= e($pl['reg_date'] ?? '') ?>">
+            <?= $pl['reg_date'] ? date('d.m.Y', strtotime($pl['reg_date'])) : '—' ?>
+          </td>
+          <td class="text-center" data-sort="<?= $pl['skill'] ?? 0 ?>">
+            <?php if ($pl['skill']):
+              $sv = ($t['sport'] ?? '') === 'tennis' ? number_format((float)$pl['skill'], 1) : (int)$pl['skill']; ?>
+            <span class="badge bg-secondary"><?= $sv ?></span>
+            <?php endif; ?>
+          </td>
+          <?php if ($c['phase'] === 'setup'): ?>
+          <td>
+            <form method="post" action="<?= url('competition/'.$c['id'].'/player/'.$pl['id'].'/remove') ?>">
+              <?= csrf_field() ?>
+              <button class="btn btn-outline-danger btn-sm py-0 px-1"><i class="bi bi-x"></i></button>
+            </form>
+          </td>
+          <?php endif; ?>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+    <?php if ($c['phase'] === 'setup' && $unassigned): ?>
+    <div class="mt-3 pt-3 border-top">
+      <form method="post" action="<?= url('competition/'.$c['id'].'/player/add') ?>">
+        <?= csrf_field() ?>
+        <select name="player_ids[]" class="form-select form-select-sm mb-2" multiple size="4">
+          <?php foreach ($unassigned as $pl): ?>
+          <option value="<?= $pl['id'] ?>">
+            <?= e(trim($pl['name'] . ' ' . ($pl['firstname'] ?? ''))) ?>
+            <?php if ($pl['club']): ?>(<?= e($pl['club']) ?>)<?php endif; ?>
+            <?php if ($unassigned_skills[$pl['id']] ?? 0): ?>· <?= $unassigned_skills[$pl['id']] ?><?php endif; ?>
+          </option>
+          <?php endforeach; ?>
+        </select>
+        <button class="btn btn-sm btn-primary w-100"><i class="bi bi-plus me-1"></i>Hinzufügen</button>
+      </form>
+    </div>
+    <?php endif; ?>
+  </div>
+
+</div>
+<?php endif; ?>
+
+<!-- KO-Phase auslosen (standalone, Gruppenphase abgeschlossen) -->
+<?php if (can_edit() && $c['phase'] === 'group' && $unplayed_group == 0 && (int)$c['advance_count'] > 0): ?>
+<div class="card shadow-sm mb-4 border-primary">
+  <div class="card-body">
+    <form method="post" action="<?= url('competition/'.$c['id'].'/draw/ko') ?>">
+      <?= csrf_field() ?>
+      <button class="btn btn-primary w-100"><i class="bi bi-trophy me-1"></i>KO-Phase auslosen</button>
+    </form>
   </div>
 </div>
 <?php endif; ?>
 
-<div class="row g-4">
-  <!-- ═══ LINKS: Gruppenphase / KO ══════════════════════════════════════════ -->
-  <div class="col-lg-8">
-
-    <?php if ($groups): ?>
+<!-- ═══ Gruppenphase / KO-Bracket (volle Breite) ════════════════════════════ -->
+<?php if ($groups): ?>
     <!-- Export-Links -->
     <div class="d-flex gap-2 mb-3">
       <a href="<?= url('competition/'.$c['id'].'/pdf/groups') ?>" class="btn btn-outline-danger btn-sm" target="_blank">
@@ -160,7 +269,7 @@ ob_start(); ?>
       </button>
     </div>
     <div id="grp-edit-toolbar" style="display:none"
-         class="d-flex align-items-center gap-2 mb-3 p-2 rounded border border-warning-subtle bg-warning-subtle">
+         class="align-items-center gap-2 mb-3 p-2 rounded border border-warning-subtle bg-warning-subtle">
       <i class="bi bi-info-circle text-warning-emphasis"></i>
       <span class="small">Spieler per Drag &amp; Drop zwischen Gruppen verschieben.</span>
       <div class="ms-auto d-flex gap-2">
@@ -188,7 +297,7 @@ ob_start(); ?>
             </thead>
             <tbody>
               <?php foreach ($standings as $i => $pl): ?>
-              <tr<?= $i === 0 ? ' class="table-success"' : '' ?>>
+              <tr<?= $i < (int)$c['advance_count'] ? ' class="table-success"' : '' ?>>
                 <td><strong><?= $i+1 ?></strong></td>
                 <td>
                   <?= e($pl['name']) ?>
@@ -220,27 +329,27 @@ ob_start(); ?>
           </form>
           <?php foreach ($matches as $m): ?>
           <?php if (!$m['player1_id'] || !$m['player2_id']) continue; ?>
-          <div class="d-flex align-items-center gap-2 mb-2">
-            <span class="flex-grow-1 text-end small"><?= e($m['p1name']) ?></span>
+          <div class="mb-2" style="display:grid;grid-template-columns:1fr 56px 1.2rem 56px 1fr 30px;align-items:center;column-gap:4px">
+            <span class="text-end small text-truncate"><?= e($m['p1name']) ?></span>
             <input type="number" name="matches[<?= $m['id'] ?>][score1]" min="0"
                    form="grp-form-<?= $g['id'] ?>"
-                   class="form-control form-control-sm text-center" style="width:60px"
+                   class="form-control form-control-sm text-center"
                    value="<?= $m['played'] ? $m['score1'] : '' ?>">
-            <span>:</span>
+            <span class="text-center">:</span>
             <input type="number" name="matches[<?= $m['id'] ?>][score2]" min="0"
                    form="grp-form-<?= $g['id'] ?>"
-                   class="form-control form-control-sm text-center" style="width:60px"
+                   class="form-control form-control-sm text-center"
                    value="<?= $m['played'] ? $m['score2'] : '' ?>">
-            <span class="flex-grow-1 small"><?= e($m['p2name']) ?></span>
+            <span class="small text-truncate"><?= e($m['p2name']) ?></span>
             <?php if ($m['played']): ?>
             <form method="post" action="<?= url('match/'.$m['id'].'/result/clear') ?>">
               <?= csrf_field() ?>
-              <button class="btn btn-sm btn-outline-danger" title="Ergebnis löschen">
+              <button class="btn btn-sm btn-outline-danger p-0" style="width:30px;height:30px" title="Ergebnis löschen">
                 <i class="bi bi-x-circle"></i>
               </button>
             </form>
             <?php else: ?>
-            <div style="width:34px"></div>
+            <div></div>
             <?php endif; ?>
           </div>
           <?php endforeach; ?>
@@ -286,7 +395,7 @@ ob_start(); ?>
     </div>
     <?php if (can_edit() && $ko_no_results): ?>
     <div id="ko-edit-toolbar" style="display:none"
-         class="d-flex align-items-center gap-2 mb-3 p-2 rounded border border-warning-subtle bg-warning-subtle">
+         class="align-items-center gap-2 mb-3 p-2 rounded border border-warning-subtle bg-warning-subtle">
       <i class="bi bi-info-circle text-warning-emphasis"></i>
       <span class="small">Spieler im 1. Runde per Drag &amp; Drop tauschen.</span>
       <div class="ms-auto d-flex gap-2">
@@ -471,133 +580,6 @@ ob_start(); ?>
     </div>
     <?php endif; ?>
     <?php endif; ?>
-  </div>
-
-  <!-- ═══ RECHTS: Spielerliste + Aktionen ══════════════════════════════════ -->
-  <div class="col-lg-4">
-
-    <?php if (can_edit() && $c['phase'] === 'setup'): ?>
-    <!-- Gruppenauslosung -->
-    <?php if ($c['mode'] !== 'ko_only' && count($assigned) >= 3): ?>
-    <div class="card shadow-sm mb-3">
-      <div class="card-body">
-        <form method="post" action="<?= url('competition/'.$c['id'].'/draw/groups') ?>">
-          <?= csrf_field() ?>
-          <button class="btn btn-primary w-100">
-            <i class="bi bi-shuffle me-1"></i>Gruppen auslosen
-          </button>
-        </form>
-      </div>
-    </div>
-    <?php endif; ?>
-    <!-- KO-Direktauslosung -->
-    <?php if ($c['mode'] === 'ko_only' && count($assigned) >= 2): ?>
-    <div class="card shadow-sm mb-3">
-      <div class="card-body">
-        <form method="post" action="<?= url('competition/'.$c['id'].'/draw/ko-direct') ?>">
-          <?= csrf_field() ?>
-          <button class="btn btn-primary w-100">
-            <i class="bi bi-shuffle me-1"></i>KO-Bracket auslosen
-          </button>
-        </form>
-      </div>
-    </div>
-    <?php endif; ?>
-    <?php endif; ?>
-
-    <?php if (can_edit() && $c['phase'] === 'group' && $unplayed_group == 0 && (int)$c['advance_count'] > 0): ?>
-    <!-- KO-Auslosung -->
-    <div class="card shadow-sm mb-3 border-primary">
-      <div class="card-body">
-        <form method="post" action="<?= url('competition/'.$c['id'].'/draw/ko') ?>">
-          <?= csrf_field() ?>
-          <button class="btn btn-primary w-100">
-            <i class="bi bi-trophy me-1"></i>KO-Phase auslosen
-          </button>
-        </form>
-      </div>
-    </div>
-    <?php endif; ?>
-
-    <!-- Spielerliste -->
-    <div class="card shadow-sm mb-3">
-      <div class="card-header fw-semibold d-flex align-items-center gap-2">
-        <span><i class="bi bi-people me-1"></i>Spieler (<?= count($assigned) ?>)
-        <?php if ($c['max_players']): ?><span class="text-muted small">/ <?= (int)$c['max_players'] ?></span><?php endif; ?>
-        </span>
-        <?php if ($assigned): ?>
-        <div class="btn-group btn-group-sm ms-auto">
-          <a href="<?= url('competition/'.$c['id'].'/players/pdf') ?>" class="btn btn-outline-danger" target="_blank" title="PDF">
-            <i class="bi bi-file-earmark-pdf"></i>
-          </a>
-          <a href="<?= url('competition/'.$c['id'].'/players/csv') ?>" class="btn btn-outline-success" title="CSV">
-            <i class="bi bi-filetype-csv"></i>
-          </a>
-        </div>
-        <?php endif; ?>
-      </div>
-      <div class="table-responsive">
-        <table class="table table-sm table-hover align-middle mb-0" data-sortable>
-          <thead class="table-light">
-            <tr>
-              <th>Name</th>
-              <th>Verein</th>
-              <th>Angemeldet</th>
-              <th class="text-center">St.</th>
-              <?php if (can_edit() && $c['phase'] === 'setup'): ?><th class="no-sort"></th><?php endif; ?>
-            </tr>
-          </thead>
-          <tbody>
-          <?php foreach ($assigned as $pl): ?>
-          <tr>
-            <td class="small fw-semibold"><?= e(trim($pl['name'] . ' ' . ($pl['firstname'] ?? ''))) ?></td>
-            <td class="small text-muted"><?= e($pl['club'] ?? '') ?></td>
-            <td class="small text-muted text-nowrap"
-                data-sort="<?= e($pl['reg_date'] ?? '') ?>">
-              <?= $pl['reg_date'] ? date('d.m.Y', strtotime($pl['reg_date'])) : '—' ?>
-            </td>
-            <td class="text-center" data-sort="<?= $pl['skill'] ?? 0 ?>">
-              <?php if ($pl['skill']):
-                $sv = ($t['sport'] ?? '') === 'tennis' ? number_format((float)$pl['skill'], 1) : (int)$pl['skill']; ?>
-              <span class="badge bg-secondary"><?= $sv ?></span>
-              <?php endif; ?>
-            </td>
-            <?php if (can_edit() && $c['phase'] === 'setup'): ?>
-            <td>
-              <form method="post" action="<?= url('competition/'.$c['id'].'/player/'.$pl['id'].'/remove') ?>">
-                <?= csrf_field() ?>
-                <button class="btn btn-outline-danger btn-sm py-0 px-1"><i class="bi bi-x"></i></button>
-              </form>
-            </td>
-            <?php endif; ?>
-          </tr>
-          <?php endforeach; ?>
-          </tbody>
-        </table>
-      </div>
-      <?php if (can_edit() && $c['phase'] === 'setup' && $unassigned): ?>
-      <div class="card-footer">
-        <form method="post" action="<?= url('competition/'.$c['id'].'/player/add') ?>">
-          <?= csrf_field() ?>
-          <select name="player_ids[]" class="form-select form-select-sm mb-2" multiple size="4">
-            <?php foreach ($unassigned as $pl): ?>
-            <option value="<?= $pl['id'] ?>">
-              <?= e(trim($pl['name'] . ' ' . ($pl['firstname'] ?? ''))) ?>
-              <?php if ($pl['club']): ?>(<?= e($pl['club']) ?>)<?php endif; ?>
-              <?php if ($unassigned_skills[$pl['id']] ?? 0): ?>· <?= $unassigned_skills[$pl['id']] ?><?php endif; ?>
-            </option>
-            <?php endforeach; ?>
-          </select>
-          <button class="btn btn-sm btn-primary w-100">
-            <i class="bi bi-plus me-1"></i>Hinzufügen
-          </button>
-        </form>
-      </div>
-      <?php endif; ?>
-    </div>
-
-  </div>
-</div>
 <?php
 $extra_js = <<<'JS'
 <script>
@@ -607,7 +589,7 @@ function toggleGrpEdit() {
   grpEditActive = !grpEditActive;
   document.querySelectorAll('.grp-normal-view').forEach(function(el) { el.style.display = grpEditActive ? 'none' : ''; });
   document.querySelectorAll('.grp-edit-panel').forEach(function(el) { el.style.display = grpEditActive ? '' : 'none'; });
-  var tb = document.getElementById('grp-edit-toolbar'); if (tb) tb.style.display = grpEditActive ? '' : 'none';
+  var tb = document.getElementById('grp-edit-toolbar'); if (tb) tb.style.display = grpEditActive ? 'flex' : 'none';
   var btn = document.getElementById('grp-edit-btn');
   if (btn) btn.innerHTML = grpEditActive ? '<i class="bi bi-x me-1"></i>Abbrechen' : '<i class="bi bi-arrows-move me-1"></i>Umstellen';
 }
@@ -638,7 +620,7 @@ function toggleKoEdit() {
     s.style.background = koEditActive && has ? '#fff3cd' : '';
     s.style.cursor = koEditActive && has ? 'grab' : '';
   });
-  var tb = document.getElementById('ko-edit-toolbar'); if (tb) tb.style.display = koEditActive ? '' : 'none';
+  var tb = document.getElementById('ko-edit-toolbar'); if (tb) tb.style.display = koEditActive ? 'flex' : 'none';
   var btn = document.getElementById('ko-edit-btn');
   if (btn) btn.innerHTML = koEditActive ? '<i class="bi bi-x me-1"></i>Abbrechen' : '<i class="bi bi-arrows-move me-1"></i>Umstellen';
 }

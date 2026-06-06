@@ -129,8 +129,14 @@ function confirm_all(array $p): void {
         "SELECT competition_id FROM registration_competition WHERE registration_id=? AND status='pending'", [$rid]
     );
     $added = 0;
+    $full_comps = [];
     foreach ($pending as $row) {
-        if (_add_player_to_competition($pid, $row['competition_id'], (float)$r['skill'])) $added++;
+        if (_add_player_to_competition($pid, $row['competition_id'], (float)$r['skill'])) {
+            $added++;
+        } else {
+            $comp = db_fetch("SELECT name FROM competition WHERE id=?", [$row['competition_id']]);
+            $full_comps[] = $comp ? $comp['name'] : "Bewerb #{$row['competition_id']}";
+        }
         db_execute("UPDATE registration_competition SET status='confirmed' WHERE registration_id=? AND competition_id=?",
             [$rid, $row['competition_id']]);
     }
@@ -142,6 +148,9 @@ function confirm_all(array $p): void {
         send_reg_manage_mail($r['email'], $token);
     }
 
+    if ($full_comps) {
+        flash('warning', 'Spieler nicht zugeordnet (Bewerb voll): ' . implode(', ', $full_comps));
+    }
     flash('success', "Alle Nennungen bestätigt — Spieler $added Bewerb(en) zugeordnet.");
     redirect('tournament/' . $r['tournament_id']);
 }
@@ -170,7 +179,7 @@ function confirm_comp(array $p): void {
     $sport = $t ? ($t['sport'] ?? '') : '';
     $pid   = _find_or_create_player($r);
     _update_player_skill_db($pid, $sport, (float)$r['skill']);
-    _add_player_to_competition($pid, $cid, (float)$r['skill']);
+    $added = _add_player_to_competition($pid, $cid, (float)$r['skill']);
     db_execute("UPDATE registration_competition SET status='confirmed' WHERE registration_id=? AND competition_id=?", [$rid, $cid]);
     _update_registration_status($rid);
 
@@ -183,6 +192,9 @@ function confirm_comp(array $p): void {
         send_reg_manage_mail($r['email'], $token);
     }
 
+    if (!$added) {
+        flash('warning', 'Bewerb ist voll — Spieler wurde nicht zugeordnet.');
+    }
     flash('success', 'Nennung bestätigt.');
     redirect('tournament/' . $r['tournament_id']);
 }
@@ -450,10 +462,14 @@ function change_confirm_all(array $p): void {
 
     if ($rcr['request_type'] === 'withdraw') {
         _process_withdraw($rcr['registration_id'], $rcr['tournament_id']);
+        $full_comps = [];
     } else {
-        _process_change_approve_all($rcr_id, $rcr['registration_id']);
+        $full_comps = _process_change_approve_all($rcr_id, $rcr['registration_id']);
     }
     db_execute("UPDATE registration_change_request SET status='confirmed' WHERE id=?", [$rcr_id]);
+    if ($full_comps) {
+        flash('warning', 'Spieler nicht zugeordnet (Bewerb voll): ' . implode(', ', $full_comps));
+    }
     flash('success', 'Antrag bestätigt.');
     redirect('tournament/' . $rcr['tournament_id']);
 }
@@ -482,8 +498,11 @@ function change_confirm_comp(array $p): void {
         if ($comp_entry['action'] === 'add') {
             $r = db_fetch("SELECT * FROM registration WHERE id=?", [$rcr['rid']]);
             if ($r) {
-                $pid = _find_or_create_player($r);
-                _add_player_to_competition($pid, $cid, (float)$r['skill']);
+                $pid   = _find_or_create_player($r);
+                $added = _add_player_to_competition($pid, $cid, (float)$r['skill']);
+                if (!$added) {
+                    flash('warning', 'Bewerb ist voll — Spieler wurde nicht zugeordnet.');
+                }
             }
         } elseif ($comp_entry['action'] === 'remove') {
             $r = db_fetch("SELECT * FROM registration WHERE id=?", [$rcr['rid']]);
@@ -552,6 +571,15 @@ function _find_player(array $r): ?int {
 }
 
 function _add_player_to_competition(int $pid, int $cid, float $skill = 0): bool {
+    $c   = db_fetch("SELECT max_players FROM competition WHERE id=?", [$cid]);
+    $max = (int)($c['max_players'] ?? 0);
+    if ($max > 0) {
+        $already = db_fetch("SELECT 1 FROM competition_player WHERE competition_id=? AND player_id=?", [$cid, $pid]);
+        if (!$already) {
+            $count = (int)db_fetch("SELECT COUNT(*) as n FROM competition_player WHERE competition_id=?", [$cid])['n'];
+            if ($count >= $max) return false;
+        }
+    }
     try {
         db_execute(
             "INSERT IGNORE INTO competition_player (competition_id, player_id, created_at, skill) VALUES (?,?,NOW(),?)",
@@ -601,16 +629,20 @@ function _process_withdraw(int $rid, int $tid): void {
     }
 }
 
-function _process_change_approve_all(int $rcr_id, int $rid): void {
+function _process_change_approve_all(int $rcr_id, int $rid): array {
     $r = db_fetch("SELECT * FROM registration WHERE id=?", [$rid]);
-    if (!$r) return;
+    if (!$r) return [];
     $entries = db_fetchall(
         "SELECT * FROM registration_change_competition WHERE change_request_id=? AND status='pending'", [$rcr_id]
     );
     $pid = _find_or_create_player($r);
+    $full_comps = [];
     foreach ($entries as $entry) {
         if ($entry['action'] === 'add') {
-            _add_player_to_competition($pid, $entry['competition_id'], (float)$r['skill']);
+            if (!_add_player_to_competition($pid, $entry['competition_id'], (float)$r['skill'])) {
+                $comp = db_fetch("SELECT name FROM competition WHERE id=?", [$entry['competition_id']]);
+                $full_comps[] = $comp ? $comp['name'] : "Bewerb #{$entry['competition_id']}";
+            }
         } elseif ($entry['action'] === 'remove') {
             db_execute("DELETE FROM competition_player WHERE competition_id=? AND player_id=?",
                 [$entry['competition_id'], $pid]);
@@ -618,6 +650,7 @@ function _process_change_approve_all(int $rcr_id, int $rid): void {
         db_execute("UPDATE registration_change_competition SET status='confirmed' WHERE change_request_id=? AND competition_id=?",
             [$rcr_id, $entry['competition_id']]);
     }
+    return $full_comps;
 }
 
 function _maybe_close_change_request(int $rcr_id): void {

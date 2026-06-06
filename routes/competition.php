@@ -263,20 +263,29 @@ function add_player(array $p): void {
     csrf_verify();
     $cid  = (int)$p['id'];
     $pids = $_POST['player_ids'] ?? [];
-    $c    = db_fetch("SELECT tournament_id FROM competition WHERE id=?", [$cid]);
+    $c    = db_fetch("SELECT tournament_id, max_players FROM competition WHERE id=?", [$cid]);
     $sport = '';
+    $max   = (int)($c['max_players'] ?? 0);
     if ($c) {
         $t = db_fetch("SELECT sport FROM tournament WHERE id=?", [$c['tournament_id']]);
         $sport = $t ? ($t['sport'] ?? '') : '';
     }
+    $skipped = 0;
     foreach ((array)$pids as $pid_str) {
         $pid = (int)$pid_str;
         if (!$pid) continue;
+        if ($max > 0) {
+            $count = (int)db_fetch("SELECT COUNT(*) as n FROM competition_player WHERE competition_id=?", [$cid])['n'];
+            if ($count >= $max) { $skipped++; continue; }
+        }
         $skill = _get_player_skill($pid, $sport);
         db_execute(
             "INSERT IGNORE INTO competition_player (competition_id, player_id, created_at, skill) VALUES (?,?,NOW(),?)",
             [$cid, $pid, $skill]
         );
+    }
+    if ($skipped > 0) {
+        flash('warning', "Maximale Spieleranzahl ($max) erreicht — $skipped Spieler nicht hinzugefügt.");
     }
     redirect('competition/' . $cid);
 }
