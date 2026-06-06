@@ -192,13 +192,11 @@ ob_start(); ?>
                 <td><strong><?= $i+1 ?></strong></td>
                 <td>
                   <?= e($pl['name']) ?>
-                  <small class="text-muted">
-                    <?= e($pl['club']) ?>
-                    <?php if (($t['show_skill'] ?? 0) && $pl['skill']):
-                      $sv = ($t['sport'] ?? '') === 'tennis' ? number_format((float)$pl['skill'], 1) : (int)$pl['skill']; ?>
-                    (<?= $sv ?>)
-                    <?php endif; ?>
-                  </small>
+                  <small class="text-muted"><?= e($pl['club']) ?></small>
+                  <?php if (($t['show_skill'] ?? 0) && $pl['skill']):
+                    $sv = ($t['sport'] ?? '') === 'tennis' ? number_format((float)$pl['skill'], 1) : (int)$pl['skill']; ?>
+                  <span class="badge bg-secondary ms-1"><?= $sv ?></span>
+                  <?php endif; ?>
                 </td>
                 <td class="text-center"><?= $pl['played'] ?></td>
                 <td class="text-center"><?= $pl['wins'] ?></td>
