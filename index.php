@@ -117,10 +117,12 @@ $routes = [
     ['POST',     '/competition/{id}/results/bulk',    'match_result', 'save_bulk'],
 
     // Players
-    ['GET',      '/players',               'player', 'index'],
-    ['GET|POST', '/player/new',            'player', 'new_player'],
-    ['GET|POST', '/player/{id}/edit',      'player', 'edit'],
-    ['POST',     '/player/{id}/delete',    'player', 'delete'],
+    ['GET',      '/players',                  'player', 'index'],
+    ['GET',      '/players/import/template',  'player', 'import_template'],
+    ['GET|POST', '/players/import',           'player', 'import_players'],
+    ['GET|POST', '/player/new',               'player', 'new_player'],
+    ['GET|POST', '/player/{id}/edit',         'player', 'edit'],
+    ['POST',     '/player/{id}/delete',       'player', 'delete'],
 
     // PDFs & Exporte
     ['GET', '/tournament/{id}/aushang',           'pdf', 'aushang'],

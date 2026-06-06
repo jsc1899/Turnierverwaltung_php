@@ -7,6 +7,9 @@ ob_start(); ?>
   <button class="btn btn-primary btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#newPlayerModal">
     <i class="bi bi-person-plus me-1"></i>Neuer Spieler
   </button>
+  <a href="<?= url('players/import') ?>" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-file-earmark-arrow-up me-1"></i>Importieren
+  </a>
   <?php endif; ?>
 </div>
 <p class="text-muted small mb-4">Stammdaten und Spielstärken aller registrierten Spieler.</p>
