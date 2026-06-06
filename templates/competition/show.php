@@ -428,16 +428,9 @@ ob_start(); ?>
     ?>
 
     <?php if (can_edit()): ?>
-    <?php foreach ($ko_rounds as $ri => $round): ?>
-    <form id="ko-form-<?= $ri ?>" method="post" action="<?= url('competition/'.$c['id'].'/results/bulk') ?>">
+    <form id="ko-form" method="post" action="<?= url('competition/'.$c['id'].'/results/bulk') ?>">
       <?= csrf_field() ?>
     </form>
-    <?php endforeach; ?>
-    <?php if ($third_place_match): ?>
-    <form id="ko-form-p3" method="post" action="<?= url('competition/'.$c['id'].'/results/bulk') ?>">
-      <?= csrf_field() ?>
-    </form>
-    <?php endif; ?>
     <?php endif; ?>
 
     <div style="overflow-x:auto; margin-bottom:4px">
@@ -473,7 +466,7 @@ ob_start(); ?>
               </span>
               <?php if (can_edit() && $m['player1_id'] && $m['player2_id']): ?>
               <input type="number" name="matches[<?= $m['id'] ?>][score1]" min="0"
-                     form="ko-form-<?= $ri ?>"
+                     form="ko-form"
                      class="form-control form-control-sm text-center" style="width:40px;height:24px;padding:0 2px;font-size:.8rem"
                      value="<?= $m['played'] ? $m['score1'] : '' ?>">
               <?php elseif ($m['played']): ?>
@@ -495,7 +488,7 @@ ob_start(); ?>
               </span>
               <?php if (can_edit() && $m['player1_id'] && $m['player2_id']): ?>
               <input type="number" name="matches[<?= $m['id'] ?>][score2]" min="0"
-                     form="ko-form-<?= $ri ?>"
+                     form="ko-form"
                      class="form-control form-control-sm text-center" style="width:40px;height:24px;padding:0 2px;font-size:.8rem"
                      value="<?= $m['played'] ? $m['score2'] : '' ?>">
               <?php elseif ($m['played']): ?>
@@ -520,16 +513,12 @@ ob_start(); ?>
         <svg id="bracket-svg-<?= $c['id'] ?>" style="position:absolute;top:0;left:0;pointer-events:none;overflow:visible"
              width="<?= $bracket_w ?>" height="<?= $bracket_h ?>"></svg>
       </div>
-      <!-- Speichern-Buttons -->
+      <!-- Speichern-Button -->
       <?php if (can_edit()): ?>
-      <div style="display:flex;width:<?= $bracket_w ?>px;margin-top:6px">
-        <?php foreach ($ko_rounds as $ri => $round): ?>
-        <div style="width:230px;flex-shrink:0;padding:0 8px">
-          <button form="ko-form-<?= $ri ?>" type="submit" class="btn btn-primary btn-sm w-100">
-            <i class="bi bi-save me-1"></i>Speichern
-          </button>
-        </div>
-        <?php endforeach; ?>
+      <div class="mt-2">
+        <button form="ko-form-0" type="submit" class="btn btn-primary btn-sm">
+          <i class="bi bi-save me-1"></i>Ergebnisse speichern
+        </button>
       </div>
       <?php endif; ?>
 
@@ -550,7 +539,7 @@ ob_start(); ?>
               <span class="flex-grow-1 small text-truncate" style="max-width:130px"
                     title="<?= e($m['p1name'] ?? '') ?>"><?= e($m['p1name'] ?? 'Freilos') ?></span>
               <?php if (can_edit() && $m['player1_id'] && $m['player2_id']): ?>
-              <input type="number" name="matches[<?= $m['id'] ?>][score1]" min="0" form="ko-form-p3"
+              <input type="number" name="matches[<?= $m['id'] ?>][score1]" min="0" form="ko-form"
                      class="form-control form-control-sm text-center" style="width:40px;height:24px;padding:0 2px;font-size:.8rem"
                      value="<?= $m['played'] ? $m['score1'] : '' ?>">
               <?php elseif ($m['played']): ?><span class="fw-bold small"><?= $m['score1'] ?></span><?php endif; ?>
@@ -560,7 +549,7 @@ ob_start(); ?>
               <span class="flex-grow-1 small text-truncate" style="max-width:130px"
                     title="<?= e($m['p2name'] ?? '') ?>"><?= e($m['p2name'] ?? 'Freilos') ?></span>
               <?php if (can_edit() && $m['player1_id'] && $m['player2_id']): ?>
-              <input type="number" name="matches[<?= $m['id'] ?>][score2]" min="0" form="ko-form-p3"
+              <input type="number" name="matches[<?= $m['id'] ?>][score2]" min="0" form="ko-form"
                      class="form-control form-control-sm text-center" style="width:40px;height:24px;padding:0 2px;font-size:.8rem"
                      value="<?= $m['played'] ? $m['score2'] : '' ?>">
               <?php elseif ($m['played']): ?><span class="fw-bold small"><?= $m['score2'] ?></span><?php endif; ?>
@@ -577,13 +566,6 @@ ob_start(); ?>
             <?php endif; ?>
           </div>
           <?php endforeach; ?>
-          <?php if (can_edit()): ?>
-          <div class="mt-1">
-            <button form="ko-form-p3" type="submit" class="btn btn-primary btn-sm w-100">
-              <i class="bi bi-save me-1"></i>Speichern
-            </button>
-          </div>
-          <?php endif; ?>
         </div>
       </div>
       <?php endif; ?>
@@ -675,16 +657,11 @@ function _dko_match_card(array $m, string $form_id, bool $editable): string {
         <svg id="dko-wb-svg-<?= $c['id'] ?>" style="position:absolute;top:0;left:0;pointer-events:none;overflow:visible"
              width="<?= $dko_wb_w ?>" height="<?= $dko_wb_h ?>"></svg>
       </div>
-      <!-- Speichern-Buttons (eine Spalte pro Runde) -->
       <?php if (can_edit()): ?>
-      <div style="display:flex;width:<?= $dko_wb_w ?>px;margin-top:6px">
-        <?php foreach ($dko_wb as $rd): ?>
-        <div style="width:230px;flex-shrink:0;padding:0 8px">
-          <button form="dko-wb-form" type="submit" class="btn btn-primary btn-sm w-100">
-            <i class="bi bi-save me-1"></i>Speichern
-          </button>
-        </div>
-        <?php endforeach; ?>
+      <div class="mt-2">
+        <button form="dko-wb-form" type="submit" class="btn btn-primary btn-sm">
+          <i class="bi bi-save me-1"></i>Ergebnisse speichern
+        </button>
       </div>
       <?php endif; ?>
     </div>
