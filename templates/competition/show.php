@@ -445,11 +445,13 @@ ob_start(); ?>
         <?php endforeach; ?>
       </div>
       <!-- Bracket body -->
+      <?php $ko_match_num = 0; ?>
       <div id="ko-bracket-<?= $c['id'] ?>" style="display:flex; position:relative; height:<?= $bracket_h ?>px; width:<?= $bracket_w ?>px">
         <?php foreach ($ko_rounds as $ri => $round): ?>
         <div class="ko-round" style="display:flex;flex-direction:column;justify-content:space-around;width:230px;flex-shrink:0;height:100%;padding:0 8px">
-          <?php foreach ($round['matches'] as $m): ?>
+          <?php foreach ($round['matches'] as $m): $ko_match_num++; ?>
           <div class="ko-match" style="border:1px solid #dee2e6;border-radius:6px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.07);overflow:hidden">
+            <div style="font-size:.65rem;color:#9e9e9e;padding:1px 6px;border-bottom:1px solid #f5f5f5;background:#fafafa">Spiel <?= $ko_match_num ?></div>
             <!-- Spieler 1 -->
             <?php $isFirstRound = ($ri === 0); ?>
             <div class="d-flex align-items-center gap-1 px-2 <?= ($m['played'] && $m['score1'] > $m['score2']) ? 'bg-success-subtle fw-semibold' : '' ?>"
@@ -516,7 +518,7 @@ ob_start(); ?>
       <!-- Speichern-Button -->
       <?php if (can_edit()): ?>
       <div class="mt-2">
-        <button form="ko-form-0" type="submit" class="btn btn-primary btn-sm">
+        <button form="ko-form" type="submit" class="btn btn-primary btn-sm">
           <i class="bi bi-save me-1"></i>Ergebnisse speichern
         </button>
       </div>
@@ -575,27 +577,36 @@ ob_start(); ?>
 
 <?php if ($c['mode'] === 'double_ko' && ($dko_wb || $dko_lb || $dko_gf)): ?>
 <!-- ═══ Doppel-KO-Bracket ════════════════════════════════════════════════════ -->
-<?php
+<?php $wb_num_map = []; // wird im WB-Block befüllt; hier vorbelegen für LB-Block
 
 // Helper: render one DKO match card
-function _dko_match_card(array $m, string $form_id, bool $editable): string {
+function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_num = null, ?string $p1ph = null, ?string $p2ph = null): string {
     $p1 = $m['p1name'] ?? null;
     $p2 = $m['p2name'] ?? null;
     $has_both = $m['player1_id'] && $m['player2_id'];
     $p1win = $m['played'] && $m['score1'] > $m['score2'];
     $p2win = $m['played'] && $m['score2'] > $m['score1'];
     $o = '<div class="ko-match" style="border:1px solid #dee2e6;border-radius:6px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.07);overflow:hidden;min-width:150px">';
+    if ($match_num !== null) {
+        $o .= '<div style="font-size:.65rem;color:#9e9e9e;padding:1px 6px;border-bottom:1px solid #f5f5f5;background:#fafafa">Spiel ' . $match_num . '</div>';
+    }
     foreach ([1,2] as $slot) {
         $name  = $slot === 1 ? $p1 : $p2;
         $score = $slot === 1 ? $m['score1'] : $m['score2'];
         $won   = $slot === 1 ? $p1win : $p2win;
         $sid   = $slot === 1 ? $m['player1_id'] : $m['player2_id'];
+        $ph    = $slot === 1 ? $p1ph : $p2ph;
         $border = $slot === 1 ? 'border-bottom:1px solid #f0f0f0;' : '';
         $bg = $won ? 'background:#d1fae5;' : '';
         $fw = $won ? 'font-weight:600;' : '';
         $o .= "<div class=\"d-flex align-items-center gap-1 px-2\" style=\"min-height:30px;{$border}{$bg}\">";
-        $o .= '<span class="flex-grow-1 small text-truncate" style="max-width:110px;' . $fw . '" title="' . e($name ?? '') . '">'
-            . e($name ?? '—') . '</span>';
+        if ($name) {
+            $o .= '<span class="flex-grow-1 small text-truncate" style="max-width:110px;' . $fw . '" title="' . e($name) . '">' . e($name) . '</span>';
+        } elseif ($ph) {
+            $o .= '<span class="flex-grow-1 text-truncate text-muted fst-italic" style="max-width:110px;font-size:.7rem" title="' . e($ph) . '">' . e($ph) . '</span>';
+        } else {
+            $o .= '<span class="flex-grow-1 small text-muted fst-italic">—</span>';
+        }
         if ($editable && $has_both && !$m['played']) {
             $o .= '<input type="number" name="matches[' . $m['id'] . '][score' . $slot . ']" min="0" form="' . e($form_id) . '"'
                 . ' class="form-control form-control-sm text-center" style="width:38px;height:24px;padding:0 2px;font-size:.8rem">';
@@ -626,6 +637,14 @@ function _dko_match_card(array $m, string $form_id, bool $editable): string {
   $dko_slot_h  = 100;
   $dko_wb_h    = $dko_first_n * $dko_slot_h;
   $dko_wb_w    = count($dko_wb_arr) * 230;
+  // Sequentielle Spielnummern für WB (Runde 1 top→bottom, Runde 2 top→bottom, ...)
+  $wb_num_map = []; $wb_n = 0;
+  foreach ($dko_wb_arr as $rd) {
+      foreach ($rd['matches'] as $wm) {
+          $wb_n++;
+          $wb_num_map[(int)$wm['ko_round']][(int)$wm['ko_position']] = $wb_n;
+      }
+  }
 ?>
 <div class="card shadow-sm mb-4">
   <div class="card-header fw-semibold"><i class="bi bi-trophy me-1 text-warning"></i>Winners Bracket</div>
@@ -650,7 +669,7 @@ function _dko_match_card(array $m, string $form_id, bool $editable): string {
         <?php foreach ($dko_wb as $rd): ?>
         <div class="ko-round" style="display:flex;flex-direction:column;justify-content:space-around;width:230px;flex-shrink:0;height:100%;padding:0 8px">
           <?php foreach ($rd['matches'] as $m): ?>
-          <?= _dko_match_card($m, 'dko-wb-form', can_edit()) ?>
+          <?= _dko_match_card($m, 'dko-wb-form', can_edit(), $wb_num_map[(int)$m['ko_round']][(int)$m['ko_position']] ?? null) ?>
           <?php endforeach; ?>
         </div>
         <?php endforeach; ?>
@@ -669,7 +688,29 @@ function _dko_match_card(array $m, string $form_id, bool $editable): string {
 </div>
 <?php endif; ?>
 
-<?php if ($dko_lb): ?>
+<?php if ($dko_lb):
+  // Platzhalter: LB-Slot → "Verlierer Spiel N" (aus WB)
+  $lb_ph = [];
+  if (!empty($wb_num_map)) {
+      $n_wb1 = $dko_cap >> 1; // Anzahl WB-R1-Matches
+      // LB R1: beide Slots kommen aus WB R1
+      for ($p = 0; $p < ($n_wb1 >> 1); $p++) {
+          $lb_ph[1][$p][1] = 'Verlierer Spiel ' . ($wb_num_map[1][$p] ?? '?');
+          $lb_ph[1][$p][2] = 'Verlierer Spiel ' . ($wb_num_map[1][$n_wb1 - 1 - $p] ?? '?');
+      }
+      // LB gerade Runden: Slot 2 kommt aus WB-Runde (lb_r/2 + 1)
+      for ($lb_r = 2; $lb_r <= $dko_lb_total; $lb_r += 2) {
+          $wb_r       = (int)($lb_r / 2) + 1;
+          $wb_r_count = $dko_cap >> $wb_r;
+          $lb_r_count = count($dko_lb[$lb_r]['matches'] ?? []);
+          for ($p = 0; $p < $lb_r_count; $p++) {
+              $wb_pos = $wb_r_count - 1 - $p;
+              $lb_ph[$lb_r][$p][2] = 'Verlierer Spiel ' . ($wb_num_map[$wb_r][$wb_pos] ?? '?');
+          }
+      }
+  }
+  $lb_match_num = 0;
+?>
 <div class="card shadow-sm mb-4">
   <div class="card-header fw-semibold"><i class="bi bi-arrow-down-circle me-1 text-danger"></i>Losers Bracket</div>
   <div class="card-body p-3">
@@ -680,12 +721,16 @@ function _dko_match_card(array $m, string $form_id, bool $editable): string {
     <?php endif; ?>
     <div style="overflow-x:auto">
       <div class="d-flex gap-4 align-items-start" style="min-width:max-content">
-        <?php foreach ($dko_lb as $rd): ?>
+        <?php foreach ($dko_lb as $lb_rd_key => $rd): ?>
         <div style="min-width:160px">
           <div class="fw-semibold small text-muted mb-2 text-nowrap"><?= e($rd['name']) ?></div>
           <div class="d-flex flex-column gap-2">
-            <?php foreach ($rd['matches'] as $m): ?>
-            <?= _dko_match_card($m, 'dko-lb-form', can_edit()) ?>
+            <?php foreach ($rd['matches'] as $m): $lb_match_num++; $lr = (int)$m['ko_round']; $lp = (int)$m['ko_position']; ?>
+            <?= _dko_match_card(
+                $m, 'dko-lb-form', can_edit(), $lb_match_num,
+                !$m['player1_id'] ? ($lb_ph[$lr][$lp][1] ?? null) : null,
+                !$m['player2_id'] ? ($lb_ph[$lr][$lp][2] ?? null) : null
+            ) ?>
             <?php endforeach; ?>
           </div>
         </div>

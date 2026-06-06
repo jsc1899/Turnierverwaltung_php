@@ -258,6 +258,7 @@ function show(array $p): void {
         'unplayed_group' => $unplayed_group, 'places' => $places,
         'ko_no_results' => $ko_no_results, 'group_no_results' => $group_no_results,
         'dko_wb' => $dko_wb, 'dko_lb' => $dko_lb, 'dko_gf' => $dko_gf,
+        'dko_cap' => $cap ?? 0, 'dko_lb_total' => $lb_total ?? 0,
     ]);
 }
 
