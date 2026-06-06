@@ -251,39 +251,71 @@ function generate_match_cards_pdf(int $cid): void {
         [$cid]
     );
 
+    // 6 Karten pro A4-Seite: Ränder 5mm → Druckbereich 287mm → 6×46mm + 5×2mm = 286mm
     $html = pdf_css() . '<style>
-        .card { border: 0.8pt solid #d1d5db; border-radius: 2mm; padding: 4mm;
-                margin-bottom: 5mm; page-break-inside: avoid; }
-        .card-hdr { background: #eff6ff; padding: 2mm 4mm; margin: -4mm -4mm 3mm;
+        .card { border: 0.8pt solid #d1d5db; border-radius: 2mm; padding: 3mm 5mm;
+                margin-bottom: 2mm; page-break-inside: avoid; min-height: 46mm; }
+        .card-hdr { background: #eff6ff; padding: 1mm 4mm; margin: -3mm -5mm 2mm;
                     border-radius: 2mm 2mm 0 0; font-weight: bold; font-size: 9pt; color: #1e40af; }
-        .players { width: 100%; border-collapse: collapse; margin-bottom: 3mm; }
-        .players td { padding: 2mm 3mm; border: 0.3pt solid #e5e7eb; font-size: 10pt; }
-        .players th { width: 25%; background: #f3f4f6; font-size: 8pt; padding: 1.5mm 3mm; border: 0.3pt solid #e5e7eb; }
-        .sig { margin-top: 7mm; font-size: 8pt; color: #6b7280; }
-        .sig-line { display: inline-block; width: 55mm; border-bottom: 0.5pt solid #9ca3af; margin: 0 2mm; }
+        .players { width: 100%; border-collapse: collapse; margin-bottom: 2mm; }
+        .players td { padding: 1mm 3mm; border: 0.3pt solid #e5e7eb; font-size: 10pt; }
+        .players th { background: #f3f4f6; font-size: 8pt; padding: 0.8mm 3mm;
+                      border: 0.3pt solid #e5e7eb; text-align: left; }
+        .sig-table { width: 100%; border-collapse: collapse; }
+        .sig-write { height: 6mm; border-bottom: 0.6pt solid #374151; }
+        .sig-label { font-size: 8pt; color: #4b5563; padding-top: 0.8mm; }
     </style>';
 
     if (!$matches) {
         $html .= '<p style="color:#6b7280">Keine offenen Spiele gefunden.</p>';
     }
+    $group_counters = [];
     foreach ($matches as $i => $m) {
-        $label = $m['group_name'] ? e($m['group_name']) : 'KO';
+        if ($m['group_name']) {
+            $key = $m['group_name'];
+            $group_counters[$key] = ($group_counters[$key] ?? 0) + 1;
+            $label = e($m['group_name']);
+            $game_nr = $group_counters[$key];
+        } else {
+            $ko_round = (int)$m['ko_round'];
+            $label = match($ko_round) {
+                2  => 'Finale',
+                3  => '3. Platz',
+                4  => 'Halbfinale',
+                8  => 'Viertelfinale',
+                16 => 'Achtelfinale',
+                default => 'KO Runde ' . $ko_round,
+            };
+            $game_nr = (int)$m['ko_position'] + 1;
+        }
         $html .= '<div class="card">';
-        $html .= '<div class="card-hdr">' . e($c['name']) . ' &nbsp;·&nbsp; ' . $label . ' &nbsp;·&nbsp; Spiel ' . ($i+1) . '</div>';
-        $html .= '<table class="players">';
-        $html .= '<tr><th>Spieler 1</th><th>Ergebnis</th><th>Spieler 2</th><th>Sieger</th></tr>';
-        $html .= '<tr>'
+        $html .= '<div class="card-hdr">' . e($c['name']) . ' &nbsp;·&nbsp; ' . $label . ' &nbsp;·&nbsp; Spiel ' . $game_nr . '</div>';
+
+        // Spieler + Ergebnis
+        $html .= '<table class="players">'
+            . '<tr><th style="width:44%">Spieler 1</th><th style="width:12%;text-align:center">Ergebnis</th><th style="width:44%">Spieler 2</th></tr>'
+            . '<tr>'
             . '<td>' . e($m['p1name'] ?? '') . ($m['p1club'] ? '<br><span style="font-size:8pt;color:#6b7280">' . e($m['p1club']) . '</span>' : '') . '</td>'
-            . '<td style="text-align:center;font-size:14pt;letter-spacing:2mm">&nbsp; : &nbsp;</td>'
+            . '<td style="text-align:center;font-size:14pt;letter-spacing:2mm">&nbsp;:&nbsp;</td>'
             . '<td>' . e($m['p2name'] ?? '') . ($m['p2club'] ? '<br><span style="font-size:8pt;color:#6b7280">' . e($m['p2club']) . '</span>' : '') . '</td>'
-            . '<td></td>'
-            . '</tr>';
-        $html .= '</table>';
-        $html .= '<div class="sig">Unterschrift: <span class="sig-line"></span> Spieler 1 &nbsp;&nbsp;&nbsp; <span class="sig-line"></span> Spieler 2</div>';
+            . '</tr></table>';
+
+        // Unterschriften: volle Breite, Linie darüber
+        $html .= '<table class="sig-table">'
+            . '<tr>'
+            . '<td style="width:50%;padding-right:6mm"><div class="sig-write"></div><div class="sig-label">Unterschrift Spieler 1</div></td>'
+            . '<td style="width:50%;padding-left:6mm"><div class="sig-write"></div><div class="sig-label">Unterschrift Spieler 2</div></td>'
+            . '</tr></table>';
+
         $html .= '</div>';
+
+        // Seitenumbruch nach jeder 6. Karte (nicht nach der letzten)
+        if (($i + 1) % 6 === 0 && isset($matches[$i + 1])) {
+            $html .= '<div style="page-break-after:always"></div>';
+        }
     }
 
-    $pdf = mpdf();
+    $pdf = mpdf(['margin_top' => 5, 'margin_bottom' => 5, 'margin_left' => 12, 'margin_right' => 12]);
     $pdf->WriteHTML($html);
     $pdf->Output('Match-Cards.pdf', \Mpdf\Output\Destination::INLINE);
     exit;

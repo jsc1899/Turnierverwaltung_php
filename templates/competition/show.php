@@ -386,6 +386,9 @@ ob_start(); ?>
       <a href="<?= url('competition/'.$c['id'].'/pdf/ko') ?>" class="btn btn-outline-danger btn-sm" target="_blank">
         <i class="bi bi-file-earmark-pdf me-1"></i>KO PDF
       </a>
+      <a href="<?= url('competition/'.$c['id'].'/pdf/match-cards') ?>" class="btn btn-outline-secondary btn-sm" target="_blank">
+        <i class="bi bi-card-text me-1"></i>Match-Cards
+      </a>
       <?php if (can_edit() && $ko_no_results): ?>
       <button type="button" id="ko-edit-btn" onclick="toggleKoEdit()"
               class="btn btn-outline-secondary btn-sm ms-auto">
