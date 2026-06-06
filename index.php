@@ -107,11 +107,14 @@ $routes = [
     ['POST',     '/competition/{id}/reset/groups',           'competition', 'reset_groups'],
     ['POST',     '/competition/{id}/reset/ko',               'competition', 'reset_ko'],
     ['POST',     '/competition/{id}/groups/reorder',         'competition', 'groups_reorder'],
+    ['POST',     '/competition/{id}/ko/reorder',             'competition', 'ko_reorder'],
     ['POST',     '/competition/{id}/seedings/save',          'competition', 'seedings_save'],
 
     // Match results
-    ['POST',     '/match/{id}/result',      'match_result', 'save'],
-    ['POST',     '/ko-match/{id}/result',   'match_result', 'save_ko'],
+    ['POST',     '/match/{id}/result',               'match_result', 'save'],
+    ['POST',     '/match/{id}/result/clear',          'match_result', 'clear_result'],
+    ['POST',     '/ko-match/{id}/result',             'match_result', 'save_ko'],
+    ['POST',     '/competition/{id}/results/bulk',    'match_result', 'save_bulk'],
 
     // Players
     ['GET',      '/players',               'player', 'index'],

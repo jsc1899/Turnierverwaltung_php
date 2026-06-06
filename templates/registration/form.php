@@ -51,7 +51,8 @@
             </div>
             <div class="col-md-4">
               <label class="form-label">Spielstärke <span class="text-danger">*</span></label>
-              <input type="number" name="skill" class="form-control" step="0.5" min="1" required
+              <input type="number" name="skill" class="form-control"
+                     step="<?= ($t['sport'] ?? '') === 'tennis' ? '0.1' : '1' ?>" min="0.1" required
                      value="<?= e(post('skill')) ?>" placeholder="z.B. 700">
             </div>
           </div>

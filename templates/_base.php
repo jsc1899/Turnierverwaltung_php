@@ -71,6 +71,51 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+(function() {
+  function cellVal(row, idx) {
+    var c = row.cells[idx];
+    return c ? (c.dataset.sort || c.textContent).trim() : '';
+  }
+  function parseDate(s) {
+    var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return +new Date(+m[1], +m[2]-1, +m[3]);
+    m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})/);
+    if (m) return +new Date(+m[3], +m[2]-1, +m[1]);
+    return null;
+  }
+  function sortTable(table, idx, asc) {
+    var tbody = table.querySelector('tbody');
+    var rows = Array.from(tbody.querySelectorAll('tr'));
+    rows.sort(function(a, b) {
+      var ca = cellVal(a, idx), cb = cellVal(b, idx);
+      var da = parseDate(ca), db = parseDate(cb);
+      if (da !== null && db !== null) return asc ? da - db : db - da;
+      var na = parseFloat(ca.replace(',', '.')), nb = parseFloat(cb.replace(',', '.'));
+      if (!isNaN(na) && !isNaN(nb)) return asc ? na - nb : nb - na;
+      return asc ? ca.localeCompare(cb, 'de') : cb.localeCompare(ca, 'de');
+    });
+    rows.forEach(function(r) { tbody.appendChild(r); });
+  }
+  document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('table[data-sortable] thead th:not(.no-sort)').forEach(function(th) {
+      var table = th.closest('table');
+      var idx   = Array.from(th.parentElement.children).indexOf(th);
+      var icon  = document.createElement('span');
+      icon.className = 'ms-1 text-muted'; icon.style.fontSize = '.7em';
+      th.appendChild(icon);
+      th.style.cursor = 'pointer'; th.style.userSelect = 'none';
+      var asc = true;
+      th.addEventListener('click', function() {
+        table.querySelectorAll('thead th span.ms-1').forEach(function(s) { s.textContent = ''; });
+        sortTable(table, idx, asc);
+        icon.textContent = asc ? '▲' : '▼';
+        asc = !asc;
+      });
+    });
+  });
+})();
+</script>
 <?php if (!empty($extra_js)): ?>
 <?= $extra_js ?>
 <?php endif; ?>

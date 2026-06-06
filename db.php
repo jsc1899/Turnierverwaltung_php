@@ -52,7 +52,8 @@ function init_db(): void {
             banner_image        VARCHAR(500) DEFAULT '',
             organizer           VARCHAR(255) DEFAULT '',
             sport               VARCHAR(100) DEFAULT '',
-            info_url            VARCHAR(500) DEFAULT ''
+            info_url            VARCHAR(500) DEFAULT '',
+            show_skill          TINYINT(1) DEFAULT 0
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
         CREATE TABLE IF NOT EXISTS competition (
@@ -75,7 +76,7 @@ function init_db(): void {
             firstname VARCHAR(255) DEFAULT '',
             club      VARCHAR(255) DEFAULT '',
             gender    VARCHAR(20) DEFAULT '',
-            skill     INT DEFAULT 0,
+            skill     DECIMAL(8,1) DEFAULT 0,
             pass_nr   VARCHAR(100) DEFAULT '',
             email     VARCHAR(255) DEFAULT ''
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -83,7 +84,7 @@ function init_db(): void {
         CREATE TABLE IF NOT EXISTS player_skill (
             player_id  INT NOT NULL,
             sport      VARCHAR(100) NOT NULL DEFAULT '',
-            skill      INT NOT NULL DEFAULT 0,
+            skill      DECIMAL(8,1) NOT NULL DEFAULT 0,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (player_id, sport),
             FOREIGN KEY (player_id) REFERENCES player(id) ON DELETE CASCADE
@@ -92,7 +93,7 @@ function init_db(): void {
         CREATE TABLE IF NOT EXISTS competition_player (
             competition_id INT NOT NULL,
             player_id      INT NOT NULL,
-            skill          INT DEFAULT 0,
+            skill          DECIMAL(8,1) DEFAULT 0,
             created_at     VARCHAR(50) DEFAULT '',
             PRIMARY KEY (competition_id, player_id),
             FOREIGN KEY (competition_id) REFERENCES competition(id) ON DELETE CASCADE,
@@ -140,7 +141,7 @@ function init_db(): void {
             club          VARCHAR(255) DEFAULT '',
             gender        VARCHAR(20) DEFAULT '',
             pass_nr       VARCHAR(100) DEFAULT '',
-            skill         INT DEFAULT 0,
+            skill         DECIMAL(8,1) DEFAULT 0,
             email         VARCHAR(255) DEFAULT '',
             status        VARCHAR(20) DEFAULT 'pending',
             created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -194,6 +195,13 @@ function init_db(): void {
             PRIMARY KEY (ip, action)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ");
+
+    // Migrations für bestehende Datenbanken
+    $pdo->exec("ALTER TABLE tournament ADD COLUMN IF NOT EXISTS show_skill TINYINT(1) DEFAULT 0");
+    $pdo->exec("ALTER TABLE player          MODIFY COLUMN skill DECIMAL(8,1) DEFAULT 0");
+    $pdo->exec("ALTER TABLE player_skill    MODIFY COLUMN skill DECIMAL(8,1) NOT NULL DEFAULT 0");
+    $pdo->exec("ALTER TABLE competition_player MODIFY COLUMN skill DECIMAL(8,1) DEFAULT 0");
+    $pdo->exec("ALTER TABLE registration    MODIFY COLUMN skill DECIMAL(8,1) DEFAULT 0");
 
     // Admin-Rolle sicherstellen
     db_execute("UPDATE user SET role = 'admin' WHERE email = ?", [ADMIN_EMAIL]);

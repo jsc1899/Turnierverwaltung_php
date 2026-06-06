@@ -21,6 +21,7 @@ function new_tournament(array $p): void {
     $event_date       = trim(post('event_date'));
     $max_competitions = max(1, min(5, (int)post('max_competitions', 1)));
     $is_public        = post('is_public') === '1' ? 1 : 0;
+    $show_skill       = post('show_skill') === '1' ? 1 : 0;
     [$registrations_open, $is_done] = _tournament_status(post('tournament_status', 'open'));
 
     if (!$name) {
@@ -29,8 +30,8 @@ function new_tournament(array $p): void {
         return;
     }
     $tid = db_insert(
-        "INSERT INTO tournament (name, organizer, sport, event_date, max_competitions, registrations_open, is_public, is_done, info_url) VALUES (?,?,?,?,?,?,?,?,?)",
-        [$name, $organizer, $sport, $event_date, $max_competitions, $registrations_open, $is_public, $is_done, $info_url]
+        "INSERT INTO tournament (name, organizer, sport, event_date, max_competitions, registrations_open, is_public, is_done, info_url, show_skill) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        [$name, $organizer, $sport, $event_date, $max_competitions, $registrations_open, $is_public, $is_done, $info_url, $show_skill]
     );
     _save_tournament_files((int)$tid);
     redirect('tournament/' . $tid);
@@ -146,6 +147,7 @@ function settings(array $p): void {
     $event_date       = trim(post('event_date'));
     $max_competitions = max(1, min(5, (int)post('max_competitions', 1)));
     $is_public        = post('is_public') === '1' ? 1 : 0;
+    $show_skill       = post('show_skill') === '1' ? 1 : 0;
     [$registrations_open, $is_done] = _tournament_status(post('tournament_status', 'open'));
 
     $ausschreibung = $t['ausschreibung'] ?? '';
@@ -168,10 +170,10 @@ function settings(array $p): void {
 
     db_execute(
         "UPDATE tournament SET name=?, organizer=?, sport=?, event_date=?, max_competitions=?,
-         ausschreibung=?, registrations_open=?, is_public=?, is_done=?, banner_image=?, info_url=?
+         ausschreibung=?, registrations_open=?, is_public=?, is_done=?, banner_image=?, info_url=?, show_skill=?
          WHERE id=?",
         [$name, $organizer, $sport, $event_date, $max_competitions,
-         $ausschreibung, $registrations_open, $is_public, $is_done, $banner_image, $info_url,
+         $ausschreibung, $registrations_open, $is_public, $is_done, $banner_image, $info_url, $show_skill,
          $p['id']]
     );
     flash('success', 'Einstellungen gespeichert.');

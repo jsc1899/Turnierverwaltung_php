@@ -193,10 +193,19 @@ function show(array $p): void {
         }
     }
 
+    $group_no_results = false;
+    if ($c['phase'] === 'group') {
+        $played_group = db_fetch(
+            "SELECT COUNT(*) as n FROM `match` WHERE competition_id=? AND group_id IS NOT NULL AND played=1",
+            [$cid]
+        )['n'];
+        $group_no_results = ($played_group == 0);
+    }
     $ko_no_results = false;
     if ($c['phase'] === 'ko') {
         $played_ko = db_fetch(
-            "SELECT COUNT(*) as n FROM `match` WHERE competition_id=? AND group_id IS NULL AND ko_round != 3 AND played=1",
+            "SELECT COUNT(*) as n FROM `match` WHERE competition_id=? AND group_id IS NULL AND ko_round != 3
+             AND player1_id IS NOT NULL AND player2_id IS NOT NULL AND played=1",
             [$cid]
         )['n'];
         $ko_no_results = ($played_ko == 0);
@@ -210,7 +219,7 @@ function show(array $p): void {
         'groups' => $groups, 'ko_rounds' => $ko_rounds,
         'third_place_match' => $third_place_match,
         'unplayed_group' => $unplayed_group, 'places' => $places,
-        'ko_no_results' => $ko_no_results,
+        'ko_no_results' => $ko_no_results, 'group_no_results' => $group_no_results,
     ]);
 }
 
@@ -390,33 +399,52 @@ function draw_ko(array $p): void {
             $seconds[] = ['gid' => $g['id'], 'pid' => $st[1]['id']];
     }
 
-    if ($advance_count >= 2 && count($firsts) === count($seconds)) {
-        shuffle($firsts); shuffle($seconds);
-        $avail = $seconds; $pairs = [];
-        foreach ($firsts as $f) {
-            $placed = false;
-            foreach ($avail as $i => $s) {
-                if ($s['gid'] !== $f['gid']) {
-                    $pairs[] = [$f['pid'], $s['pid']];
-                    array_splice($avail, $i, 1);
-                    $placed = true; break;
-                }
-            }
-            if (!$placed && $avail) { $pairs[] = [$f['pid'], array_shift($avail)['pid']]; }
-        }
-        $bracket = [];
-        foreach ($pairs as [$p1, $p2]) { $bracket[] = $p1; $bracket[] = $p2; }
-    } else {
-        $advancing = array_merge(array_column($firsts, 'pid'), array_column($seconds, 'pid'));
-        shuffle($advancing);
-        $bracket = $advancing;
-    }
+    // Winners = top seeds (get byes), runners-up = lower seeds
+    shuffle($firsts);
+    if ($seconds) shuffle($seconds);
 
-    $real = array_filter($bracket);
-    if (count($real) < 2) {
+    $seedings = array_merge(array_column($firsts, 'pid'), array_column($seconds, 'pid'));
+    $gids     = array_merge(array_column($firsts, 'gid'), array_column($seconds, 'gid'));
+    $n        = count($seedings);
+
+    if ($n < 2) {
         flash('danger', 'Nicht genug Spieler für KO-Phase.');
         redirect('competition/' . $cid);
         return;
+    }
+
+    $bracket_total = next_power_of_2($n);
+    $num_byes      = $bracket_total - $n;
+    $num_matches   = $bracket_total / 2;
+    $match_order   = seeded_match_order($num_matches);
+    $bracket       = array_fill(0, $bracket_total, null);
+
+    // Top seeds get byes (placed as player1 with no opponent → auto-advanced)
+    for ($i = 0; $i < $num_byes; $i++) {
+        $pos = $match_order[$i];
+        $bracket[$pos * 2] = $seedings[$i];
+    }
+
+    // Remaining seeds fill real first-round matches (lowest vs highest), cross-group preferred
+    $remaining      = array_slice($seedings, $num_byes);
+    $remaining_gids = array_slice($gids, $num_byes);
+    $real_positions = array_slice($match_order, $num_byes);
+    $lo = 0; $hi = count($remaining) - 1;
+    foreach ($real_positions as $pos) {
+        if ($lo > $hi) break;
+        $bracket[$pos * 2] = $remaining[$lo];
+        if ($lo < $hi) {
+            $best = $hi;
+            for ($j = $hi; $j > $lo; $j--) {
+                if ($remaining_gids[$j] !== $remaining_gids[$lo]) { $best = $j; break; }
+            }
+            if ($best !== $hi) {
+                [$remaining[$best], $remaining[$hi]]         = [$remaining[$hi], $remaining[$best]];
+                [$remaining_gids[$best], $remaining_gids[$hi]] = [$remaining_gids[$hi], $remaining_gids[$best]];
+            }
+            $bracket[$pos * 2 + 1] = $remaining[$hi];
+        }
+        $lo++; $hi--;
     }
 
     _build_ko_bracket($cid, $bracket, (bool)$c['third_place']);
@@ -494,17 +522,38 @@ function reset_ko(array $p): void {
 function groups_reorder(array $p): void {
     require_edit();
     csrf_verify();
-    $cid    = (int)$p['id'];
-    $groups = $_POST['groups'] ?? [];
-    // groups = array of {group_id: [player_id, ...]}
-    // Delete existing group assignments and matches, then rebuild
-    db_execute("DELETE FROM `match` WHERE competition_id=? AND group_id IS NOT NULL", [$cid]);
-    db_execute("DELETE FROM group_player gp WHERE gp.group_id IN (SELECT id FROM grp WHERE competition_id=?)", [$cid]);
+    $cid = (int)$p['id'];
 
-    foreach ($groups as $gid_str => $pids) {
+    $played = db_fetch(
+        "SELECT COUNT(*) as n FROM `match` WHERE competition_id=? AND group_id IS NOT NULL AND played=1",
+        [$cid]
+    )['n'];
+    if ($played > 0) {
+        flash('warning', 'Umstellen nicht möglich: bereits Ergebnisse eingetragen.');
+        redirect('competition/' . $cid);
+        return;
+    }
+
+    $valid_gids = array_column(db_fetchall("SELECT id FROM grp WHERE competition_id=?", [$cid]), 'id');
+    $valid_pids = array_column(
+        db_fetchall("SELECT player_id FROM competition_player WHERE competition_id=?", [$cid]),
+        'player_id'
+    );
+
+    db_execute("DELETE FROM `match` WHERE competition_id=? AND group_id IS NOT NULL", [$cid]);
+    if ($valid_gids) {
+        $ph = implode(',', array_fill(0, count($valid_gids), '?'));
+        db_execute("DELETE FROM group_player WHERE group_id IN ($ph)", $valid_gids);
+    }
+
+    $groups_post = $_POST['groups'] ?? [];
+    foreach ($groups_post as $gid_str => $pids) {
         $gid = (int)$gid_str;
+        if (!in_array($gid, $valid_gids)) continue;
         foreach ((array)$pids as $pid) {
-            db_execute("INSERT IGNORE INTO group_player (group_id, player_id) VALUES (?,?)", [$gid, (int)$pid]);
+            $pid = (int)$pid;
+            if (!in_array($pid, $valid_pids)) continue;
+            db_execute("INSERT IGNORE INTO group_player (group_id, player_id) VALUES (?,?)", [$gid, $pid]);
         }
         $pids_arr = array_column(
             db_fetchall("SELECT player_id FROM group_player WHERE group_id=?", [$gid]),
@@ -518,9 +567,44 @@ function groups_reorder(array $p): void {
             );
         }
     }
-    header('Content-Type: application/json');
-    echo json_encode(['ok' => true]);
-    exit;
+    flash('success', 'Gruppen neu eingeteilt.');
+    redirect('competition/' . $cid);
+}
+
+function ko_reorder(array $p): void {
+    require_edit();
+    csrf_verify();
+    $cid = (int)$p['id'];
+
+    $played = db_fetch(
+        "SELECT COUNT(*) as n FROM `match` WHERE competition_id=? AND group_id IS NULL AND ko_round != 3
+         AND player1_id IS NOT NULL AND player2_id IS NOT NULL AND played=1",
+        [$cid]
+    )['n'];
+    if ($played > 0) {
+        flash('warning', 'Umstellen nicht möglich: bereits Ergebnisse eingetragen.');
+        redirect('competition/' . $cid);
+        return;
+    }
+
+    $valid_pids = array_column(
+        db_fetchall("SELECT player_id FROM competition_player WHERE competition_id=?", [$cid]),
+        'player_id'
+    );
+
+    $raw = array_map('intval', (array)($_POST['bracket'] ?? []));
+    $bracket = array_map(fn($v) => ($v > 0 && in_array($v, $valid_pids)) ? $v : null, $raw);
+
+    if (count(array_filter($bracket)) < 2) {
+        flash('danger', 'Ungültige Bracket-Daten.');
+        redirect('competition/' . $cid);
+        return;
+    }
+
+    $c = db_fetch("SELECT third_place FROM competition WHERE id=?", [$cid]);
+    _build_ko_bracket($cid, $bracket, (bool)($c['third_place'] ?? false));
+    flash('success', 'KO-Bracket aktualisiert.');
+    redirect('competition/' . $cid);
 }
 
 function seedings_save(array $p): void {

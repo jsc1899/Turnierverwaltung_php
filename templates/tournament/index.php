@@ -4,10 +4,15 @@ $sport_labels = ['tischtennis'=>'Tischtennis','tennis'=>'Tennis','fussball'=>'Fu
 
 ob_start(); ?>
 <div class="row g-4">
-  <div class="col-lg-8">
+  <div class="col-12">
     <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
       <h2 class="mb-0"><i class="bi bi-trophy me-2"></i>Turniere</h2>
       <div class="ms-auto d-flex flex-wrap gap-2 align-items-center">
+        <?php if (can_edit()): ?>
+        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newTournamentModal">
+          <i class="bi bi-plus-circle me-1"></i>Neues Turnier
+        </button>
+        <?php endif; ?>
         <div class="btn-group btn-group-sm" id="status-filter">
           <button class="btn btn-outline-secondary active" data-filter="all">Alle</button>
           <button class="btn btn-outline-secondary" data-filter="open">Offen</button>
@@ -125,14 +130,18 @@ ob_start(); ?>
     <div class="text-muted">Noch keine Turniere angelegt.</div>
     <?php endif; ?>
   </div>
+</div>
 
-  <?php if (can_edit()): ?>
-  <div class="col-lg-4">
-    <div class="card shadow-sm">
-      <div class="card-header fw-semibold">
-        <i class="bi bi-plus-circle me-1"></i>Neues Turnier
+<?php if (can_edit()): ?>
+<!-- Neues Turnier Modal -->
+<div class="modal fade" id="newTournamentModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-plus-circle me-1"></i>Neues Turnier</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <div class="card-body">
+      <div class="modal-body">
         <form method="post" action="<?= url('tournament/new') ?>" enctype="multipart/form-data">
           <?= csrf_field() ?>
           <div class="mb-3">
@@ -181,6 +190,12 @@ ob_start(); ?>
             </div>
           </div>
           <div class="mb-3">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="show_skill" id="new_show_skill" value="1">
+              <label class="form-check-label" for="new_show_skill">Spielstärke in Tabellen anzeigen</label>
+            </div>
+          </div>
+          <div class="mb-3">
             <label class="form-label">Ausschreibung (PDF)</label>
             <input type="file" name="ausschreibung_file" class="form-control" accept=".pdf">
           </div>
@@ -188,15 +203,18 @@ ob_start(); ?>
             <label class="form-label">Turnierbild (JPG, PNG, GIF, WebP)</label>
             <input type="file" name="banner_file" class="form-control" accept=".jpg,.jpeg,.png,.gif,.webp">
           </div>
-          <button type="submit" class="btn btn-primary w-100">
-            <i class="bi bi-plus me-1"></i>Erstellen
-          </button>
+          <div class="d-flex gap-2 justify-content-end">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-plus me-1"></i>Erstellen
+            </button>
+          </div>
         </form>
       </div>
     </div>
   </div>
-  <?php endif; ?>
 </div>
+<?php endif; ?>
 
 <!-- Image Modal -->
 <div class="modal fade" id="imageModal" tabindex="-1">

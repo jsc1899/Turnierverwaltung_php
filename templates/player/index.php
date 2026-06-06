@@ -1,11 +1,18 @@
 <?php
 $sport_icons = ['tischtennis'=>'🏓','tennis'=>'🎾','fussball'=>'⚽','cornhole'=>null];
 ob_start(); ?>
-<h2 class="mb-1"><i class="bi bi-person-lines-fill me-2"></i>Spielerregister</h2>
+<div class="d-flex align-items-center mb-1 gap-2">
+  <h2 class="mb-0"><i class="bi bi-person-lines-fill me-2"></i>Spielerregister</h2>
+  <?php if (can_edit()): ?>
+  <button class="btn btn-primary btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#newPlayerModal">
+    <i class="bi bi-person-plus me-1"></i>Neuer Spieler
+  </button>
+  <?php endif; ?>
+</div>
 <p class="text-muted small mb-4">Stammdaten und Spielstärken aller registrierten Spieler.</p>
 
 <div class="row g-4">
-  <div class="col-xl-9">
+  <div class="col-12">
     <?php if ($players): ?>
     <div class="d-flex align-items-center mb-2">
       <span class="text-muted small"><?= count($players) ?> Einträge</span>
@@ -19,11 +26,11 @@ ob_start(); ?>
       </div>
     </div>
     <div class="table-responsive">
-      <table class="table table-hover align-middle">
+      <table class="table table-hover align-middle" data-sortable>
         <thead class="table-light">
           <tr>
             <th>Nachname</th><th>Vorname</th><th class="text-center">G</th>
-            <th>Verein</th><th>Pass-Nr.</th><th>E-Mail</th><th>Spielstärke</th><th></th>
+            <th>Verein</th><th>Pass-Nr.</th><th>E-Mail</th><th>Spielstärke</th><th class="no-sort"></th>
           </tr>
         </thead>
         <tbody>
@@ -39,14 +46,15 @@ ob_start(); ?>
             <td><?= e($p['club'] ?? '') ?></td>
             <td><span class="text-muted"><?= e($p['pass_nr'] ?? '') ?></span></td>
             <td><span class="text-muted small"><?= e($p['email'] ?? '') ?></span></td>
-            <td>
+            <td data-sort="<?= array_sum($ps) ?>">
               <?php foreach ($sports_list as [$sk, $sl, $se]):
-                if (!isset($ps[$sk])) continue; ?>
+                if (!isset($ps[$sk])) continue;
+                $sv = $sk === 'tennis' ? number_format((float)$ps[$sk], 1) : (int)$ps[$sk]; ?>
               <span class="badge bg-secondary me-1" title="<?= e($sl) ?>">
                 <?php if ($se): echo $se; else: ?>
                 <img src="<?= url('static/cornhole_icon.svg') ?>" height="12" alt="Cornhole">
                 <?php endif; ?>
-                <?= $ps[$sk] ?>
+                <?= $sv ?>
               </span>
               <?php endforeach; ?>
             </td>
@@ -110,8 +118,8 @@ ob_start(); ?>
                         <?php foreach ($sports_list as [$sk, $sl, $se]): ?>
                         <div class="col-3">
                           <label class="form-label small"><?= $se ? $se : '<img src="'.url('static/cornhole_icon.svg').'" height="14">' ?> <?= e($sl) ?></label>
-                          <input type="number" step="0.5" min="0" name="skill_<?= $sk ?>"
-                                 class="form-control form-control-sm"
+                          <input type="number" step="<?= $sk === 'tennis' ? '0.1' : '1' ?>" min="0"
+                                 name="skill_<?= $sk ?>" class="form-control form-control-sm"
                                  value="<?= $ps[$sk] ?? '' ?>" placeholder="0">
                         </div>
                         <?php endforeach; ?>
@@ -135,30 +143,36 @@ ob_start(); ?>
     <p class="text-muted">Noch keine Spieler im Register.</p>
     <?php endif; ?>
   </div>
+</div>
 
-  <?php if (can_edit()): ?>
-  <div class="col-xl-3">
-    <div class="card shadow-sm">
-      <div class="card-header fw-semibold"><i class="bi bi-person-plus me-1"></i>Neuer Spieler</div>
-      <div class="card-body">
+<?php if (can_edit()): ?>
+<!-- Neuer Spieler Modal -->
+<div class="modal fade" id="newPlayerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-person-plus me-1"></i>Neuer Spieler</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
         <form method="post" action="<?= url('player/new') ?>">
           <?= csrf_field() ?>
           <div class="mb-2">
             <label class="form-label">Nachname <span class="text-danger">*</span></label>
-            <input type="text" name="name" class="form-control form-control-sm" required>
+            <input type="text" name="name" class="form-control" required>
           </div>
           <div class="mb-2">
             <label class="form-label">Vorname <span class="text-danger">*</span></label>
-            <input type="text" name="firstname" class="form-control form-control-sm" required>
+            <input type="text" name="firstname" class="form-control" required>
           </div>
           <div class="mb-2">
             <label class="form-label">Verein</label>
-            <input type="text" name="club" class="form-control form-control-sm">
+            <input type="text" name="club" class="form-control">
           </div>
           <div class="row g-2 mb-2">
             <div class="col">
               <label class="form-label">Geschlecht</label>
-              <select name="gender" class="form-select form-select-sm">
+              <select name="gender" class="form-select">
                 <option value="">—</option>
                 <option value="m">m</option>
                 <option value="w">w</option>
@@ -166,29 +180,33 @@ ob_start(); ?>
             </div>
             <div class="col">
               <label class="form-label">Pass-Nr. <span class="text-danger">*</span></label>
-              <input type="text" name="pass_nr" class="form-control form-control-sm" required>
+              <input type="text" name="pass_nr" class="form-control" required>
             </div>
           </div>
           <div class="mb-2">
             <label class="form-label">E-Mail <span class="text-danger">*</span></label>
-            <input type="email" name="email" class="form-control form-control-sm" required>
+            <input type="email" name="email" class="form-control" required>
           </div>
           <div class="mb-3">
             <label class="form-label">Spielstärken</label>
             <?php foreach ($sports_list as [$sk, $sl, $se]): ?>
             <div class="input-group input-group-sm mb-1">
               <span class="input-group-text"><?= $se ?: '<img src="'.url('static/cornhole_icon.svg').'" height="12">' ?></span>
-              <input type="number" step="0.5" min="0" name="skill_<?= $sk ?>" class="form-control" placeholder="<?= e($sl) ?>">
+              <input type="number" step="<?= $sk === 'tennis' ? '0.1' : '1' ?>" min="0"
+                     name="skill_<?= $sk ?>" class="form-control" placeholder="<?= e($sl) ?>">
             </div>
             <?php endforeach; ?>
           </div>
-          <button class="btn btn-primary w-100 btn-sm">Hinzufügen</button>
+          <div class="d-flex gap-2 justify-content-end">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+            <button type="submit" class="btn btn-primary">Hinzufügen</button>
+          </div>
         </form>
       </div>
     </div>
   </div>
-  <?php endif; ?>
 </div>
+<?php endif; ?>
 <?php
 $content = ob_get_clean();
 require __DIR__ . '/../_base.php';

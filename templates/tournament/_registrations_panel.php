@@ -162,9 +162,9 @@
     <i class="bi bi-clock-history me-1"></i>Historie (<?= count($history) ?>)
   </div>
   <div class="table-responsive">
-    <table class="table table-sm table-hover align-middle mb-0">
+    <table class="table table-sm table-hover align-middle mb-0" data-sortable>
       <thead class="table-light">
-        <tr><th>Datum</th><th>Name</th><th>Typ</th><th>Bewerbe</th><th class="text-center">Status</th></tr>
+        <tr><th>Datum</th><th>Name</th><th>Typ</th><th class="no-sort">Bewerbe</th><th class="text-center">Status</th></tr>
       </thead>
       <tbody>
         <?php foreach ($history as $h): ?>

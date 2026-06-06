@@ -3,9 +3,9 @@ $role_labels = ['admin' => 'Admin', 'editor' => 'Editor', 'viewer' => 'Betrachte
 ob_start(); ?>
 <h2 class="mb-4"><i class="bi bi-people me-2"></i>Benutzerverwaltung</h2>
 <div class="table-responsive">
-  <table class="table table-hover align-middle">
+  <table class="table table-hover align-middle" data-sortable>
     <thead class="table-light">
-      <tr><th>Benutzer</th><th>E-Mail</th><th>Rolle</th><th>Registriert</th><th></th></tr>
+      <tr><th>Benutzer</th><th>E-Mail</th><th class="no-sort">Rolle</th><th>Registriert</th><th class="no-sort"></th></tr>
     </thead>
     <tbody>
       <?php foreach ($users as $u): ?>

@@ -61,6 +61,13 @@ ob_start(); ?>
           data-bs-toggle="collapse" data-bs-target="#settings-panel">
     <i class="bi bi-gear me-1"></i>Einstellungen
   </button>
+  <form method="post" action="<?= url('tournament/' . $t['id'] . '/delete') ?>"
+        onsubmit="return confirm('Turnier wirklich löschen?')">
+    <?= csrf_field() ?>
+    <button class="btn btn-outline-danger btn-sm">
+      <i class="bi bi-trash me-1"></i>Löschen
+    </button>
+  </form>
   <?php endif; ?>
 </div>
 
@@ -147,6 +154,13 @@ ob_start(); ?>
             <option value="0"<?= ($t['is_public'] == 0) ? ' selected' : '' ?>>nur Admins/Editoren</option>
           </select>
         </div>
+        <div class="col-12">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="show_skill" id="show_skill" value="1"
+                   <?= ($t['show_skill'] ?? 0) ? 'checked' : '' ?>>
+            <label class="form-check-label" for="show_skill">Spielstärke in Tabellen anzeigen</label>
+          </div>
+        </div>
         <div class="col-12 d-flex gap-2">
           <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-check me-1"></i>Speichern</button>
           <button type="button" class="btn btn-secondary btn-sm"
@@ -173,9 +187,14 @@ ob_start(); ?>
 <?php endif; ?>
 
 <div class="row g-4">
-  <div class="col-lg-8">
+  <div class="col-12">
     <div class="d-flex align-items-center mb-3">
       <h5 class="mb-0">Bewerbe</h5>
+      <?php if (can_edit()): ?>
+      <button class="btn btn-primary btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#newCompetitionModal">
+        <i class="bi bi-plus-circle me-1"></i>Neuer Bewerb
+      </button>
+      <?php endif; ?>
       <?php if (can_edit() && $comp_info): ?>
       <div class="btn-group btn-group-sm ms-auto">
         <span class="btn btn-sm btn-outline-secondary disabled pe-none" style="cursor:default">Spielerliste</span>
@@ -249,14 +268,18 @@ ob_start(); ?>
     <?php include __DIR__ . '/_registrations_panel.php'; ?>
     <?php endif; ?>
   </div>
+</div>
 
-  <?php if (can_edit()): ?>
-  <div class="col-lg-4">
-    <div class="card shadow-sm">
-      <div class="card-header fw-semibold">
-        <i class="bi bi-plus-circle me-1"></i>Neuer Bewerb
+<?php if (can_edit()): ?>
+<!-- Neuer Bewerb Modal -->
+<div class="modal fade" id="newCompetitionModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-plus-circle me-1"></i>Neuer Bewerb</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <div class="card-body">
+      <div class="modal-body">
         <form method="post" action="<?= url('tournament/' . $t['id'] . '/competition/new') ?>">
           <?= csrf_field() ?>
           <div class="mb-3">
@@ -289,24 +312,18 @@ ob_start(); ?>
               </select>
             </div>
           </div>
-          <button type="submit" class="btn btn-primary w-100">
-            <i class="bi bi-plus me-1"></i>Erstellen
-          </button>
+          <div class="d-flex gap-2 justify-content-end">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-plus me-1"></i>Erstellen
+            </button>
+          </div>
         </form>
       </div>
     </div>
-    <div class="mt-3">
-      <form method="post" action="<?= url('tournament/' . $t['id'] . '/delete') ?>"
-            onsubmit="return confirm('Turnier wirklich löschen?')">
-        <?= csrf_field() ?>
-        <button class="btn btn-outline-danger btn-sm w-100">
-          <i class="bi bi-trash me-1"></i>Turnier löschen
-        </button>
-      </form>
-    </div>
   </div>
-  <?php endif; ?>
 </div>
+<?php endif; ?>
 
 <!-- Image Modal -->
 <div class="modal fade" id="imageModal" tabindex="-1">
