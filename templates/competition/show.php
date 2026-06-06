@@ -638,7 +638,13 @@ function _dko_match_card(array $m, string $form_id, bool $editable): string {
 }
 ?>
 
-<?php if ($dko_wb): ?>
+<?php if ($dko_wb):
+  $dko_wb_arr  = array_values($dko_wb);
+  $dko_first_n = count(reset($dko_wb_arr)['matches']);
+  $dko_slot_h  = 100;
+  $dko_wb_h    = $dko_first_n * $dko_slot_h;
+  $dko_wb_w    = count($dko_wb_arr) * 230;
+?>
 <div class="card shadow-sm mb-4">
   <div class="card-header fw-semibold"><i class="bi bi-trophy me-1 text-warning"></i>Winners Bracket</div>
   <div class="card-body p-3">
@@ -648,26 +654,40 @@ function _dko_match_card(array $m, string $form_id, bool $editable): string {
     </form>
     <?php endif; ?>
     <div style="overflow-x:auto">
-      <div class="d-flex gap-4 align-items-start" style="min-width:max-content">
+      <!-- Rundenüberschriften -->
+      <div style="display:flex;width:<?= $dko_wb_w ?>px">
+        <?php $last_wb_ri = count($dko_wb_arr) - 1; $ri = 0; foreach ($dko_wb as $rd): ?>
+        <div style="width:230px;flex-shrink:0;text-align:center;font-weight:600;font-size:.8rem;padding:0 8px 4px;
+                    color:<?= $ri === $last_wb_ri ? '#856404' : '#6c757d' ?>">
+          <?= $ri === $last_wb_ri ? '🏆 ' : '' ?><?= e($rd['name']) ?>
+        </div>
+        <?php $ri++; endforeach; ?>
+      </div>
+      <!-- Bracket-Körper (exakt wie normaler KO) -->
+      <div id="dko-wb-bracket-<?= $c['id'] ?>" style="display:flex;position:relative;height:<?= $dko_wb_h ?>px;width:<?= $dko_wb_w ?>px">
         <?php foreach ($dko_wb as $rd): ?>
-        <div style="min-width:160px">
-          <div class="fw-semibold small text-muted mb-2 text-nowrap"><?= e($rd['name']) ?></div>
-          <div class="d-flex flex-column gap-2">
-            <?php foreach ($rd['matches'] as $m): ?>
-            <?= _dko_match_card($m, 'dko-wb-form', can_edit()) ?>
-            <?php endforeach; ?>
-          </div>
+        <div class="ko-round" style="display:flex;flex-direction:column;justify-content:space-around;width:230px;flex-shrink:0;height:100%;padding:0 8px">
+          <?php foreach ($rd['matches'] as $m): ?>
+          <?= _dko_match_card($m, 'dko-wb-form', can_edit()) ?>
+          <?php endforeach; ?>
+        </div>
+        <?php endforeach; ?>
+        <svg id="dko-wb-svg-<?= $c['id'] ?>" style="position:absolute;top:0;left:0;pointer-events:none;overflow:visible"
+             width="<?= $dko_wb_w ?>" height="<?= $dko_wb_h ?>"></svg>
+      </div>
+      <!-- Speichern-Buttons (eine Spalte pro Runde) -->
+      <?php if (can_edit()): ?>
+      <div style="display:flex;width:<?= $dko_wb_w ?>px;margin-top:6px">
+        <?php foreach ($dko_wb as $rd): ?>
+        <div style="width:230px;flex-shrink:0;padding:0 8px">
+          <button form="dko-wb-form" type="submit" class="btn btn-primary btn-sm w-100">
+            <i class="bi bi-save me-1"></i>Speichern
+          </button>
         </div>
         <?php endforeach; ?>
       </div>
+      <?php endif; ?>
     </div>
-    <?php if (can_edit()): ?>
-    <div class="mt-3">
-      <button form="dko-wb-form" type="submit" class="btn btn-primary btn-sm">
-        <i class="bi bi-save me-1"></i>WB Ergebnisse speichern
-      </button>
-    </div>
-    <?php endif; ?>
   </div>
 </div>
 <?php endif; ?>
@@ -844,9 +864,7 @@ document.addEventListener('drop', function(e) {
 });
 
 // ── KO Bracket SVG ───────────────────────────────────────────────
-function drawBracket(cid) {
-  var bracket = document.getElementById('ko-bracket-' + cid);
-  var svg = document.getElementById('bracket-svg-' + cid);
+function drawBracketEl(bracket, svg) {
   if (!bracket || !svg) return;
   svg.innerHTML = '';
   var bRect = bracket.getBoundingClientRect();
@@ -873,6 +891,12 @@ function drawBracket(cid) {
     }
   }
 }
+function drawBracket(cid) {
+  drawBracketEl(
+    document.getElementById('ko-bracket-' + cid),
+    document.getElementById('bracket-svg-' + cid)
+  );
+}
 function bLine(svg, x1, y1, x2, y2) {
   var l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
   l.setAttribute('x1', x1); l.setAttribute('y1', y1);
@@ -880,16 +904,17 @@ function bLine(svg, x1, y1, x2, y2) {
   l.setAttribute('stroke', '#adb5bd'); l.setAttribute('stroke-width', '2');
   svg.appendChild(l);
 }
-document.addEventListener('DOMContentLoaded', function() {
+function drawAllBrackets() {
   document.querySelectorAll('[id^="ko-bracket-"]').forEach(function(el) {
     drawBracket(el.id.replace('ko-bracket-', ''));
   });
-});
-window.addEventListener('resize', function() {
-  document.querySelectorAll('[id^="ko-bracket-"]').forEach(function(el) {
-    drawBracket(el.id.replace('ko-bracket-', ''));
+  document.querySelectorAll('[id^="dko-wb-bracket-"]').forEach(function(el) {
+    var cid = el.id.replace('dko-wb-bracket-', '');
+    drawBracketEl(el, document.getElementById('dko-wb-svg-' + cid));
   });
-});
+}
+document.addEventListener('DOMContentLoaded', drawAllBrackets);
+window.addEventListener('resize', drawAllBrackets);
 </script>
 JS;
 $content = ob_get_clean();
