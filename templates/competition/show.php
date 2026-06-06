@@ -709,7 +709,7 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
           }
       }
   }
-  $lb_match_num = 0;
+  $lb_match_num = $wb_n ?? 0;
 ?>
 <div class="card shadow-sm mb-4">
   <div class="card-header fw-semibold"><i class="bi bi-arrow-down-circle me-1 text-danger"></i>Losers Bracket</div>
