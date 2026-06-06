@@ -113,23 +113,21 @@ function draw_double_ko(int $cid, array $seedings): void {
         [$cid]
     );
 
-    // Seed WB R1 (same lo/hi approach as draw_ko_direct)
-    $num_byes     = $cap - $n;
-    $num_matches  = $cap >> 1;
-    $match_order  = seeded_match_order($num_matches);
-    $bracket_arr  = array_fill(0, $cap, null);
+    // Seed WB R1: S1 top (slot 0), S2 bottom (slot cap-1), S3/S4 mid-halves, etc.
+    $num_byes    = $cap - $n;
+    $seeded_pos  = array_slice(seeded_player_slots($cap), 0, $cap >> 1);
+    $bracket_arr = array_fill(0, $cap, null);
 
-    for ($i = 0; $i < $num_byes; $i++) {
-        $pos = $match_order[$i];
-        $bracket_arr[$pos * 2] = $seedings[$i];
+    $n_seeded = min($cap >> 1, $n);
+    for ($i = 0; $i < $n_seeded; $i++) {
+        $bracket_arr[$seeded_pos[$i]] = $seedings[$i];
     }
-    $remaining      = array_slice($seedings, $num_byes);
-    $real_positions = array_slice($match_order, $num_byes);
-    $lo = 0; $hi = count($remaining) - 1;
-    foreach ($real_positions as $pos) {
-        if ($lo >= $hi) break;
-        $bracket_arr[$pos * 2]     = $remaining[$lo++];
-        $bracket_arr[$pos * 2 + 1] = $remaining[$hi--];
+    $opp_start = $cap >> 1;
+    for ($j = 0, $jmax = $n - $opp_start; $j < $jmax; $j++) {
+        $seed_i = $num_byes + $j;
+        if ($seed_i < ($cap >> 1)) {
+            $bracket_arr[$seeded_pos[$seed_i] ^ 1] = $seedings[$n - 1 - $j];
+        }
     }
 
     $wb1 = db_fetchall(
@@ -143,6 +141,9 @@ function draw_double_ko(int $cid, array $seedings): void {
         if ($p1 !== null && $p2 === null) {
             db_execute("UPDATE `match` SET played=1, score1=1, score2=0 WHERE id=?", [$m['id']]);
             dko_advance($cid, $cap, 'W', 1, $i, (int)$p1, null, true);
+        } elseif ($p1 === null && $p2 !== null) {
+            db_execute("UPDATE `match` SET played=1, score1=0, score2=1 WHERE id=?", [$m['id']]);
+            dko_advance($cid, $cap, 'W', 1, $i, (int)$p2, null, true);
         }
     }
 
@@ -181,12 +182,14 @@ function recompute_double_ko(int $cid): void {
             [$cid, $r]
         );
         foreach ($matches as $m) {
-            $is_bye = ($m['player2_id'] === null);
-            if ($r === 1 && $is_bye) {
-                if ($m['player1_id']) {
-                    dko_advance($cid, $cap, 'W', 1, (int)$m['ko_position'], (int)$m['player1_id'], null, true);
+            if ($r === 1) {
+                $p1_bye = ($m['player2_id'] === null && $m['player1_id'] !== null);
+                $p2_bye = ($m['player1_id'] === null && $m['player2_id'] !== null);
+                if ($p1_bye || $p2_bye) {
+                    $bye_pid = $p1_bye ? (int)$m['player1_id'] : (int)$m['player2_id'];
+                    dko_advance($cid, $cap, 'W', 1, (int)$m['ko_position'], $bye_pid, null, true);
+                    continue;
                 }
-                continue;
             }
             if (!$m['player1_id'] || !$m['player2_id']) continue;
             $winner = (int)($m['score1'] > $m['score2'] ? $m['player1_id'] : $m['player2_id']);

@@ -522,7 +522,7 @@ function draw_ko_direct(array $p): void {
         return;
     }
     $rows = db_fetchall(
-        "SELECT cp.player_id FROM competition_player cp WHERE cp.competition_id=? ORDER BY cp.skill DESC",
+        "SELECT cp.player_id FROM competition_player cp WHERE cp.competition_id=? ORDER BY COALESCE(cp.skill,0) DESC, RAND()",
         [$cid]
     );
     $n = count($rows);
@@ -541,21 +541,21 @@ function draw_ko_direct(array $p): void {
 
     $bracket_total = next_power_of_2($n);
     $num_byes      = $bracket_total - $n;
-    $num_matches   = $bracket_total / 2;
-    $match_order   = seeded_match_order($num_matches);
+    $seeded_pos    = array_slice(seeded_player_slots($bracket_total), 0, $bracket_total >> 1);
     $bracket       = array_fill(0, $bracket_total, null);
 
-    for ($i = 0; $i < $num_byes; $i++) {
-        $pos = $match_order[$i];
-        $bracket[$pos * 2] = $players[$i];
+    // S1..S(cap/2) occupy their seeded positions; byes leave partner slots null
+    $n_seeded = min($bracket_total >> 1, $n);
+    for ($i = 0; $i < $n_seeded; $i++) {
+        $bracket[$seeded_pos[$i]] = $players[$i];
     }
-    $remaining      = array_slice($players, $num_byes);
-    $real_positions = array_slice($match_order, $num_byes);
-    $lo = 0; $hi = count($remaining) - 1;
-    foreach ($real_positions as $pos) {
-        if ($lo >= $hi) break;
-        $bracket[$pos * 2]     = $remaining[$lo++];
-        $bracket[$pos * 2 + 1] = $remaining[$hi--];
+    // Remaining players are opponents, paired weakest-to-strongest
+    $opp_start = $bracket_total >> 1;
+    for ($j = 0, $jmax = $n - $opp_start; $j < $jmax; $j++) {
+        $seed_i = $num_byes + $j;
+        if ($seed_i < ($bracket_total >> 1)) {
+            $bracket[$seeded_pos[$seed_i] ^ 1] = $players[$n - 1 - $j];
+        }
     }
 
     _build_ko_bracket($cid, $bracket, (bool)$c['third_place']);

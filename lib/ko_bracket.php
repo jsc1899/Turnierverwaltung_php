@@ -5,6 +5,26 @@ function next_power_of_2(int $n): int {
     return (int)(2 ** ceil(log($n, 2)));
 }
 
+// Returns cap player-slot indices in seeding priority order.
+// Index 0 = S1 (slot 0, absolute top), index 1 = S2 (slot cap-1, absolute bottom).
+// S3/S4 are randomly placed in the centre of each half; S5–S8 in quarter centres; etc.
+function seeded_player_slots(int $cap): array {
+    $result = [0, $cap - 1];
+    $added  = [0 => true, $cap - 1 => true];
+    $step   = $cap >> 1;
+    while ($step >= 2) {
+        $group = [];
+        for ($i = $step - 1; $i < $cap - 1; $i += $step) {
+            if (!isset($added[$i]))     { $group[] = $i;     $added[$i]     = true; }
+            if (!isset($added[$i + 1])) { $group[] = $i + 1; $added[$i + 1] = true; }
+        }
+        shuffle($group);
+        array_push($result, ...$group);
+        $step >>= 1;
+    }
+    return $result;
+}
+
 function seeded_match_order(int $num_matches): array {
     if ($num_matches <= 1) return range(0, $num_matches - 1);
     if ($num_matches === 2) return [0, 1];
