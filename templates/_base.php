@@ -31,6 +31,7 @@
         <?php if (is_admin()): ?>
         <li class="nav-item"><a class="nav-link" href="<?= url('admin/users') ?>">Benutzer</a></li>
         <?php endif; ?>
+        <li class="nav-item"><a class="nav-link" href="<?= url('hilfe') ?>"><i class="bi bi-question-circle me-1"></i>Hilfe</a></li>
       </ul>
       <ul class="navbar-nav">
         <?php $u = current_user(); ?>

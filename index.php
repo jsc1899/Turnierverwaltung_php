@@ -142,6 +142,9 @@ $routes = [
     ['GET', '/competition/{id}/players/pdf',      'pdf', 'competition_players_pdf'],
     ['GET', '/competition/{id}/players/csv',      'pdf', 'competition_players_csv'],
 
+    // Hilfe
+    ['GET',  '/hilfe',                    'help',  'help_page'],
+
     // Admin
     ['GET',  '/admin/users',              'admin', 'users'],
     ['POST', '/admin/user/{id}/role',     'admin', 'set_role'],
