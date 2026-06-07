@@ -63,7 +63,7 @@ PDO singleton via `get_db()`. Four helpers used everywhere:
 - `db_insert(sql, params)` → `string` (last insert ID)
 - `db_execute(sql, params)` → `int` (affected rows)
 
-All queries use parameterized statements. Schema is defined inline in `init_db()`.
+All queries use parameterized statements. Schema is defined inline in `init_db()`. **Schema migrations** for columns added after initial deployment are handled via try-catch `ALTER TABLE` statements at the bottom of `init_db()` — add new columns there, never in the `CREATE TABLE` block of existing tables.
 
 ### Templates (`templates/`)
 
@@ -77,6 +77,8 @@ require __DIR__ . '/../_base.php';
 ```
 
 `_base.php` renders Bootstrap 5.3 layout with `$content`. Optional `$extra_js` string for page-specific `<script>` blocks. Always use `e($val)` (= `htmlspecialchars`) for output escaping. URL helper: `url('path/to/resource')`.
+
+Alternatively, route handlers can call `render('path/template', ['var' => $val])` which calls `extract()` and then includes the template.
 
 ### Auth & roles
 
@@ -94,20 +96,38 @@ HMAC-SHA256 tokens in format `base64url(payload).base64url(timestamp).base64url(
 - `make_reset_token()` / `verify_reset_token()` — 1h, includes password hash to invalidate on change
 - `make_manage_email_token()` / `verify_manage_email_token()` — 7 days, per-email magic link for registration self-service
 
+### Email (`lib/mail.php`)
+
+`send_mail(to, subject, html_body)` wraps PHPMailer. When `MAIL_HOST` is empty (dev), returns false and callers flash the link to the UI instead. `MAIL_TLS=true` → STARTTLS on the configured port; `false` → SMTPS.
+
 ### KO bracket logic (`lib/ko_bracket.php`)
 
 - `ko_round` counts **down**: first round is the highest value (e.g. 8 for 8-player bracket), final is always `ko_round=2`
 - `ko_position` is 0-based within a round
 - Winner of `(ko_round, ko_position)` advances to `(ko_round/2, ko_position/2)`, fills `player1_id` if `ko_position % 2 == 0`, else `player2_id`
-- `ko_round=3` is the sentinel for the 3rd-place match (non-power-of-2)
+- `ko_round=3` is the sentinel for the 3rd-place match (non-power-of-2 value used as flag)
 - `recompute_ko_from(cid, from_ko_round)` clears all downstream rounds and re-propagates all played results — call this after any KO result edit
 - Byes are auto-advanced with score 1:0 immediately at draw time
 - `advance_count=0` means group-only (no KO phase)
-- `competition.mode`: `'groups_ko'` (default) or `'ko_only'`
+- `competition.mode`: `'groups_ko'` (default), `'ko_only'`, or `'double_ko'`
+- **Seeding draw order**: players are sorted by `skill DESC, player_id` (or `skill ASC, player_id` for tennis mode). The `player_id` tiebreaker must match the display label ordering in `show()` — using `RAND()` would cause seeding labels to disagree with bracket positions for equal-skill players.
+- `seeded_player_slots(cap)`: returns slot indices in seeding priority. S1=slot 0, S2=slot cap-1, S3/S4=shuffled centre pair of each half, etc. Positions within each tier are still randomly assigned via `shuffle()`.
+
+### Double KO bracket logic (`lib/double_ko_bracket.php`)
+
+- `match.bracket`: `'W'` = Winners Bracket, `'L'` = Losers Bracket, `'GF'` = Grand Final. Single-KO matches have `bracket=NULL`.
+- WB `ko_round` counts up (1 = first round, k = WB final feeding into GF).
+- LB has `2*(k-1)` rounds. Odd LB rounds are Minor (1:1 match count ratio from previous round), even rounds are Major (2:1 halving). Minor→Major: same position, player1. Major→Minor: halve position.
+- WB R1 losers fold into LB R1; WB Rr (r≥2) losers drop to LB R(2r-2) in reversed position as player2.
+- `recompute_double_ko(cid)` rebuilds all derived slots from scratch — call after any DKO result edit.
 
 ### Group standings (`lib/standings.php`)
 
 `group_standings(group_id)` computes on the fly. Scoring: win=2pts, draw=1pt, loss=0pt. Tie-breaking: goal difference → goals scored.
+
+### Round-robin schedule (`lib/round_robin.php`)
+
+`round_robin_schedule(player_ids)` returns match pairs using the standard circle method. Handles odd counts by adding a bye slot.
 
 ### PDF & CSV exports (`lib/pdf.php`)
 
@@ -138,13 +158,13 @@ Export functions:
 | Table | Purpose |
 |-------|---------|
 | `tournament` | Top-level container |
-| `competition` | Discipline within tournament; `phase`: setup→group→ko→done |
+| `competition` | Discipline within tournament; `phase`: setup→group→ko→done; `mode`: groups_ko/ko_only/double_ko; `show_seeding`, `seeding_order` ('asc'/'desc') for KO modes |
 | `player` | Global player registry |
 | `player_skill` | Per-sport skill values (PK: player_id + sport) |
 | `competition_player` | Players assigned to a competition (with per-competition skill) |
 | `grp` | Named groups (A, B, C…) within a competition |
 | `group_player` | Players in a group |
-| `match` | Group matches (`group_id IS NOT NULL`) and KO matches (`group_id IS NULL`, `ko_round` set) |
+| `match` | Group matches (`group_id IS NOT NULL`) and KO matches (`group_id IS NULL`, `ko_round` set); `bracket` column: NULL=single KO, 'W'/'L'/'GF'=double KO |
 | `registration` | Public sign-up (status: pending/confirmed/rejected) |
 | `registration_competition` | Which competitions a registration covers |
 | `registration_change_request` | Withdraw or modify request from player |

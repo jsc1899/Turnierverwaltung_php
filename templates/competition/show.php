@@ -107,6 +107,11 @@ ob_start(); ?>
   <div class="tab-pane fade<?= $settings_active ? ' show active' : '' ?> p-3" id="tab-settings" role="tabpanel">
     <form method="post" action="<?= url('competition/'.$c['id'].'/settings') ?>" class="row g-3 align-items-end">
       <?= csrf_field() ?>
+      <div class="col-auto">
+        <label class="form-label">Name</label>
+        <input type="text" name="name" class="form-control form-control-sm" style="min-width:180px"
+               value="<?= e($c['name']) ?>" required>
+      </div>
       <?php if (!in_array($c['mode'], ['ko_only', 'double_ko'])): ?>
       <?php if ($c['phase'] === 'setup'): ?>
       <div class="col-auto">
@@ -120,20 +125,37 @@ ob_start(); ?>
       <?php endif; ?>
       <div class="col-auto">
         <label class="form-label">KO-Aufstieg</label>
-        <select name="advance_count" class="form-select form-select-sm">
+        <select name="advance_count" id="advance_count" class="form-select form-select-sm"
+                onchange="document.getElementById('third_place_wrap').style.display=this.value==='0'?'none':''">
           <option value="0"<?= (int)$c['advance_count'] === 0 ? ' selected' : '' ?>>Nur Gruppenphase</option>
           <option value="1"<?= (int)$c['advance_count'] === 1 ? ' selected' : '' ?>>Gruppenerste → KO</option>
           <option value="2"<?= (int)$c['advance_count'] === 2 ? ' selected' : '' ?>>Erste &amp; Zweite → KO</option>
         </select>
       </div>
       <?php endif; ?>
-      <div class="col-auto">
+      <div class="col-auto" id="third_place_wrap"<?= (!in_array($c['mode'], ['ko_only','double_ko']) && (int)$c['advance_count'] === 0) ? ' style="display:none"' : '' ?>>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" name="third_place" id="third_place"
                  <?= $c['third_place'] ? 'checked' : '' ?>>
           <label class="form-check-label" for="third_place">Platz-3-Spiel</label>
         </div>
       </div>
+      <?php if (in_array($c['mode'], ['ko_only', 'double_ko'])): ?>
+      <div class="col-auto">
+        <label class="form-label">Setzungsreihenfolge</label>
+        <select name="seeding_order" class="form-select form-select-sm">
+          <option value="desc"<?= ($c['seeding_order'] ?? 'desc') === 'desc' ? ' selected' : '' ?>>Höhere Stärke = stärker</option>
+          <option value="asc"<?= ($c['seeding_order'] ?? 'desc') === 'asc'  ? ' selected' : '' ?>>Niedrigere Stärke = stärker (Tennis)</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="show_seeding" id="show_seeding"
+                 <?= ($c['show_seeding'] ?? 1) ? 'checked' : '' ?>>
+          <label class="form-check-label" for="show_seeding">Setzungen anzeigen</label>
+        </div>
+      </div>
+      <?php endif; ?>
       <div class="col-auto">
         <div class="form-check">
           <input class="form-check-input" type="checkbox" name="registrations_open" id="regs_open"
@@ -424,7 +446,7 @@ ob_start(); ?>
       $first_count = count($ko_rounds[0]['matches']);
       $slot_h = 100;
       $bracket_h = $first_count * $slot_h;
-      $bracket_w = count($ko_rounds) * 230;
+      $bracket_w = count($ko_rounds) * 270;
     ?>
 
     <?php if (can_edit()): ?>
@@ -438,7 +460,7 @@ ob_start(); ?>
       <div style="display:flex; width:<?= $bracket_w ?>px">
         <?php $last_ri = count($ko_rounds) - 1; ?>
         <?php foreach ($ko_rounds as $ri => $round): ?>
-        <div style="width:230px; flex-shrink:0; text-align:center; font-weight:600; font-size:.8rem; padding:0 8px 4px;
+        <div style="width:270px; flex-shrink:0; text-align:center; font-weight:600; font-size:.8rem; padding:0 8px 4px;
                     color:<?= $ri === $last_ri ? '#856404' : '#6c757d' ?>">
           <?= $ri === $last_ri ? '🏆 ' : '' ?><?= e($round['name']) ?>
         </div>
@@ -448,7 +470,7 @@ ob_start(); ?>
       <?php $ko_match_num = 0; ?>
       <div id="ko-bracket-<?= $c['id'] ?>" style="display:flex; position:relative; height:<?= $bracket_h ?>px; width:<?= $bracket_w ?>px">
         <?php foreach ($ko_rounds as $ri => $round): ?>
-        <div class="ko-round" style="display:flex;flex-direction:column;justify-content:space-around;width:230px;flex-shrink:0;height:100%;padding:0 8px">
+        <div class="ko-round" style="display:flex;flex-direction:column;justify-content:space-around;width:270px;flex-shrink:0;height:100%;padding:0 8px">
           <?php foreach ($round['matches'] as $m): $ko_match_num++; ?>
           <div class="ko-match" style="border:1px solid #dee2e6;border-radius:6px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.07);overflow:hidden">
             <div style="font-size:.65rem;color:#9e9e9e;padding:1px 6px;border-bottom:1px solid #f5f5f5;background:#fafafa">Spiel <?= $ko_match_num ?></div>
@@ -456,8 +478,11 @@ ob_start(); ?>
             <?php $isFirstRound = ($ri === 0); ?>
             <div class="d-flex align-items-center gap-1 px-2 <?= ($m['played'] && $m['score1'] > $m['score2']) ? 'bg-success-subtle fw-semibold' : '' ?>"
                  style="min-height:33px;border-bottom:1px solid #f0f0f0">
+              <?php if (!empty($ko_seedings)): ?>
+              <small class="ko-seed-badge text-muted" style="font-size:.6rem;white-space:nowrap;flex-shrink:0;min-width:34px"><?= ($m['player1_id'] && ($s = $ko_seedings[$m['player1_id']] ?? null)) ? '(' . e($s) . ')' : '' ?></small>
+              <?php endif; ?>
               <span class="flex-grow-1 small text-truncate<?= ($ko_no_results && can_edit() && $isFirstRound) ? ' ko-slot' : '' ?>"
-                    style="max-width:130px"
+                    style="min-width:0"
                     data-pid="<?= (int)($m['player1_id'] ?? 0) ?>"
                     data-name="<?= e($m['p1name'] ?? '') ?>"
                     title="<?= e($m['p1name'] ?? '') ?>"
@@ -469,17 +494,20 @@ ob_start(); ?>
               <?php if (can_edit() && $m['player1_id'] && $m['player2_id']): ?>
               <input type="number" name="matches[<?= $m['id'] ?>][score1]" min="0"
                      form="ko-form"
-                     class="form-control form-control-sm text-center" style="width:40px;height:24px;padding:0 2px;font-size:.8rem"
+                     class="form-control form-control-sm text-center ms-auto" style="width:40px;height:24px;padding:0 2px;font-size:.8rem;flex-shrink:0"
                      value="<?= $m['played'] ? $m['score1'] : '' ?>">
               <?php elseif ($m['played']): ?>
-              <span class="fw-bold small"><?= $m['score1'] ?></span>
+              <span class="fw-bold small ms-auto" style="flex-shrink:0"><?= $m['score1'] ?></span>
               <?php endif; ?>
             </div>
             <!-- Spieler 2 -->
             <div class="d-flex align-items-center gap-1 px-2 <?= ($m['played'] && $m['score2'] > $m['score1']) ? 'bg-success-subtle fw-semibold' : '' ?>"
                  style="min-height:33px">
+              <?php if (!empty($ko_seedings)): ?>
+              <small class="ko-seed-badge text-muted" style="font-size:.6rem;white-space:nowrap;flex-shrink:0;min-width:34px"><?= ($m['player2_id'] && ($s = $ko_seedings[$m['player2_id']] ?? null)) ? '(' . e($s) . ')' : '' ?></small>
+              <?php endif; ?>
               <span class="flex-grow-1 small text-truncate<?= ($ko_no_results && can_edit() && $isFirstRound) ? ' ko-slot' : '' ?>"
-                    style="max-width:130px"
+                    style="min-width:0"
                     data-pid="<?= (int)($m['player2_id'] ?? 0) ?>"
                     data-name="<?= e($m['p2name'] ?? '') ?>"
                     title="<?= e($m['p2name'] ?? '') ?>"
@@ -491,10 +519,10 @@ ob_start(); ?>
               <?php if (can_edit() && $m['player1_id'] && $m['player2_id']): ?>
               <input type="number" name="matches[<?= $m['id'] ?>][score2]" min="0"
                      form="ko-form"
-                     class="form-control form-control-sm text-center" style="width:40px;height:24px;padding:0 2px;font-size:.8rem"
+                     class="form-control form-control-sm text-center ms-auto" style="width:40px;height:24px;padding:0 2px;font-size:.8rem;flex-shrink:0"
                      value="<?= $m['played'] ? $m['score2'] : '' ?>">
               <?php elseif ($m['played']): ?>
-              <span class="fw-bold small"><?= $m['score2'] ?></span>
+              <span class="fw-bold small ms-auto" style="flex-shrink:0"><?= $m['score2'] ?></span>
               <?php endif; ?>
             </div>
             <?php if (can_edit() && $m['played'] && $m['player1_id'] && $m['player2_id']): ?>
@@ -528,9 +556,9 @@ ob_start(); ?>
       <!-- Platz 3 – unter dem Finale ausgerichtet -->
       <div style="display:flex;width:<?= $bracket_w ?>px;margin-top:20px">
         <?php for ($i = 0; $i < count($ko_rounds) - 1; $i++): ?>
-        <div style="width:230px;flex-shrink:0"></div>
+        <div style="width:270px;flex-shrink:0"></div>
         <?php endfor; ?>
-        <div style="width:230px;flex-shrink:0;padding:0 8px">
+        <div style="width:270px;flex-shrink:0;padding:0 8px">
           <div style="text-align:center;font-weight:600;font-size:.8rem;color:#856404;padding-bottom:4px">
             🥉 Spiel um Platz 3
           </div>
@@ -538,23 +566,23 @@ ob_start(); ?>
           <div class="ko-match" style="border:1px solid #ffc107;border-radius:6px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.07);overflow:hidden">
             <div class="d-flex align-items-center gap-1 px-2 <?= ($m['played'] && $m['score1'] > $m['score2']) ? 'bg-success-subtle fw-semibold' : '' ?>"
                  style="min-height:33px;border-bottom:1px solid #f0f0f0">
-              <span class="flex-grow-1 small text-truncate" style="max-width:130px"
+              <span class="flex-grow-1 small text-truncate" style="min-width:0"
                     title="<?= e($m['p1name'] ?? '') ?>"><?= e($m['p1name'] ?? 'Freilos') ?></span>
               <?php if (can_edit() && $m['player1_id'] && $m['player2_id']): ?>
               <input type="number" name="matches[<?= $m['id'] ?>][score1]" min="0" form="ko-form"
-                     class="form-control form-control-sm text-center" style="width:40px;height:24px;padding:0 2px;font-size:.8rem"
+                     class="form-control form-control-sm text-center ms-auto" style="width:40px;height:24px;padding:0 2px;font-size:.8rem;flex-shrink:0"
                      value="<?= $m['played'] ? $m['score1'] : '' ?>">
-              <?php elseif ($m['played']): ?><span class="fw-bold small"><?= $m['score1'] ?></span><?php endif; ?>
+              <?php elseif ($m['played']): ?><span class="fw-bold small ms-auto" style="flex-shrink:0"><?= $m['score1'] ?></span><?php endif; ?>
             </div>
             <div class="d-flex align-items-center gap-1 px-2 <?= ($m['played'] && $m['score2'] > $m['score1']) ? 'bg-success-subtle fw-semibold' : '' ?>"
                  style="min-height:33px">
-              <span class="flex-grow-1 small text-truncate" style="max-width:130px"
+              <span class="flex-grow-1 small text-truncate" style="min-width:0"
                     title="<?= e($m['p2name'] ?? '') ?>"><?= e($m['p2name'] ?? 'Freilos') ?></span>
               <?php if (can_edit() && $m['player1_id'] && $m['player2_id']): ?>
               <input type="number" name="matches[<?= $m['id'] ?>][score2]" min="0" form="ko-form"
-                     class="form-control form-control-sm text-center" style="width:40px;height:24px;padding:0 2px;font-size:.8rem"
+                     class="form-control form-control-sm text-center ms-auto" style="width:40px;height:24px;padding:0 2px;font-size:.8rem;flex-shrink:0"
                      value="<?= $m['played'] ? $m['score2'] : '' ?>">
-              <?php elseif ($m['played']): ?><span class="fw-bold small"><?= $m['score2'] ?></span><?php endif; ?>
+              <?php elseif ($m['played']): ?><span class="fw-bold small ms-auto" style="flex-shrink:0"><?= $m['score2'] ?></span><?php endif; ?>
             </div>
             <?php if (can_edit() && $m['played'] && $m['player1_id'] && $m['player2_id']): ?>
             <div style="border-top:1px solid #f0f0f0;padding:0 4px 1px;text-align:right">
@@ -588,7 +616,7 @@ ob_start(); ?>
 <?php $wb_num_map = []; // wird im WB-Block befüllt; hier vorbelegen für LB-Block
 
 // Helper: render one DKO match card
-function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_num = null, ?string $p1ph = null, ?string $p2ph = null): string {
+function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_num = null, ?string $p1ph = null, ?string $p2ph = null, array $seedings = []): string {
     $p1 = $m['p1name'] ?? null;
     $p2 = $m['p2name'] ?? null;
     $has_both = $m['player1_id'] && $m['player2_id'];
@@ -598,6 +626,7 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
     if ($match_num !== null) {
         $o .= '<div style="font-size:.65rem;color:#9e9e9e;padding:1px 6px;border-bottom:1px solid #f5f5f5;background:#fafafa">Spiel ' . $match_num . '</div>';
     }
+    $nm_w = ''; // max-width entfernt; name wächst auf verfügbaren Platz
     foreach ([1,2] as $slot) {
         $name  = $slot === 1 ? $p1 : $p2;
         $score = $slot === 1 ? $m['score1'] : $m['score2'];
@@ -607,23 +636,28 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
         $border = $slot === 1 ? 'border-bottom:1px solid #f0f0f0;' : '';
         $bg = $won ? 'background:#d1fae5;' : '';
         $fw = $won ? 'font-weight:600;' : '';
+        $seed_lbl = ($sid && isset($seedings[$sid])) ? $seedings[$sid] : null;
         $o .= "<div class=\"d-flex align-items-center gap-1 px-2\" style=\"min-height:30px;{$border}{$bg}\">";
+        if (!empty($seedings)) {
+            $seed_txt = $seed_lbl ? '(' . e($seed_lbl) . ')' : '';
+            $o .= '<small class="ko-seed-badge text-muted" style="font-size:.6rem;white-space:nowrap;flex-shrink:0;min-width:34px">' . $seed_txt . '</small>';
+        }
         if ($name) {
-            $o .= '<span class="flex-grow-1 small text-truncate" style="max-width:110px;' . $fw . '" title="' . e($name) . '">' . e($name) . '</span>';
+            $o .= '<span class="flex-grow-1 small text-truncate" style="min-width:0;' . $fw . '" title="' . e($name) . '">' . e($name) . '</span>';
         } elseif ($ph) {
-            $o .= '<span class="flex-grow-1 text-truncate text-muted fst-italic" style="max-width:110px;font-size:.7rem" title="' . e($ph) . '">' . e($ph) . '</span>';
+            $o .= '<span class="flex-grow-1 text-truncate text-muted fst-italic" style="min-width:0;font-size:.7rem" title="' . e($ph) . '">' . e($ph) . '</span>';
         } else {
             $o .= '<span class="flex-grow-1 small text-muted fst-italic">—</span>';
         }
         if ($editable && $has_both && !$m['played']) {
             $o .= '<input type="number" name="matches[' . $m['id'] . '][score' . $slot . ']" min="0" form="' . e($form_id) . '"'
-                . ' class="form-control form-control-sm text-center" style="width:38px;height:24px;padding:0 2px;font-size:.8rem">';
+                . ' class="form-control form-control-sm text-center ms-auto" style="width:38px;height:24px;padding:0 2px;font-size:.8rem;flex-shrink:0">';
         } elseif ($editable && $has_both && $m['played']) {
             $o .= '<input type="number" name="matches[' . $m['id'] . '][score' . $slot . ']" min="0" form="' . e($form_id) . '"'
-                . ' class="form-control form-control-sm text-center" style="width:38px;height:24px;padding:0 2px;font-size:.8rem"'
+                . ' class="form-control form-control-sm text-center ms-auto" style="width:38px;height:24px;padding:0 2px;font-size:.8rem;flex-shrink:0"'
                 . ' value="' . (int)$score . '">';
         } elseif ($m['played'] && $sid) {
-            $o .= '<span class="fw-bold small">' . (int)$score . '</span>';
+            $o .= '<span class="fw-bold small ms-auto" style="flex-shrink:0">' . (int)$score . '</span>';
         }
         $o .= '</div>';
     }
@@ -644,7 +678,7 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
   $dko_first_n = count(reset($dko_wb_arr)['matches']);
   $dko_slot_h  = 100;
   $dko_wb_h    = $dko_first_n * $dko_slot_h;
-  $dko_wb_w    = count($dko_wb_arr) * 230;
+  $dko_wb_w    = count($dko_wb_arr) * 270;
   // Sequentielle Spielnummern für WB (Runde 1 top→bottom, Runde 2 top→bottom, ...)
   $wb_num_map = []; $wb_n = 0;
   foreach ($dko_wb_arr as $rd) {
@@ -666,7 +700,7 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
       <!-- Rundenüberschriften -->
       <div style="display:flex;width:<?= $dko_wb_w ?>px">
         <?php $last_wb_ri = count($dko_wb_arr) - 1; $ri = 0; foreach ($dko_wb as $rd): ?>
-        <div style="width:230px;flex-shrink:0;text-align:center;font-weight:600;font-size:.8rem;padding:0 8px 4px;
+        <div style="width:270px;flex-shrink:0;text-align:center;font-weight:600;font-size:.8rem;padding:0 8px 4px;
                     color:<?= $ri === $last_wb_ri ? '#856404' : '#6c757d' ?>">
           <?= $ri === $last_wb_ri ? '🏆 ' : '' ?><?= e($rd['name']) ?>
         </div>
@@ -675,9 +709,9 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
       <!-- Bracket-Körper (exakt wie normaler KO) -->
       <div id="dko-wb-bracket-<?= $c['id'] ?>" style="display:flex;position:relative;height:<?= $dko_wb_h ?>px;width:<?= $dko_wb_w ?>px">
         <?php foreach ($dko_wb as $rd): ?>
-        <div class="ko-round" style="display:flex;flex-direction:column;justify-content:space-around;width:230px;flex-shrink:0;height:100%;padding:0 8px">
+        <div class="ko-round" style="display:flex;flex-direction:column;justify-content:space-around;width:270px;flex-shrink:0;height:100%;padding:0 8px">
           <?php foreach ($rd['matches'] as $m): ?>
-          <?= _dko_match_card($m, 'dko-wb-form', can_edit(), $wb_num_map[(int)$m['ko_round']][(int)$m['ko_position']] ?? null) ?>
+          <?= _dko_match_card($m, 'dko-wb-form', can_edit(), $wb_num_map[(int)$m['ko_round']][(int)$m['ko_position']] ?? null, null, null, $ko_seedings) ?>
           <?php endforeach; ?>
         </div>
         <?php endforeach; ?>
@@ -718,6 +752,12 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
       }
   }
   $lb_match_num = $wb_n ?? 0;
+  $lb_rd_arr   = array_values($dko_lb);
+  $lb_r1_count = count(reset($lb_rd_arr)['matches']);
+  $lb_slot_h   = 100;
+  $lb_total_h  = max(1, $lb_r1_count) * $lb_slot_h;
+  $lb_col_w    = 220;
+  $lb_total_w  = count($lb_rd_arr) * $lb_col_w;
 ?>
 <div class="card shadow-sm mb-4">
   <div class="card-header fw-semibold"><i class="bi bi-arrow-down-circle me-1 text-danger"></i>Losers Bracket</div>
@@ -727,26 +767,35 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
       <?= csrf_field() ?>
     </form>
     <?php endif; ?>
-    <div style="overflow-x:auto">
-      <div class="d-flex gap-4 align-items-start" style="min-width:max-content">
-        <?php foreach ($dko_lb as $lb_rd_key => $rd): ?>
-        <div style="min-width:160px">
-          <div class="fw-semibold small text-muted mb-2 text-nowrap"><?= e($rd['name']) ?></div>
-          <div class="d-flex flex-column gap-2">
-            <?php foreach ($rd['matches'] as $m): $lb_match_num++; $lr = (int)$m['ko_round']; $lp = (int)$m['ko_position']; ?>
-            <?= _dko_match_card(
-                $m, 'dko-lb-form', can_edit(), $lb_match_num,
-                !$m['player1_id'] ? ($lb_ph[$lr][$lp][1] ?? null) : null,
-                !$m['player2_id'] ? ($lb_ph[$lr][$lp][2] ?? null) : null
-            ) ?>
-            <?php endforeach; ?>
-          </div>
+    <div style="overflow-x:auto;margin-bottom:4px">
+      <!-- Rundenüberschriften -->
+      <div style="display:flex;width:<?= $lb_total_w ?>px">
+        <?php foreach ($lb_rd_arr as $rd): ?>
+        <div style="width:<?= $lb_col_w ?>px;flex-shrink:0;text-align:center;font-weight:600;font-size:.8rem;padding:0 8px 4px;color:#6c757d">
+          <?= e($rd['name']) ?>
         </div>
         <?php endforeach; ?>
       </div>
+      <!-- Bracket-Körper -->
+      <div id="dko-lb-bracket-<?= $c['id'] ?>" style="display:flex;position:relative;height:<?= $lb_total_h ?>px;width:<?= $lb_total_w ?>px">
+        <?php foreach ($lb_rd_arr as $rd): ?>
+        <div class="lb-round" style="display:flex;flex-direction:column;justify-content:space-around;width:<?= $lb_col_w ?>px;flex-shrink:0;height:100%;padding:0 8px">
+          <?php foreach ($rd['matches'] as $m): $lb_match_num++; $lr = (int)$m['ko_round']; $lp = (int)$m['ko_position']; ?>
+          <?= _dko_match_card(
+              $m, 'dko-lb-form', can_edit(), $lb_match_num,
+              !$m['player1_id'] ? ($lb_ph[$lr][$lp][1] ?? null) : null,
+              !$m['player2_id'] ? ($lb_ph[$lr][$lp][2] ?? null) : null,
+              []
+          ) ?>
+          <?php endforeach; ?>
+        </div>
+        <?php endforeach; ?>
+        <svg id="dko-lb-svg-<?= $c['id'] ?>" style="position:absolute;top:0;left:0;pointer-events:none;overflow:visible"
+             width="<?= $lb_total_w ?>" height="<?= $lb_total_h ?>"></svg>
+      </div>
     </div>
     <?php if (can_edit()): ?>
-    <div class="mt-3">
+    <div class="mt-2">
       <button form="dko-lb-form" type="submit" class="btn btn-primary btn-sm">
         <i class="bi bi-save me-1"></i>LB Ergebnisse speichern
       </button>
@@ -767,7 +816,7 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
     <?php endif; ?>
     <div class="d-flex gap-3 align-items-start">
       <div style="min-width:200px;max-width:300px">
-        <?= _dko_match_card($dko_gf, 'dko-gf-form', can_edit()) ?>
+        <?= _dko_match_card($dko_gf, 'dko-gf-form', can_edit(), null, null, null, []) ?>
       </div>
       <div class="small text-muted align-self-center">
         <div><strong>Spieler 1:</strong> WB-Sieger (ungeschlagen)</div>
@@ -889,6 +938,15 @@ document.addEventListener('drop', function(e) {
       koDragEl.style.background = tp !== '0' ? '#fff3cd' : ''; koDragEl.setAttribute('draggable', tp !== '0' ? 'true' : 'false');
       slot.dataset.pid = sp; slot.dataset.name = sn; slot.textContent = sn || '—';
       slot.style.background = sp !== '0' ? '#fff3cd' : ''; slot.setAttribute('draggable', sp !== '0' ? 'true' : 'false');
+      // swap seeding badges
+      var db = koDragEl.parentElement.querySelector('.ko-seed-badge');
+      var sb = slot.parentElement.querySelector('.ko-seed-badge');
+      var dt = db ? db.textContent : '', st = sb ? sb.textContent : '';
+      function _mkBadge(txt) { var b = document.createElement('small'); b.className = 'ko-seed-badge text-muted'; b.style.cssText = 'font-size:.6rem;white-space:nowrap;flex-shrink:0'; b.textContent = txt; return b; }
+      if (db && st) { db.textContent = st; } else if (!db && st) { koDragEl.parentElement.insertBefore(_mkBadge(st), koDragEl); }
+      else if (db && !st) { db.remove(); }
+      if (sb && dt) { sb.textContent = dt; } else if (!sb && dt) { slot.parentElement.insertBefore(_mkBadge(dt), slot); }
+      else if (sb && !dt) { sb.remove(); }
     }
   }
 });
@@ -934,6 +992,47 @@ function bLine(svg, x1, y1, x2, y2) {
   l.setAttribute('stroke', '#adb5bd'); l.setAttribute('stroke-width', '2');
   svg.appendChild(l);
 }
+// ── LB Verbindungslinien ─────────────────────────────────────────
+function drawLbBracket(bracket, svg) {
+  if (!bracket || !svg) return;
+  svg.innerHTML = '';
+  var bRect  = bracket.getBoundingClientRect();
+  var rounds = bracket.querySelectorAll('.lb-round');
+  for (var ri = 0; ri < rounds.length - 1; ri++) {
+    var cur  = rounds[ri].querySelectorAll('.ko-match');
+    var nxt  = rounds[ri + 1].querySelectorAll('.ko-match');
+    if (ri % 2 === 0) {
+      // Minor → Major: 1:1, gleiche Position → rechtwinkliger Verbinder
+      for (var i = 0; i < cur.length; i++) {
+        var ms = cur[i], mn = nxt[i];
+        if (!ms || !mn) continue;
+        var rs = ms.getBoundingClientRect(), rn = mn.getBoundingClientRect();
+        var x1 = rs.right - bRect.left, y1 = (rs.top + rs.bottom) / 2 - bRect.top;
+        var x2 = rn.left  - bRect.left, y2 = (rn.top + rn.bottom) / 2 - bRect.top;
+        var xm = (x1 + x2) / 2;
+        bLine(svg, x1, y1, xm, y1);
+        bLine(svg, xm, y1, xm, y2);
+        bLine(svg, xm, y2, x2, y2);
+      }
+    } else {
+      // Major → Minor: 2:1 → WB-Stil (zwei Matches → eines)
+      for (var ni = 0; ni < nxt.length; ni++) {
+        var m1 = cur[ni * 2], m2 = cur[ni * 2 + 1], mn = nxt[ni];
+        if (!m1 || !m2 || !mn) continue;
+        var r1 = m1.getBoundingClientRect(), r2 = m2.getBoundingClientRect(), rn = mn.getBoundingClientRect();
+        var x1 = r1.right - bRect.left, y1 = (r1.top + r1.bottom) / 2 - bRect.top;
+        var x2 = r2.right - bRect.left, y2 = (r2.top + r2.bottom) / 2 - bRect.top;
+        var xn = rn.left  - bRect.left, yn = (rn.top + rn.bottom) / 2 - bRect.top;
+        var xm = (x1 + xn) / 2;
+        bLine(svg, x1, y1, xm, y1);
+        bLine(svg, x2, y2, xm, y2);
+        bLine(svg, xm, y1, xm, y2);
+        bLine(svg, xm, yn, xn, yn);
+      }
+    }
+  }
+}
+
 function drawAllBrackets() {
   document.querySelectorAll('[id^="ko-bracket-"]').forEach(function(el) {
     drawBracket(el.id.replace('ko-bracket-', ''));
@@ -941,6 +1040,10 @@ function drawAllBrackets() {
   document.querySelectorAll('[id^="dko-wb-bracket-"]').forEach(function(el) {
     var cid = el.id.replace('dko-wb-bracket-', '');
     drawBracketEl(el, document.getElementById('dko-wb-svg-' + cid));
+  });
+  document.querySelectorAll('[id^="dko-lb-bracket-"]').forEach(function(el) {
+    var cid = el.id.replace('dko-lb-bracket-', '');
+    drawLbBracket(el, document.getElementById('dko-lb-svg-' + cid));
   });
 }
 document.addEventListener('DOMContentLoaded', drawAllBrackets);

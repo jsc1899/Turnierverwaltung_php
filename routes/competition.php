@@ -230,6 +230,30 @@ function show(array $p): void {
         }
     }
 
+    // Seedings (player_id → label "1","2","3-4","5-8",...) for ko_only/double_ko
+    // asc: lowest non-zero = strongest (tennis); 0/NULL always last in both directions
+    $seed_order_sql = ($c['seeding_order'] ?? 'desc') === 'asc'
+        ? "CASE WHEN COALESCE(skill,0)=0 THEN 1 ELSE 0 END, COALESCE(skill,0) ASC, player_id"
+        : "COALESCE(skill,0) DESC, player_id";
+    $ko_seedings = [];
+    if (in_array($c['mode'], ['ko_only', 'double_ko']) && in_array($c['phase'], ['ko', 'done']) && !empty($c['show_seeding'])) {
+        $seed_rows = db_fetchall(
+            "SELECT player_id FROM competition_player WHERE competition_id=? ORDER BY $seed_order_sql",
+            [$cid]
+        );
+        foreach ($seed_rows as $i => $sr) {
+            $rank = $i + 1;
+            if ($rank <= 2) {
+                $lbl = (string)$rank;
+            } else {
+                $p   = (int)ceil(log($rank, 2));
+                $hi  = 1 << $p;
+                $lbl = (($hi >> 1) + 1) . '-' . $hi;
+            }
+            $ko_seedings[(int)$sr['player_id']] = $lbl;
+        }
+    }
+
     $group_no_results = false;
     if ($c['phase'] === 'group') {
         $played_group = db_fetch(
@@ -259,6 +283,7 @@ function show(array $p): void {
         'ko_no_results' => $ko_no_results, 'group_no_results' => $group_no_results,
         'dko_wb' => $dko_wb, 'dko_lb' => $dko_lb, 'dko_gf' => $dko_gf,
         'dko_cap' => $cap ?? 0, 'dko_lb_total' => $lb_total ?? 0,
+        'ko_seedings' => $ko_seedings,
     ]);
 }
 
@@ -288,17 +313,21 @@ function settings(array $p): void {
     }
 
 
+    $name              = trim(post('name', ''));
     $group_size        = max(3, min(6, (int)post('group_size', 4)));
     $advance_count     = max(0, min(2, (int)post('advance_count', 1)));
     $third_place       = post('third_place') ? 1 : 0;
     $registrations_open = post('registrations_open') ? 1 : 0;
     $max_players       = max(0, (int)post('max_players', 0));
+    $show_seeding      = post('show_seeding') ? 1 : 0;
+    $seeding_order     = post('seeding_order') === 'asc' ? 'asc' : 'desc';
 
     $c = db_fetch("SELECT phase, mode FROM competition WHERE id=?", [$cid]);
     if (!$c) { redirect('competition/' . $cid); return; }
+    if ($name) db_execute("UPDATE competition SET name=? WHERE id=?", [$name, $cid]);
     if (in_array($c['mode'], ['ko_only', 'double_ko'], true)) {
-        db_execute("UPDATE competition SET third_place=?, registrations_open=?, max_players=? WHERE id=?",
-            [$third_place, $registrations_open, $max_players, $cid]);
+        db_execute("UPDATE competition SET third_place=?, registrations_open=?, max_players=?, show_seeding=?, seeding_order=? WHERE id=?",
+            [$third_place, $registrations_open, $max_players, $show_seeding, $seeding_order, $cid]);
     } elseif ($c && $c['phase'] === 'setup') {
         db_execute("UPDATE competition SET group_size=?, advance_count=?, third_place=?, registrations_open=?, max_players=? WHERE id=?",
             [$group_size, $advance_count, $third_place, $registrations_open, $max_players, $cid]);
@@ -521,8 +550,11 @@ function draw_ko_direct(array $p): void {
         redirect('competition/' . $cid);
         return;
     }
+    $draw_order_sql = ($c['seeding_order'] ?? 'desc') === 'asc'
+        ? "CASE WHEN COALESCE(cp.skill,0)=0 THEN 1 ELSE 0 END, COALESCE(cp.skill,0) ASC, cp.player_id"
+        : "COALESCE(cp.skill,0) DESC, cp.player_id";
     $rows = db_fetchall(
-        "SELECT cp.player_id FROM competition_player cp WHERE cp.competition_id=? ORDER BY COALESCE(cp.skill,0) DESC, RAND()",
+        "SELECT cp.player_id FROM competition_player cp WHERE cp.competition_id=? ORDER BY $draw_order_sql",
         [$cid]
     );
     $n = count($rows);
@@ -549,13 +581,11 @@ function draw_ko_direct(array $p): void {
     for ($i = 0; $i < $n_seeded; $i++) {
         $bracket[$seeded_pos[$i]] = $players[$i];
     }
-    // Remaining players are opponents, paired weakest-to-strongest
-    $opp_start = $bracket_total >> 1;
-    for ($j = 0, $jmax = $n - $opp_start; $j < $jmax; $j++) {
-        $seed_i = $num_byes + $j;
-        if ($seed_i < ($bracket_total >> 1)) {
-            $bracket[$seeded_pos[$seed_i] ^ 1] = $players[$n - 1 - $j];
-        }
+    // Remaining players are opponents, randomly assigned to seeded partner slots
+    $opponents = array_slice($players, $bracket_total >> 1);
+    shuffle($opponents);
+    foreach ($opponents as $j => $opp) {
+        $bracket[$seeded_pos[$num_byes + $j] ^ 1] = $opp;
     }
 
     _build_ko_bracket($cid, $bracket, (bool)$c['third_place']);
