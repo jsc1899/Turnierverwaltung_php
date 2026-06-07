@@ -142,11 +142,7 @@ function confirm_all(array $p): void {
     }
     _update_registration_status($rid);
 
-    // Magic-Link an Spieler senden
-    if (!empty($r['email'])) {
-        $token = make_manage_email_token($r['email']);
-        send_reg_manage_mail($r['email'], $token);
-    }
+    _notify_reg_status($r);
 
     if ($full_comps) {
         flash('warning', 'Spieler nicht zugeordnet (Bewerb voll): ' . implode(', ', $full_comps));
@@ -159,10 +155,11 @@ function reject_all(array $p): void {
     require_edit();
     csrf_verify();
     $rid = (int)$p['id'];
-    $r   = db_fetch("SELECT tournament_id FROM registration WHERE id=?", [$rid]);
+    $r   = db_fetch("SELECT * FROM registration WHERE id=?", [$rid]);
     if (!$r) { redirect(''); return; }
     db_execute("UPDATE registration_competition SET status='rejected' WHERE registration_id=? AND status='pending'", [$rid]);
     db_execute("UPDATE registration SET status='rejected' WHERE id=?", [$rid]);
+    _notify_reg_status($r);
     flash('info', 'Alle Nennungen abgelehnt.');
     redirect('tournament/' . $r['tournament_id']);
 }
@@ -183,14 +180,10 @@ function confirm_comp(array $p): void {
     db_execute("UPDATE registration_competition SET status='confirmed' WHERE registration_id=? AND competition_id=?", [$rid, $cid]);
     _update_registration_status($rid);
 
-    // Magic-Link senden wenn alle Bewerbe dieser Nennung nun entschieden sind
     $still_pending = db_fetch(
         "SELECT COUNT(*) as n FROM registration_competition WHERE registration_id=? AND status='pending'", [$rid]
     )['n'];
-    if ($still_pending == 0 && !empty($r['email'])) {
-        $token = make_manage_email_token($r['email']);
-        send_reg_manage_mail($r['email'], $token);
-    }
+    if ($still_pending == 0) _notify_reg_status($r);
 
     if (!$added) {
         flash('warning', 'Bewerb ist voll — Spieler wurde nicht zugeordnet.');
@@ -203,10 +196,14 @@ function reject_comp(array $p): void {
     require_edit();
     csrf_verify();
     $rid = (int)$p['id']; $cid = (int)$p['cid'];
-    $r   = db_fetch("SELECT tournament_id FROM registration WHERE id=?", [$rid]);
+    $r   = db_fetch("SELECT * FROM registration WHERE id=?", [$rid]);
     if (!$r) { redirect(''); return; }
     db_execute("UPDATE registration_competition SET status='rejected' WHERE registration_id=? AND competition_id=?", [$rid, $cid]);
     _update_registration_status($rid);
+    $still_pending = db_fetch(
+        "SELECT COUNT(*) as n FROM registration_competition WHERE registration_id=? AND status='pending'", [$rid]
+    )['n'];
+    if ($still_pending == 0) _notify_reg_status($r);
     flash('info', 'Nennung abgelehnt.');
     redirect('tournament/' . $r['tournament_id']);
 }
@@ -599,6 +596,26 @@ function _update_player_skill_db(int $pid, string $sport, float $skill): void {
             [$pid, $sport, $skill]
         );
     }
+}
+
+function _notify_reg_status(array $r): void {
+    if (empty($r['email'])) return;
+    $t     = db_fetch("SELECT name FROM tournament WHERE id=?", [$r['tournament_id']]);
+    $comps = db_fetchall(
+        "SELECT c.name, rc.status FROM registration_competition rc
+         JOIN competition c ON c.id = rc.competition_id
+         WHERE rc.registration_id=? AND rc.status IN ('confirmed','rejected')
+         ORDER BY rc.status DESC, c.name",
+        [(int)$r['id']]
+    );
+    $confirmed = []; $rejected = [];
+    foreach ($comps as $c) {
+        if ($c['status'] === 'confirmed') $confirmed[] = $c['name'];
+        else $rejected[] = $c['name'];
+    }
+    $token = !empty($confirmed) ? make_manage_email_token($r['email']) : null;
+    $name  = trim(($r['firstname'] ?? '') . ' ' . ($r['lastname'] ?? ''));
+    send_reg_processed_mail($r['email'], $name, $t ? $t['name'] : '', $confirmed, $rejected, $token);
 }
 
 function _update_registration_status(int $rid): void {

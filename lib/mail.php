@@ -62,11 +62,44 @@ function send_reg_manage_mail(string $to, string $token): void {
         $to,
         'Turnierverwaltung – Nennungen verwalten',
         '<p>Hallo,</p>'
-        . '<p>deine Nennung wurde bearbeitet. Mit dem folgenden Link kannst du deine Nennungen einsehen und verwalten:</p>'
+        . '<p>Mit dem folgenden Link kannst du deine Nennungen einsehen und verwalten:</p>'
         . '<p><a href="' . $link . '">' . $link . '</a></p>'
         . '<p>Der Link ist 7 Tage gültig.</p>'
     );
     if (!$sent) {
         flash('info', 'Dev-Verwaltungslink: <a href="' . e($link) . '">' . e($link) . '</a>', true);
+    }
+}
+
+function send_reg_processed_mail(string $to, string $name, string $tournament,
+                                  array $confirmed, array $rejected, ?string $token): void {
+    $body  = '<p>Hallo ' . htmlspecialchars($name) . ',</p>';
+    $body .= '<p>deine Nennung für <strong>' . htmlspecialchars($tournament) . '</strong> wurde bearbeitet.</p>';
+    if (!empty($confirmed)) {
+        $body .= '<p><strong>Bestätigt:</strong></p><ul>';
+        foreach ($confirmed as $c) $body .= '<li>' . htmlspecialchars($c) . '</li>';
+        $body .= '</ul>';
+    }
+    if (!empty($rejected)) {
+        $body .= '<p><strong>Abgelehnt:</strong></p><ul>';
+        foreach ($rejected as $c) $body .= '<li>' . htmlspecialchars($c) . '</li>';
+        $body .= '</ul>';
+    }
+    if ($token) {
+        $link  = url('nennung/verwalten/' . urlencode($token));
+        $body .= '<p>Mit folgendem Link kannst du deine Nennungen verwalten (gültig 7 Tage):</p>'
+               . '<p><a href="' . $link . '">' . $link . '</a></p>';
+    }
+    $sent = send_mail($to, 'Turnierverwaltung – Nennung bearbeitet', $body);
+    if (!$sent) {
+        $parts = [];
+        if ($confirmed) $parts[] = 'Bestätigt: ' . implode(', ', array_map('htmlspecialchars', $confirmed));
+        if ($rejected)  $parts[] = 'Abgelehnt: '  . implode(', ', array_map('htmlspecialchars', $rejected));
+        $info = 'Dev-Mail an ' . e($to) . ($parts ? ': ' . implode(' | ', $parts) : '');
+        if ($token) {
+            $link  = url('nennung/verwalten/' . urlencode($token));
+            $info .= ' | <a href="' . e($link) . '">Verwaltungslink</a>';
+        }
+        flash('info', $info, true);
     }
 }
