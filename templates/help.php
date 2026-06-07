@@ -250,27 +250,28 @@ ob_start(); ?>
 
       <h5 class="mt-3">Ablauf für Spieler</h5>
       <ol>
-        <li>Turniername aufrufen → <strong>Anmelden</strong></li>
+        <li>Turnierseite aufrufen → <strong>Anmelden</strong></li>
         <li>Name, Kontaktdaten und gewünschte Bewerbe auswählen → Absenden</li>
-        <li>Die Nennung erscheint als <em>ausstehend</em> beim Admin</li>
-        <li>Nach Admin-Bestätigung erhält der Spieler einen <strong>Magic-Link</strong> per E-Mail zum Verwalten der Nennung (7 Tage gültig)</li>
-        <li>Über den Magic-Link kann die Nennung zurückgezogen oder ein Änderungsantrag gestellt werden</li>
+        <li>Die Nennung erscheint als <em>ausstehend</em> beim Admin — der Spieler erhält keine automatische Bestätigung</li>
+        <li>Sobald der Admin alle Bewerbe der Nennung bestätigt hat, wird automatisch ein <strong>Magic-Link</strong> per E-Mail verschickt (7 Tage gültig)</li>
+        <li>Über diesen Link kann die Nennung zurückgezogen oder ein Änderungsantrag gestellt werden</li>
       </ol>
 
       <h5 class="mt-3">Ablauf für Admins</h5>
       <ul>
         <li>Neue Nennungen erscheinen auf der Turnierseite unter <em>Ausstehende Nennungen</em></li>
         <li>Bestätigung: Einzeln pro Bewerb oder alle auf einmal mit <strong>Alle bestätigen</strong></li>
-        <li>Nach Bestätigung wird automatisch ein Magic-Link per E-Mail gesendet (falls E-Mail konfiguriert ist)</li>
-        <li>Änderungsanträge erscheinen unter <em>Änderungsanträge</em> und können per Bewerb einzeln angenommen oder abgelehnt werden</li>
+        <li>Der Magic-Link wird automatisch versendet, sobald alle Bewerbe einer Nennung entschieden sind — entweder bei „Alle bestätigen" oder wenn der letzte noch offene Bewerb einzeln bestätigt wird</li>
+        <li>Wird eine Nennung vollständig abgelehnt, wird kein Magic-Link gesendet</li>
+        <li>Änderungsanträge erscheinen unter <em>Änderungsanträge</em> und können pro Bewerb einzeln angenommen oder abgelehnt werden</li>
       </ul>
 
       <h5 class="mt-3">Link nachträglich anfordern</h5>
-      <p>Spieler können unter <strong>Nennung verwalten</strong> (Menü oben) mit ihrer E-Mail-Adresse einen neuen Magic-Link anfordern, falls der erste abgelaufen ist.</p>
+      <p>Ist der Magic-Link abgelaufen oder nie angekommen, können Spieler unter <strong>Nennung verwalten</strong> (Menü oben) mit ihrer E-Mail-Adresse einen neuen Link anfordern. Der Link wird nur gesendet, wenn unter dieser E-Mail-Adresse eine bestätigte Nennung für ein laufendes Turnier existiert.</p>
 
       <div class="alert alert-info small">
         <i class="bi bi-info-circle me-1"></i>
-        Ohne konfigurierte E-Mail-Einstellungen (<code>MAIL_HOST</code>) wird der Magic-Link im Admin-Interface angezeigt, anstatt per E-Mail verschickt zu werden.
+        Ohne konfigurierte E-Mail-Einstellungen (<code>MAIL_HOST</code>) wird der Magic-Link statt per E-Mail direkt im Admin-Interface als Flash-Nachricht angezeigt.
       </div>
     </section>
 
