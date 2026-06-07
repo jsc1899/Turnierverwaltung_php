@@ -50,9 +50,9 @@
               <input type="email" name="email" class="form-control" required value="<?= e(post('email')) ?>">
             </div>
             <div class="col-md-4">
-              <label class="form-label">Spielstärke <span class="text-danger">*</span></label>
+              <label class="form-label">Spielstärke</label>
               <input type="number" name="skill" class="form-control"
-                     step="<?= ($t['sport'] ?? '') === 'tennis' ? '0.1' : '1' ?>" min="0.1" required
+                     step="<?= ($t['sport'] ?? '') === 'tennis' ? '0.1' : '1' ?>" min="0"
                      value="<?= e(post('skill')) ?>" placeholder="z.B. 700">
             </div>
           </div>
