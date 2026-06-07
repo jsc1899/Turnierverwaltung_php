@@ -62,7 +62,7 @@ function send_reg_manage_mail(string $to, string $token): void {
         $to,
         'Turnierverwaltung – Nennungen verwalten',
         '<p>Hallo,</p>'
-        . '<p>hier ist dein Link zum Verwalten deiner Nennungen:</p>'
+        . '<p>deine Nennung wurde bearbeitet. Mit dem folgenden Link kannst du deine Nennungen einsehen und verwalten:</p>'
         . '<p><a href="' . $link . '">' . $link . '</a></p>'
         . '<p>Der Link ist 7 Tage gültig.</p>'
     );
