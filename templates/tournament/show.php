@@ -64,6 +64,8 @@ ob_start(); ?>
        style="height:150px;width:auto;max-width:200px;object-fit:contain;border-radius:6px;cursor:pointer;flex-shrink:0"
        onclick="openImageModal('<?= url('uploads/' . $t['banner_image']) ?>')" alt="">
   <?php endif; ?>
+</div>
+
 <!-- ═══ Registerkarten ═══════════════════════════════════════════════════════ -->
 <?php
 $pending_count = count($registrations ?? []);
