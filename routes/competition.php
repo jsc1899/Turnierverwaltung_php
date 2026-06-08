@@ -341,6 +341,23 @@ function show(array $p): void {
                         $places[] = ['rank'=>3,'name'=>$third['p2name'],'club'=>$third['p2club']];
                         $places[] = ['rank'=>4,'name'=>$third['p1name'],'club'=>$third['p1club']];
                     }
+                } elseif (!$c['third_place']) {
+                    // Kein Spiel um Platz 3 — Halbfinal-Verlierer teilen sich Platz 3
+                    $semis = db_fetchall(
+                        "SELECT m.*,
+                         TRIM(CONCAT(p1.name,IF(COALESCE(p1.firstname,'')!='',CONCAT(' ',p1.firstname),''))) as p1name, p1.club as p1club,
+                         TRIM(CONCAT(p2.name,IF(COALESCE(p2.firstname,'')!='',CONCAT(' ',p2.firstname),''))) as p2name, p2.club as p2club
+                         FROM `match` m
+                         LEFT JOIN player p1 ON p1.id=m.player1_id
+                         LEFT JOIN player p2 ON p2.id=m.player2_id
+                         WHERE m.competition_id=? AND m.ko_round=4 AND m.played=1 AND m.bracket IS NULL",
+                        [$cid]
+                    );
+                    foreach ($semis as $s) {
+                        $loser_name = $s['score1'] > $s['score2'] ? $s['p2name'] : $s['p1name'];
+                        $loser_club = $s['score1'] > $s['score2'] ? $s['p2club'] : $s['p1club'];
+                        $places[] = ['rank' => 3, 'name' => $loser_name, 'club' => $loser_club];
+                    }
                 }
             }
         }
