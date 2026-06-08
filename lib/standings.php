@@ -27,7 +27,7 @@ function _apply_h2h_tiebreaker(array $standings, array $matches, string $p1_col,
         }
 
         // h2h-Punkte → h2h-Tordiff → h2h-Tore → Gesamt-Tordiff → Gesamt-Tore
-        usort($group, function($a, $b) use ($mini) {
+        usort($group, function($a, $b) use ($mini, $seeding_order) {
             $ma = $mini[$a['id']]; $mb = $mini[$b['id']];
             if ($mb['points']    !== $ma['points'])    return $mb['points']    - $ma['points'];
             if ($mb['goal_diff'] !== $ma['goal_diff']) return $mb['goal_diff'] - $ma['goal_diff'];
