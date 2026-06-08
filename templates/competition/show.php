@@ -280,10 +280,7 @@ ob_start(); ?>
             </div>
             <?php else: ?>
             <?php if ($d_comp): ?>
-            <span class="badge bg-<?= $d_diff ? 'warning text-dark' : 'secondary' ?>"
-                  <?= $d_diff ? 'title="Aktuell im Register: ' . (int)$d_reg . '"' : '' ?>>
-              <?= (int)$d_comp ?>
-            </span>
+            <span class="badge bg-secondary"><?= (int)$d_comp ?></span>
             <?php endif; ?>
             <?php endif; ?>
           </td>
@@ -441,10 +438,7 @@ ob_start(); ?>
             </div>
             <?php else: ?>
             <?php if ($comp_skill): $sv = $is_tennis ? number_format($comp_skill, 1) : (int)$comp_skill; ?>
-            <span class="badge bg-<?= $skill_diff ? 'warning text-dark' : 'secondary' ?>"
-                  <?= $skill_diff ? 'title="Aktuell im Register: ' . ($is_tennis ? number_format($reg_skill, 1) : (int)$reg_skill) . '"' : '' ?>>
-              <?= $sv ?>
-            </span>
+            <span class="badge bg-secondary"><?= $sv ?></span>
             <?php endif; ?>
             <?php endif; ?>
           </td>
