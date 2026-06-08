@@ -40,7 +40,7 @@ function index(array $p): void {
     foreach ($all_doubles as $d) {
         $s1 = $player_skills[$d['player1_id']] ?? [];
         $s2 = $player_skills[$d['player2_id']] ?? [];
-        $sports = array_unique(array_merge(array_keys($s1), array_keys($s2)));
+        $sports = array_column(SPORTS_LIST, 0);
         $sums = [];
         foreach ($sports as $sport) {
             $v1 = isset($s1[$sport]) ? (float)$s1[$sport] : ($sport === 'tennis' ? 10.0 : 0.0);

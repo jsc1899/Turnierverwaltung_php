@@ -222,7 +222,7 @@ ob_start(); ?>
           <td class="text-center" data-sort="<?= (float)$d['skill'] ?>">
             <?php
               $d_comp  = (float)($d['skill'] ?? 0);
-              $d_reg   = (float)($d['double_skill'] ?? 0);
+              $d_reg   = (float)($d['registry_skill'] ?? 0);
               $d_diff  = abs($d_comp - $d_reg) > 0.049;
             ?>
             <?php if (can_edit()): ?>

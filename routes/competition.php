@@ -43,7 +43,7 @@ function show(array $p): void {
 
     if ($is_doubles) {
         $assigned_doubles = db_fetchall(
-            "SELECT d.id, d.name, d.player1_id, d.player2_id, d.skill as double_skill,
+            "SELECT d.id, d.name, d.player1_id, d.player2_id,
              TRIM(CONCAT(COALESCE(p1.firstname,''), IF(COALESCE(p1.firstname,'')!='', ' ',''), p1.name)) as p1name,
              TRIM(CONCAT(COALESCE(p2.firstname,''), IF(COALESCE(p2.firstname,'')!='', ' ',''), p2.name)) as p2name,
              p1.club as p1club, p2.club as p2club,
@@ -56,13 +56,24 @@ function show(array $p): void {
             [$cid]
         );
         $assigned_dids = array_column($assigned_doubles, 'id');
+        $d_sport = $t['sport'] ?? '';
+        foreach ($assigned_doubles as &$d) {
+            $d['registry_skill'] = _get_player_skill((int)$d['player1_id'], $d_sport)
+                                 + _get_player_skill((int)$d['player2_id'], $d_sport);
+        }
+        unset($d);
         $unassigned_doubles = db_fetchall(
-            "SELECT d.id, d.name, d.skill FROM `double` d
+            "SELECT d.id, d.name, d.player1_id, d.player2_id FROM `double` d
              WHERE d.id NOT IN
              (SELECT double_id FROM competition_double WHERE competition_id = ?)
              ORDER BY d.name",
             [$cid]
         );
+        foreach ($unassigned_doubles as &$ud) {
+            $ud['skill'] = _get_player_skill((int)$ud['player1_id'], $d_sport)
+                         + _get_player_skill((int)$ud['player2_id'], $d_sport);
+        }
+        unset($ud);
         // Alle competition_player-Einträge ohne Doppelpartner (authoritative source, unabhängig von registration-Status)
         $confirmed_regs = ($c['phase'] === 'setup' && !empty($c['is_doubles'])) ? db_fetchall(
             "SELECT p.id as player_id, p.firstname, p.name as lastname, p.club, p.pass_nr,
