@@ -20,6 +20,7 @@ ob_start(); ?>
           <a href="#turniere"        class="list-group-item list-group-item-action">Turniere</a>
           <a href="#bewerbe"         class="list-group-item list-group-item-action">Bewerbe</a>
           <a href="#spieler"         class="list-group-item list-group-item-action">Spieler &amp; Spielstärke</a>
+          <a href="#doppel"          class="list-group-item list-group-item-action">Doppel</a>
           <a href="#auslosung"       class="list-group-item list-group-item-action">Auslosung</a>
           <a href="#gruppenphase"    class="list-group-item list-group-item-action ps-4">↳ Gruppenphase</a>
           <a href="#ko"              class="list-group-item list-group-item-action ps-4">↳ KO-Runde</a>
@@ -61,8 +62,8 @@ ob_start(); ?>
         <div class="col-md-4">
           <div class="card h-100 border-warning">
             <div class="card-body">
-              <h6 class="card-title"><i class="bi bi-people me-1 text-warning"></i>Spieler</h6>
-              <p class="card-text small text-muted">Globales Spielerregister mit Spielstärke, Import-Funktion und öffentlichem Anmeldeformular.</p>
+              <h6 class="card-title"><i class="bi bi-people me-1 text-warning"></i>Spieler &amp; Doppel</h6>
+              <p class="card-text small text-muted">Globales Spielerregister mit Spielstärke, Doppel-Verwaltung, Import-Funktion und öffentlichem Anmeldeformular.</p>
             </div>
           </div>
         </div>
@@ -158,8 +159,18 @@ ob_start(); ?>
         <li><strong>Setzungsreihenfolge</strong> — Höhere Spielstärke = stärker (Standard) oder niedrigere = stärker (Tennis)</li>
       </ul>
 
-      <h5 class="mt-3">Spieler einem Bewerb zuweisen</h5>
-      <p>Im Setup können Spieler aus dem globalen Register über die Suchleiste dem Bewerb hinzugefügt werden. Die Spielstärke wird aus dem Register übernommen und kann für diesen Bewerb individuell angepasst werden.</p>
+      <h5 class="mt-3">Doppelbewerb</h5>
+      <p>Wird ein Bewerb als <strong>Doppelbewerb</strong> markiert, gelten folgende Besonderheiten:</p>
+      <ul>
+        <li>Dem Bewerb werden <strong>Doppel</strong> (Paare aus zwei Spielern) statt Einzelspieler zugewiesen</li>
+        <li><strong>Max. Teilnehmer</strong> zählt Doppel (nicht Einzelspieler)</li>
+        <li>Im öffentlichen Anmeldeformular erscheint ein Badge <em>Doppelbewerb</em> und ein optionales Feld für den gewünschten Partner</li>
+        <li>Die Bewerbskachel auf der Turnierseite zeigt die Anzahl zugewiesener Doppel</li>
+      </ul>
+
+      <h5 class="mt-3">Spieler/Doppel einem Bewerb zuweisen</h5>
+      <p>Im Setup können Einzelspieler aus dem globalen Register über die Suchleiste dem Bewerb hinzugefügt werden. Die Spielstärke wird aus dem Register übernommen und kann für diesen Bewerb individuell angepasst werden.</p>
+      <p>Bei Doppelbewerben werden stattdessen Doppel aus dem Doppelregister zugewiesen. Jeder Spieler darf pro Bewerb nur in einem Doppel sein.</p>
     </section>
 
     <!-- Spieler -->
@@ -186,6 +197,37 @@ ob_start(); ?>
         <li>Spieler ohne Spielstärke (0) gelten als schwächste Spieler</li>
         <li>Im Tennis-Modus (niedrigere Stärke = besser) wird die Reihenfolge umgekehrt</li>
       </ul>
+    </section>
+
+    <!-- Doppel -->
+    <section id="doppel" class="mb-5">
+      <h2 class="h4 border-bottom pb-2">Doppel</h2>
+      <p>Doppel (Spielerpaare) werden im <strong>Spielerregister</strong> unter dem Tab <em>Doppel</em> zentral verwaltet und können danach Doppelbewerben zugewiesen werden.</p>
+
+      <h5 class="mt-3">Doppel anlegen</h5>
+      <ol>
+        <li>Im Spielerregister auf den Tab <strong>Doppel</strong> wechseln</li>
+        <li>Über <strong>Neues Doppel</strong> zwei Spieler aus dem Register auswählen</li>
+        <li>Der Name wird automatisch aus den Nachnamen gebildet (z.B. „Müller / Huber"), kann aber angepasst werden</li>
+        <li>Die <strong>Spielstärke</strong> ergibt sich automatisch als Summe der Einzelspielstärken je Sportart; beim Speichern wird sie berechnet</li>
+      </ol>
+
+      <h5 class="mt-3">Spielstärke bei Doppeln</h5>
+      <ul>
+        <li>Basis ist die sportartspezifische Spielstärke beider Spieler aus <em>player_skill</em></li>
+        <li>Fehlt ein Wert bei Tennis, wird automatisch <strong>10,0</strong> als Standardwert angenommen</li>
+        <li>Die Doppelstärke wird bei jeder Änderung der Einzelspielstärken automatisch aktualisiert</li>
+      </ul>
+
+      <h5 class="mt-3">Doppel einem Bewerb zuweisen</h5>
+      <p>Auf der Bewerbsseite eines Doppelbewerbs kann über die Suchleiste ein Doppel aus dem Register hinzugefügt werden. Für jedes Doppel kann die Spielstärke bewerbs-spezifisch angepasst werden.</p>
+      <div class="alert alert-info small">
+        <i class="bi bi-info-circle me-1"></i>
+        Jeder Einzelspieler darf pro Bewerb nur in <strong>einem</strong> Doppel teilnehmen. Beim Hinzufügen wird dies automatisch geprüft.
+      </div>
+
+      <h5 class="mt-3">Doppel aus Nennungen bilden</h5>
+      <p>Melden sich Spieler für einen Doppelbewerb über das öffentliche Anmeldeformular an, erscheinen sie nach Admin-Bestätigung im Abschnitt <em>Bestätigte Nennungen (noch ohne Partner)</em> auf der Bewerbsseite. Der Admin kann dort zwei Spieler auswählen und mit <strong>Doppel bilden</strong> direkt ein Doppel anlegen und dem Bewerb zuweisen.</p>
     </section>
 
     <!-- Auslosung -->
@@ -252,26 +294,49 @@ ob_start(); ?>
       <ol>
         <li>Turnierseite aufrufen → <strong>Anmelden</strong></li>
         <li>Name, Kontaktdaten und gewünschte Bewerbe auswählen → Absenden</li>
+        <li>Bei Doppelbewerben kann optional ein <strong>Gewünschter Partner</strong> angegeben werden (rein informativ für den Admin)</li>
         <li>Die Nennung erscheint als <em>ausstehend</em> beim Admin — der Spieler erhält keine automatische Bestätigung</li>
         <li>Sobald der Admin alle Bewerbe der Nennung bestätigt hat, wird automatisch ein <strong>Magic-Link</strong> per E-Mail verschickt (7 Tage gültig)</li>
         <li>Über diesen Link kann die Nennung zurückgezogen oder ein Änderungsantrag gestellt werden</li>
       </ol>
 
-      <h5 class="mt-3">Ablauf für Admins</h5>
+      <h5 class="mt-3">Ablauf für Admins (Einzelbewerbe)</h5>
       <ul>
         <li>Neue Nennungen erscheinen auf der Turnierseite unter <em>Ausstehende Nennungen</em></li>
-        <li>Bestätigung: Einzeln pro Bewerb oder alle auf einmal mit <strong>Alle bestätigen</strong></li>
-        <li>Der Magic-Link wird automatisch versendet, sobald alle Bewerbe einer Nennung entschieden sind — entweder bei „Alle bestätigen" oder wenn der letzte noch offene Bewerb einzeln bestätigt wird</li>
+        <li>Bestätigung: Einzeln pro Bewerb oder alle auf einmal mit <strong>Alle bestätigen</strong> — der Spieler wird automatisch dem Bewerb zugeordnet</li>
+        <li>Der Magic-Link wird automatisch versendet, sobald alle Bewerbe einer Nennung entschieden sind</li>
         <li>Wird eine Nennung vollständig abgelehnt, wird kein Magic-Link gesendet</li>
-        <li>Änderungsanträge erscheinen unter <em>Änderungsanträge</em> und können pro Bewerb einzeln angenommen oder abgelehnt werden</li>
+        <li>Änderungsanträge erscheinen unter <em>Änderungsanträge</em>; nach Bestätigung oder Ablehnung wird der Spieler per E-Mail informiert</li>
       </ul>
 
+      <h5 class="mt-3">Ablauf für Admins (Doppelbewerbe)</h5>
+      <p>Bei Doppelbewerben melden sich Spieler als Einzelpersonen an — der Admin weist Doppelpartner zu:</p>
+      <ol>
+        <li>Nennung auf der Turnierseite bestätigen → Spieler erscheint im Abschnitt <em>Bestätigte Nennungen (noch ohne Partner)</em> auf der Bewerbsseite</li>
+        <li>Sobald mindestens zwei Spieler ohne Partner vorhanden sind, können zwei davon über das <strong>Doppel bilden</strong>-Formular gepaart werden</li>
+        <li>Das Doppel wird automatisch angelegt (oder ein bestehendes wiederverwendet) und dem Bewerb zugewiesen</li>
+        <li>Wunschpartner-Angaben der Spieler sind in der Nennungsübersicht und im Paarungsbereich sichtbar</li>
+      </ol>
+      <div class="alert alert-warning small">
+        <i class="bi bi-exclamation-triangle me-1"></i>
+        Zieht ein Spieler aus einem Doppelbewerb zurück, wird das gesamte Doppel aus dem Bewerb entfernt. Die Nennung des Partners wird auf <em>ausstehend</em> zurückgesetzt, sodass der Admin ihn neu zuordnen oder ablehnen kann.
+      </div>
+
+      <h5 class="mt-3">Nennungsänderung über Magic-Link</h5>
+      <p>Über den Magic-Link können Spieler:</p>
+      <ul>
+        <li>Die gesamte Nennung <strong>zurückziehen</strong> (erzeugt einen Rückzugsantrag)</li>
+        <li><strong>Bewerbe ändern</strong> — Bewerbe hinzufügen oder abmelden; bei Doppelbewerben kann der Wunschpartner angegeben oder aktualisiert werden</li>
+        <li>Den <strong>Gewünschten Partner</strong> für einen bereits zugeteilten Doppelbewerb jederzeit aktualisieren (ohne Änderungsantrag)</li>
+      </ul>
+      <p>Alle Änderungen (außer dem Partner-Namen) müssen vom Admin bestätigt werden. Nach der Bearbeitung erhält der Spieler eine E-Mail mit dem Ergebnis.</p>
+
       <h5 class="mt-3">Link nachträglich anfordern</h5>
-      <p>Ist der Magic-Link abgelaufen oder nie angekommen, können Spieler unter <strong>Nennung verwalten</strong> (Menü oben) mit ihrer E-Mail-Adresse einen neuen Link anfordern. Der Link wird nur gesendet, wenn unter dieser E-Mail-Adresse eine bestätigte Nennung für ein laufendes Turnier existiert.</p>
+      <p>Ist der Magic-Link abgelaufen oder nie angekommen, können Spieler unter <strong>Nennung verwalten</strong> (Menü oben) mit ihrer E-Mail-Adresse einen neuen Link anfordern. Der Link wird nur gesendet, wenn unter dieser E-Mail-Adresse eine Nennung für ein laufendes Turnier existiert.</p>
 
       <div class="alert alert-info small">
         <i class="bi bi-info-circle me-1"></i>
-        Ohne konfigurierte E-Mail-Einstellungen (<code>MAIL_HOST</code>) wird der Magic-Link statt per E-Mail direkt im Admin-Interface als Flash-Nachricht angezeigt.
+        Ohne konfigurierte E-Mail-Einstellungen (<code>MAIL_HOST</code>) werden Magic-Links und Benachrichtigungen statt per E-Mail direkt im Admin-Interface als Flash-Nachricht angezeigt.
       </div>
     </section>
 
