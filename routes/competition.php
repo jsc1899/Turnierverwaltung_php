@@ -255,7 +255,8 @@ function show(array $p): void {
                     "SELECT m.*,
                      COALESCE(CONCAT(dp1a.name,' / ',dp1b.name),'') as p1name,
                      COALESCE(CONCAT(dp2a.name,' / ',dp2b.name),'') as p2name,
-                     '' as p1club, '' as p2club
+                     CASE WHEN COALESCE(dp1a.club,'')='' THEN COALESCE(dp1b.club,'') WHEN COALESCE(dp1b.club,'')='' THEN COALESCE(dp1a.club,'') WHEN dp1a.club=dp1b.club THEN dp1a.club ELSE CONCAT(dp1a.club,' / ',dp1b.club) END as p1club,
+                     CASE WHEN COALESCE(dp2a.club,'')='' THEN COALESCE(dp2b.club,'') WHEN COALESCE(dp2b.club,'')='' THEN COALESCE(dp2a.club,'') WHEN dp2a.club=dp2b.club THEN dp2a.club ELSE CONCAT(dp2a.club,' / ',dp2b.club) END as p2club
                      FROM `match` m
                      LEFT JOIN `double` d1 ON d1.id = m.double1_id
                      LEFT JOIN `double` d2 ON d2.id = m.double2_id
