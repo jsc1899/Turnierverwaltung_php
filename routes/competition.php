@@ -13,7 +13,7 @@ function new_competition(array $p): void {
     require_edit();
     csrf_verify();
     $name          = trim(post('name'));
-    $group_size    = max(3, min(6, (int)post('group_size', 4)));
+    $group_size    = max(3, min(8, (int)post('group_size', 4)));
     $advance_count = max(0, min(2, (int)post('advance_count', 1)));
     $mode          = in_array(post('mode'), ['groups_ko', 'ko_only', 'double_ko']) ? post('mode') : 'groups_ko';
     $is_doubles    = post('is_doubles') ? 1 : 0;
@@ -458,7 +458,7 @@ function settings(array $p): void {
 
 
     $name              = trim(post('name', ''));
-    $group_size        = max(3, min(6, (int)post('group_size', 4)));
+    $group_size        = max(3, min(8, (int)post('group_size', 4)));
     $advance_count     = max(0, min(2, (int)post('advance_count', 1)));
     $third_place       = post('third_place') ? 1 : 0;
     $registrations_open = post('registrations_open') ? 1 : 0;
@@ -681,7 +681,7 @@ function draw_groups(array $p): void {
     $group_size = (int)$c['group_size'];
     $num_groups = max(1, (int)round($n / $group_size));
     while ($num_groups > 1 && $n / $num_groups < 3) $num_groups--;
-    while ($n / $num_groups > 6) $num_groups++;
+    while ($n / $num_groups > 8) $num_groups++;
 
     $pdo = get_db();
     $pdo->beginTransaction();

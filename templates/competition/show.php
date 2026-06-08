@@ -121,7 +121,7 @@ ob_start(); ?>
       <div class="col-auto">
         <label class="form-label">Gruppengröße</label>
         <select name="group_size" class="form-select form-select-sm">
-          <?php foreach ([3,4,5,6] as $s): ?>
+          <?php foreach ([3,4,5,6,7,8] as $s): ?>
           <option value="<?= $s ?>"<?= (int)$c['group_size'] === $s ? ' selected' : '' ?>><?= $s ?> Spieler</option>
           <?php endforeach; ?>
         </select>

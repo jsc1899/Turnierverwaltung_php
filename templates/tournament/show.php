@@ -304,6 +304,8 @@ ob_start(); ?>
                 <option value="4" selected>4 Spieler</option>
                 <option value="5">5 Spieler</option>
                 <option value="6">6 Spieler</option>
+                <option value="7">7 Spieler</option>
+                <option value="8">8 Spieler</option>
               </select>
             </div>
             <div class="mb-3">
