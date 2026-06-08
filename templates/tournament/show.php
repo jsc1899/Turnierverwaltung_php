@@ -82,15 +82,17 @@ $nennung_badge = $pending_count + $change_count;
       <?php endif; ?>
     </button>
   </li>
+  <?php if (can_edit()): ?>
   <li class="nav-item" role="presentation">
     <button class="nav-link" id="tab-registrations-btn"
             data-bs-toggle="tab" data-bs-target="#tab-registrations" type="button" role="tab">
       <i class="bi bi-person-lines-fill me-1"></i>Nennungen
-      <?php if (can_edit() && $nennung_badge > 0): ?>
+      <?php if ($nennung_badge > 0): ?>
       <span class="badge bg-warning text-dark ms-1"><?= $nennung_badge ?></span>
       <?php endif; ?>
     </button>
   </li>
+  <?php endif; ?>
   <?php if (can_edit()): ?>
   <li class="nav-item" role="presentation">
     <button class="nav-link" id="tab-settings-btn"
@@ -183,16 +185,16 @@ $nennung_badge = $pending_count + $change_count;
     <?php endif; ?>
   </div><!-- /tab-competitions -->
 
+  <?php if (can_edit()): ?>
   <!-- ── Tab: Nennungen ────────────────────────────────────────────────────── -->
   <div class="tab-pane fade p-3" id="tab-registrations" role="tabpanel">
-    <?php if (can_edit() && ($registrations || $change_requests || $history)): ?>
+    <?php if ($registrations || $change_requests || $history): ?>
     <?php include __DIR__ . '/_registrations_panel.php'; ?>
-    <?php elseif (!$t['registrations_open'] && !can_edit()): ?>
-    <p class="text-muted mb-0"><i class="bi bi-lock me-1"></i>Nennungen sind geschlossen.</p>
-    <?php elseif (can_edit()): ?>
+    <?php else: ?>
     <p class="text-muted mb-0">Noch keine Nennungen vorhanden.</p>
     <?php endif; ?>
   </div><!-- /tab-registrations -->
+  <?php endif; ?>
 
   <?php if (can_edit()): ?>
   <!-- ── Tab: Einstellungen ─────────────────────────────────────────────────── -->
