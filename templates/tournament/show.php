@@ -39,6 +39,11 @@ ob_start(); ?>
       <a href="<?= url('tournament/' . $t['id'] . '/aushang') ?>" target="_blank" class="text-decoration-none">
         <i class="bi bi-printer me-1"></i>Aushang
       </a>
+      <?php if ($t['registrations_open']): ?>
+      <a href="<?= url('tournament/' . $t['id'] . '/register') ?>" target="_blank" class="text-decoration-none">
+        <i class="bi bi-box-arrow-in-right me-1"></i>Spielernennung für das Turnier abgeben
+      </a>
+      <?php endif; ?>
       <?php if ($t['is_done']): ?>
       <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
         <i class="bi bi-flag-fill"></i> beendet
@@ -177,19 +182,6 @@ $nennung_badge = $pending_count + $change_count;
 
   <!-- ── Tab: Nennungen ────────────────────────────────────────────────────── -->
   <div class="tab-pane fade p-3" id="tab-registrations" role="tabpanel">
-    <?php if ($t['registrations_open']): ?>
-    <div class="alert alert-info d-flex align-items-center gap-3 mb-3 py-2">
-      <i class="bi bi-link-45deg fs-5"></i>
-      <div class="flex-grow-1">
-        <div class="fw-semibold small mb-1">Nennungs-Link für Spieler</div>
-        <?php $reg_link = url('tournament/' . $t['id'] . '/register'); ?>
-        <a id="reg-link" href="<?= e($reg_link) ?>" target="_blank" class="text-break small"><?= e($reg_link) ?></a>
-      </div>
-      <button class="btn btn-outline-secondary btn-sm" onclick="copyRegLink()">
-        <i class="bi bi-clipboard"></i>
-      </button>
-    </div>
-    <?php endif; ?>
     <?php if (can_edit() && ($registrations || $change_requests || $history)): ?>
     <?php include __DIR__ . '/_registrations_panel.php'; ?>
     <?php elseif (!$t['registrations_open'] && !can_edit()): ?>
@@ -402,14 +394,6 @@ $extra_js = <<<'JS'
 function openImageModal(src) {
   document.getElementById('imageModalImg').src = src;
   new bootstrap.Modal(document.getElementById('imageModal')).show();
-}
-function copyRegLink() {
-  var link = document.getElementById('reg-link').href;
-  navigator.clipboard.writeText(link).then(function() {
-    var btn = event.target.closest('button');
-    btn.innerHTML = '<i class="bi bi-check"></i>';
-    setTimeout(function() { btn.innerHTML = '<i class="bi bi-clipboard"></i>'; }, 1500);
-  });
 }
 function toggleGroupSettings() {
   var sel = document.getElementById('comp-mode-select');
