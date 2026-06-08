@@ -246,8 +246,8 @@ ob_start(); ?>
       </ol>
       <p>Die Gruppenplatzierung (Wertung: Sieg=2 Pkt., Unentschieden=1 Pkt., Niederlage=0 Pkt.) bestimmt, welche Spieler in die KO-Runde aufsteigen. Tiebreaker-Reihenfolge bei Punktegleichstand:</p>
       <ol class="small">
-        <li>Direkter Vergleich (Mini-Tabelle nur aus den Spielen der punktegleichen Spieler): Punkte → Tordifferenz → erzielte Tore</li>
-        <li>Gesamte Tordifferenz aller Gruppenspiele</li>
+        <li>Direkter Vergleich (Mini-Tabelle nur aus den Spielen der punktegleichen Spieler): Punkte → Differenz → erzielte Tore</li>
+        <li>Gesamte Differenz aller Gruppenspiele</li>
         <li>Gesamte erzielte Tore</li>
         <li>Spielstärke (Richtung je nach Setzungsreihenfolge: höher = besser bzw. niedriger = besser)</li>
       </ol>
