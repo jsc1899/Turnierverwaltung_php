@@ -301,16 +301,11 @@ function show(array $p): void {
                     $ko_rounds[] = ['round' => (int)$r, 'name' => $round_names[(int)$r] ?? "Runde $r", 'matches' => $rmatches];
                 }
             }
-            $final = db_fetch(
-                "SELECT m.*,
-                 TRIM(CONCAT(p1.name, IF(COALESCE(p1.firstname,'')!='',CONCAT(' ',p1.firstname),''))) as p1name, p1.club as p1club,
-                 TRIM(CONCAT(p2.name, IF(COALESCE(p2.firstname,'')!='',CONCAT(' ',p2.firstname),''))) as p2name, p2.club as p2club
-                 FROM `match` m
-                 LEFT JOIN player p1 ON p1.id=m.player1_id
-                 LEFT JOIN player p2 ON p2.id=m.player2_id
-                 WHERE m.competition_id=? AND m.ko_round=2 AND m.played=1 AND m.bracket IS NULL",
-                [$cid]
-            );
+            // Platzierungen aus $rounds_dict ermitteln — enthält korrekte Namen für Singles + Doppel
+            $final = null;
+            foreach ($rounds_dict[2] ?? [] as $m) {
+                if ($m['played']) { $final = $m; break; }
+            }
             if ($final) {
                 if ($final['score1'] > $final['score2']) {
                     $places = [
@@ -323,16 +318,10 @@ function show(array $p): void {
                         ['rank'=>2,'name'=>$final['p1name'],'club'=>$final['p1club']],
                     ];
                 }
-                $third = db_fetch(
-                    "SELECT m.*,
-                     TRIM(CONCAT(p1.name,IF(COALESCE(p1.firstname,'')!='',CONCAT(' ',p1.firstname),''))) as p1name, p1.club as p1club,
-                     TRIM(CONCAT(p2.name,IF(COALESCE(p2.firstname,'')!='',CONCAT(' ',p2.firstname),''))) as p2name, p2.club as p2club
-                     FROM `match` m
-                     LEFT JOIN player p1 ON p1.id=m.player1_id
-                     LEFT JOIN player p2 ON p2.id=m.player2_id
-                     WHERE m.competition_id=? AND m.ko_round=3 AND m.played=1",
-                    [$cid]
-                );
+                $third = null;
+                foreach ($rounds_dict[3] ?? [] as $m) {
+                    if ($m['played']) { $third = $m; break; }
+                }
                 if ($third) {
                     if ($third['score1'] > $third['score2']) {
                         $places[] = ['rank'=>3,'name'=>$third['p1name'],'club'=>$third['p1club']];
@@ -343,17 +332,8 @@ function show(array $p): void {
                     }
                 } elseif (!$c['third_place']) {
                     // Kein Spiel um Platz 3 — Halbfinal-Verlierer teilen sich Platz 3
-                    $semis = db_fetchall(
-                        "SELECT m.*,
-                         TRIM(CONCAT(p1.name,IF(COALESCE(p1.firstname,'')!='',CONCAT(' ',p1.firstname),''))) as p1name, p1.club as p1club,
-                         TRIM(CONCAT(p2.name,IF(COALESCE(p2.firstname,'')!='',CONCAT(' ',p2.firstname),''))) as p2name, p2.club as p2club
-                         FROM `match` m
-                         LEFT JOIN player p1 ON p1.id=m.player1_id
-                         LEFT JOIN player p2 ON p2.id=m.player2_id
-                         WHERE m.competition_id=? AND m.ko_round=4 AND m.played=1 AND m.bracket IS NULL",
-                        [$cid]
-                    );
-                    foreach ($semis as $s) {
+                    foreach ($rounds_dict[4] ?? [] as $s) {
+                        if (!$s['played']) continue;
                         $loser_name = $s['score1'] > $s['score2'] ? $s['p2name'] : $s['p1name'];
                         $loser_club = $s['score1'] > $s['score2'] ? $s['p2club'] : $s['p1club'];
                         $places[] = ['rank' => 3, 'name' => $loser_name, 'club' => $loser_club];
