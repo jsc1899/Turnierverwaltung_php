@@ -56,159 +56,67 @@ ob_start(); ?>
        style="height:150px;width:auto;max-width:200px;object-fit:contain;border-radius:6px;cursor:pointer;flex-shrink:0"
        onclick="openImageModal('<?= url('uploads/' . $t['banner_image']) ?>')" alt="">
   <?php endif; ?>
-  <?php if (can_edit()): ?>
-  <button class="btn btn-outline-secondary btn-sm"
-          data-bs-toggle="collapse" data-bs-target="#settings-panel">
-    <i class="bi bi-gear me-1"></i>Einstellungen
-  </button>
-  <form method="post" action="<?= url('tournament/' . $t['id'] . '/delete') ?>"
-        onsubmit="return confirm('Turnier wirklich löschen?')">
-    <?= csrf_field() ?>
-    <button class="btn btn-outline-danger btn-sm">
-      <i class="bi bi-trash me-1"></i>Löschen
+</div>
+
+<!-- ═══ Registerkarten ═══════════════════════════════════════════════════════ -->
+<?php
+$pending_count = count($registrations ?? []);
+$change_count  = count($change_requests ?? []);
+$nennung_badge = $pending_count + $change_count;
+?>
+<ul class="nav nav-tabs mb-0" id="tournament-tabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="tab-competitions-btn"
+            data-bs-toggle="tab" data-bs-target="#tab-competitions" type="button" role="tab">
+      <i class="bi bi-diagram-3 me-1"></i>Bewerbe
+      <?php if ($comp_info): ?>
+      <span class="badge bg-secondary ms-1"><?= count($comp_info) ?></span>
+      <?php endif; ?>
     </button>
-  </form>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tab-registrations-btn"
+            data-bs-toggle="tab" data-bs-target="#tab-registrations" type="button" role="tab">
+      <i class="bi bi-person-lines-fill me-1"></i>Nennungen
+      <?php if (can_edit() && $nennung_badge > 0): ?>
+      <span class="badge bg-warning text-dark ms-1"><?= $nennung_badge ?></span>
+      <?php endif; ?>
+    </button>
+  </li>
+  <?php if (can_edit()): ?>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tab-settings-btn"
+            data-bs-toggle="tab" data-bs-target="#tab-settings" type="button" role="tab">
+      <i class="bi bi-gear me-1"></i>Einstellungen
+    </button>
+  </li>
   <?php endif; ?>
-</div>
+</ul>
 
-<?php if (can_edit()): ?>
-<!-- Settings Panel -->
-<div class="collapse mb-4" id="settings-panel">
-  <div class="card shadow-sm">
-    <div class="card-header fw-semibold"><i class="bi bi-gear me-1"></i>Turnier-Einstellungen</div>
-    <div class="card-body">
-      <form method="post" action="<?= url('tournament/' . $t['id'] . '/settings') ?>"
-            enctype="multipart/form-data" class="row g-3">
-        <?= csrf_field() ?>
-        <div class="col-md-6">
-          <label class="form-label">Name</label>
-          <input type="text" name="name" class="form-control" value="<?= e($t['name']) ?>" required>
-        </div>
-        <div class="col-md-4">
-          <label class="form-label">Veranstalter</label>
-          <input type="text" name="organizer" class="form-control" value="<?= e($t['organizer'] ?? '') ?>">
-        </div>
-        <div class="col-md-2">
-          <label class="form-label">Sportart</label>
-          <?php $sport_current = $t['sport'] ?? ''; include __DIR__ . '/../_sport_picker.php'; ?>
-        </div>
-        <div class="col-md-3">
-          <label class="form-label">Termin</label>
-          <input type="date" name="event_date" class="form-control" value="<?= e($t['event_date'] ?? '') ?>">
-        </div>
-        <div class="col-md-3">
-          <label class="form-label">Max. Bewerbe je Spieler</label>
-          <select name="max_competitions" class="form-select">
-            <?php for ($i = 1; $i <= 5; $i++): ?>
-            <option value="<?= $i ?>"<?= (int)($t['max_competitions'] ?? 1) === $i ? ' selected' : '' ?>><?= $i ?></option>
-            <?php endfor; ?>
-          </select>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Weitere Informationen (URL)</label>
-          <input type="url" name="info_url" class="form-control"
-                 value="<?= e($t['info_url'] ?? '') ?>" placeholder="https://…">
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Ausschreibung (PDF)</label>
-          <?php if ($t['ausschreibung']): ?>
-          <div class="d-flex align-items-center gap-2 mb-2">
-            <a href="<?= url('tournament/' . $t['id'] . '/ausschreibung') ?>" target="_blank" class="small text-decoration-none">
-              <i class="bi bi-file-earmark-pdf text-danger"></i> aktuell
-            </a>
-            <div class="form-check mb-0">
-              <input class="form-check-input" type="checkbox" name="remove_ausschreibung" id="remove_ausschreibung">
-              <label class="form-check-label text-danger small" for="remove_ausschreibung">Entfernen</label>
-            </div>
-          </div>
-          <?php endif; ?>
-          <input type="file" name="ausschreibung_file" class="form-control" accept=".pdf">
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Turnierbild (JPG, PNG, GIF, WebP)</label>
-          <?php if ($t['banner_image']): ?>
-          <div class="d-flex align-items-center gap-2 mb-2">
-            <img src="<?= url('uploads/' . $t['banner_image']) ?>"
-                 height="48" class="rounded border" style="object-fit:cover;cursor:pointer"
-                 onclick="openImageModal('<?= url('uploads/' . $t['banner_image']) ?>')">
-            <div class="form-check mb-0">
-              <input class="form-check-input" type="checkbox" name="remove_banner" id="remove_banner">
-              <label class="form-check-label text-danger small" for="remove_banner">Bild entfernen</label>
-            </div>
-          </div>
-          <?php endif; ?>
-          <input type="file" name="banner_file" class="form-control" accept=".jpg,.jpeg,.png,.gif,.webp">
-        </div>
-        <div class="col-md-3">
-          <label class="form-label">Turnierstatus</label>
-          <select name="tournament_status" class="form-select">
-            <option value="open"<?= ($t['registrations_open'] && !$t['is_done']) ? ' selected' : '' ?>>offen</option>
-            <option value="closed"<?= (!$t['registrations_open'] && !$t['is_done']) ? ' selected' : '' ?>>geschlossen</option>
-            <option value="done"<?= $t['is_done'] ? ' selected' : '' ?>>beendet</option>
-          </select>
-        </div>
-        <div class="col-md-3">
-          <label class="form-label">Sichtbarkeit</label>
-          <select name="is_public" class="form-select">
-            <option value="1"<?= ($t['is_public'] != 0) ? ' selected' : '' ?>>öffentlich</option>
-            <option value="0"<?= ($t['is_public'] == 0) ? ' selected' : '' ?>>nur Admins/Editoren</option>
-          </select>
-        </div>
-        <div class="col-12">
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="show_skill" id="show_skill" value="1"
-                   <?= ($t['show_skill'] ?? 0) ? 'checked' : '' ?>>
-            <label class="form-check-label" for="show_skill">Spielstärke in Tabellen anzeigen</label>
-          </div>
-        </div>
-        <div class="col-12 d-flex gap-2">
-          <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-check me-1"></i>Speichern</button>
-          <button type="button" class="btn btn-secondary btn-sm"
-                  data-bs-toggle="collapse" data-bs-target="#settings-panel">Abbrechen</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-<?php endif; ?>
+<div class="tab-content border border-top-0 rounded-bottom mb-4">
 
-<?php if ($t['registrations_open']): ?>
-<div class="alert alert-info d-flex align-items-center gap-3 mb-4 py-2">
-  <i class="bi bi-link-45deg fs-5"></i>
-  <div class="flex-grow-1">
-    <div class="fw-semibold small mb-1">Nennungs-Link für Spieler</div>
-    <?php $reg_link = url('tournament/' . $t['id'] . '/register'); ?>
-    <a id="reg-link" href="<?= e($reg_link) ?>" target="_blank" class="text-break small"><?= e($reg_link) ?></a>
-  </div>
-  <button class="btn btn-outline-secondary btn-sm" onclick="copyRegLink()">
-    <i class="bi bi-clipboard"></i>
-  </button>
-</div>
-<?php endif; ?>
-
-<div class="row g-4">
-  <div class="col-12">
-    <div class="d-flex align-items-center mb-3">
-      <h5 class="mb-0">Bewerbe</h5>
+  <!-- ── Tab: Bewerbe ──────────────────────────────────────────────────────── -->
+  <div class="tab-pane fade show active p-3" id="tab-competitions" role="tabpanel">
+    <div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
       <?php if (can_edit()): ?>
-      <button class="btn btn-primary btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#newCompetitionModal">
+      <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newCompetitionModal">
         <i class="bi bi-plus-circle me-1"></i>Neuer Bewerb
       </button>
       <?php endif; ?>
       <?php if (can_edit() && $comp_info): ?>
       <div class="btn-group btn-group-sm ms-auto">
         <span class="btn btn-sm btn-outline-secondary disabled pe-none" style="cursor:default">Spielerliste</span>
-        <a href="<?= url('tournament/' . $t['id'] . '/players/pdf') ?>" class="btn btn-outline-danger" target="_blank" title="PDF exportieren">
+        <a href="<?= url('tournament/' . $t['id'] . '/players/pdf') ?>" class="btn btn-outline-danger" target="_blank" title="PDF">
           <i class="bi bi-file-earmark-pdf me-1"></i>PDF
         </a>
-        <a href="<?= url('tournament/' . $t['id'] . '/players/csv') ?>" class="btn btn-outline-success" title="CSV exportieren">
+        <a href="<?= url('tournament/' . $t['id'] . '/players/csv') ?>" class="btn btn-outline-success" title="CSV">
           <i class="bi bi-filetype-csv me-1"></i>CSV
         </a>
       </div>
       <?php endif; ?>
     </div>
     <?php if ($comp_info): ?>
-    <div class="row g-3 mb-4">
+    <div class="row g-3">
       <?php foreach ($comp_info as $ci): $c = $ci['comp']; ?>
       <div class="col-md-6">
         <div class="card shadow-sm h-100">
@@ -263,14 +171,143 @@ ob_start(); ?>
       <?php endforeach; ?>
     </div>
     <?php else: ?>
-    <p class="text-muted">Noch keine Bewerbe angelegt.</p>
+    <p class="text-muted mb-0">Noch keine Bewerbe angelegt.</p>
     <?php endif; ?>
+  </div><!-- /tab-competitions -->
 
+  <!-- ── Tab: Nennungen ────────────────────────────────────────────────────── -->
+  <div class="tab-pane fade p-3" id="tab-registrations" role="tabpanel">
+    <?php if ($t['registrations_open']): ?>
+    <div class="alert alert-info d-flex align-items-center gap-3 mb-3 py-2">
+      <i class="bi bi-link-45deg fs-5"></i>
+      <div class="flex-grow-1">
+        <div class="fw-semibold small mb-1">Nennungs-Link für Spieler</div>
+        <?php $reg_link = url('tournament/' . $t['id'] . '/register'); ?>
+        <a id="reg-link" href="<?= e($reg_link) ?>" target="_blank" class="text-break small"><?= e($reg_link) ?></a>
+      </div>
+      <button class="btn btn-outline-secondary btn-sm" onclick="copyRegLink()">
+        <i class="bi bi-clipboard"></i>
+      </button>
+    </div>
+    <?php endif; ?>
     <?php if (can_edit() && ($registrations || $change_requests || $history)): ?>
     <?php include __DIR__ . '/_registrations_panel.php'; ?>
+    <?php elseif (!$t['registrations_open'] && !can_edit()): ?>
+    <p class="text-muted mb-0"><i class="bi bi-lock me-1"></i>Nennungen sind geschlossen.</p>
+    <?php elseif (can_edit()): ?>
+    <p class="text-muted mb-0">Noch keine Nennungen vorhanden.</p>
     <?php endif; ?>
-  </div>
-</div>
+  </div><!-- /tab-registrations -->
+
+  <?php if (can_edit()): ?>
+  <!-- ── Tab: Einstellungen ─────────────────────────────────────────────────── -->
+  <div class="tab-pane fade p-3" id="tab-settings" role="tabpanel">
+    <form method="post" action="<?= url('tournament/' . $t['id'] . '/settings') ?>"
+          enctype="multipart/form-data" class="row g-3">
+      <?= csrf_field() ?>
+      <div class="col-md-6">
+        <label class="form-label">Name</label>
+        <input type="text" name="name" class="form-control" value="<?= e($t['name']) ?>" required>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Veranstalter</label>
+        <input type="text" name="organizer" class="form-control" value="<?= e($t['organizer'] ?? '') ?>">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Sportart</label>
+        <?php $sport_current = $t['sport'] ?? ''; include __DIR__ . '/../_sport_picker.php'; ?>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Termin</label>
+        <input type="date" name="event_date" class="form-control" value="<?= e($t['event_date'] ?? '') ?>">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Max. Bewerbe je Spieler</label>
+        <select name="max_competitions" class="form-select">
+          <?php for ($i = 1; $i <= 5; $i++): ?>
+          <option value="<?= $i ?>"<?= (int)($t['max_competitions'] ?? 1) === $i ? ' selected' : '' ?>><?= $i ?></option>
+          <?php endfor; ?>
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Weitere Informationen (URL)</label>
+        <input type="url" name="info_url" class="form-control"
+               value="<?= e($t['info_url'] ?? '') ?>" placeholder="https://…">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Ausschreibung (PDF)</label>
+        <?php if ($t['ausschreibung']): ?>
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <a href="<?= url('tournament/' . $t['id'] . '/ausschreibung') ?>" target="_blank" class="small text-decoration-none">
+            <i class="bi bi-file-earmark-pdf text-danger"></i> aktuell
+          </a>
+          <div class="form-check mb-0">
+            <input class="form-check-input" type="checkbox" name="remove_ausschreibung" id="remove_ausschreibung">
+            <label class="form-check-label text-danger small" for="remove_ausschreibung">Entfernen</label>
+          </div>
+        </div>
+        <?php endif; ?>
+        <input type="file" name="ausschreibung_file" class="form-control" accept=".pdf">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Turnierbild (JPG, PNG, GIF, WebP)</label>
+        <?php if ($t['banner_image']): ?>
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <img src="<?= url('uploads/' . $t['banner_image']) ?>"
+               height="48" class="rounded border" style="object-fit:cover;cursor:pointer"
+               onclick="openImageModal('<?= url('uploads/' . $t['banner_image']) ?>')">
+          <div class="form-check mb-0">
+            <input class="form-check-input" type="checkbox" name="remove_banner" id="remove_banner">
+            <label class="form-check-label text-danger small" for="remove_banner">Bild entfernen</label>
+          </div>
+        </div>
+        <?php endif; ?>
+        <input type="file" name="banner_file" class="form-control" accept=".jpg,.jpeg,.png,.gif,.webp">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Turnierstatus</label>
+        <select name="tournament_status" class="form-select">
+          <option value="open"<?= ($t['registrations_open'] && !$t['is_done']) ? ' selected' : '' ?>>offen</option>
+          <option value="closed"<?= (!$t['registrations_open'] && !$t['is_done']) ? ' selected' : '' ?>>geschlossen</option>
+          <option value="done"<?= $t['is_done'] ? ' selected' : '' ?>>beendet</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Sichtbarkeit</label>
+        <select name="is_public" class="form-select">
+          <option value="1"<?= ($t['is_public'] != 0) ? ' selected' : '' ?>>öffentlich</option>
+          <option value="0"<?= ($t['is_public'] == 0) ? ' selected' : '' ?>>nur Admins/Editoren</option>
+        </select>
+      </div>
+      <div class="col-12">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="show_skill" id="show_skill" value="1"
+                 <?= ($t['show_skill'] ?? 0) ? 'checked' : '' ?>>
+          <label class="form-check-label" for="show_skill">Spielstärke in Tabellen anzeigen</label>
+        </div>
+      </div>
+      <div class="col-12">
+        <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-check me-1"></i>Speichern</button>
+      </div>
+    </form>
+
+    <hr class="my-4">
+
+    <div>
+      <h6 class="text-danger mb-2"><i class="bi bi-exclamation-triangle me-1"></i>Turnier löschen</h6>
+      <p class="text-muted small mb-2">Das Turnier und alle zugehörigen Bewerbe, Spieler und Ergebnisse werden unwiderruflich gelöscht.</p>
+      <form method="post" action="<?= url('tournament/' . $t['id'] . '/delete') ?>"
+            onsubmit="return confirm('Turnier wirklich löschen?')">
+        <?= csrf_field() ?>
+        <button class="btn btn-outline-danger btn-sm">
+          <i class="bi bi-trash me-1"></i>Turnier löschen
+        </button>
+      </form>
+    </div>
+  </div><!-- /tab-settings -->
+  <?php endif; ?>
+
+</div><!-- /tab-content -->
 
 <?php if (can_edit()): ?>
 <!-- Neuer Bewerb Modal -->
@@ -352,6 +389,16 @@ ob_start(); ?>
 <?php
 $extra_js = <<<'JS'
 <script>
+(function() {
+  var hash = window.location.hash;
+  var map = {
+    '#bewerbe':      'tab-competitions-btn',
+    '#nennungen':    'tab-registrations-btn',
+    '#einstellungen':'tab-settings-btn'
+  };
+  var btnId = map[hash];
+  if (btnId) { var btn = document.getElementById(btnId); if (btn) bootstrap.Tab.getOrCreateInstance(btn).show(); }
+})();
 function openImageModal(src) {
   document.getElementById('imageModalImg').src = src;
   new bootstrap.Modal(document.getElementById('imageModal')).show();
