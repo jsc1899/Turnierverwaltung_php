@@ -242,28 +242,30 @@ ob_start(); ?>
               $d_diff  = abs($d_comp - $d_reg) > 0.049;
             ?>
             <?php if (can_edit()): ?>
-            <form method="post" action="<?= url('competition/'.$c['id'].'/double/'.$d['id'].'/skill') ?>"
-                  class="d-inline-flex align-items-center gap-1">
-              <?= csrf_field() ?>
-              <input type="number" name="skill" value="<?= (int)$d_comp ?>"
-                     min="0" class="form-control form-control-sm text-center<?= $d_diff ? ' border-warning' : '' ?>" style="width:5rem">
-              <button type="submit" class="btn btn-outline-secondary btn-sm py-0 px-1" title="Speichern">
-                <i class="bi bi-check-lg"></i>
-              </button>
-            </form>
-            <?php if ($d_diff): ?>
-            <div class="d-flex align-items-center gap-1 text-warning small mt-1">
-              <i class="bi bi-exclamation-triangle-fill"></i>
-              <span>Aktuell: <?= (int)$d_reg ?></span>
-              <form method="post" action="<?= url('competition/'.$c['id'].'/double/'.$d['id'].'/skill') ?>">
+            <div class="d-inline-flex flex-column align-items-center gap-1">
+              <form method="post" action="<?= url('competition/'.$c['id'].'/double/'.$d['id'].'/skill') ?>"
+                    class="d-inline-flex align-items-center gap-1">
                 <?= csrf_field() ?>
-                <input type="hidden" name="skill" value="<?= (int)$d_reg ?>">
-                <button type="submit" class="btn btn-link btn-sm p-0 text-warning lh-1" title="Auf aktuellen Registerwert setzen">
-                  <i class="bi bi-arrow-clockwise"></i>
+                <input type="number" name="skill" value="<?= (int)$d_comp ?>"
+                       min="0" class="form-control form-control-sm text-center<?= $d_diff ? ' border-warning' : '' ?>" style="width:5rem">
+                <button type="submit" class="btn btn-outline-secondary btn-sm py-0 px-1" title="Speichern">
+                  <i class="bi bi-check-lg"></i>
                 </button>
               </form>
+              <?php if ($d_diff): ?>
+              <div class="d-flex align-items-center gap-1 text-warning small">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                <span>Aktuell: <?= (int)$d_reg ?></span>
+                <form method="post" action="<?= url('competition/'.$c['id'].'/double/'.$d['id'].'/skill') ?>">
+                  <?= csrf_field() ?>
+                  <input type="hidden" name="skill" value="<?= (int)$d_reg ?>">
+                  <button type="submit" class="btn btn-link btn-sm p-0 text-warning lh-1" title="Auf aktuellen Registerwert setzen">
+                    <i class="bi bi-arrow-clockwise"></i>
+                  </button>
+                </form>
+              </div>
+              <?php endif; ?>
             </div>
-            <?php endif; ?>
             <?php else: ?>
             <?php if ($d_comp): ?>
             <span class="badge bg-<?= $d_diff ? 'warning text-dark' : 'secondary' ?>"
@@ -399,30 +401,32 @@ ob_start(); ?>
               $skill_diff  = abs($comp_skill - $reg_skill) > 0.049;
             ?>
             <?php if (can_edit()): ?>
-            <form method="post" action="<?= url('competition/'.$c['id'].'/player/'.$pl['id'].'/skill') ?>"
-                  class="d-inline-flex align-items-center gap-1">
-              <?= csrf_field() ?>
-              <input type="number" name="skill"
-                     value="<?= $is_tennis ? number_format($comp_skill, 1) : (int)$comp_skill ?>"
-                     min="0"<?= $is_tennis ? ' step="0.1"' : '' ?>
-                     class="form-control form-control-sm text-center<?= $skill_diff ? ' border-warning' : '' ?>" style="width:5rem">
-              <button type="submit" class="btn btn-outline-secondary btn-sm py-0 px-1" title="Speichern">
-                <i class="bi bi-check-lg"></i>
-              </button>
-            </form>
-            <?php if ($skill_diff): ?>
-            <div class="d-flex align-items-center gap-1 text-warning small mt-1">
-              <i class="bi bi-exclamation-triangle-fill"></i>
-              <span>Aktuell: <?= $is_tennis ? number_format($reg_skill, 1) : (int)$reg_skill ?></span>
-              <form method="post" action="<?= url('competition/'.$c['id'].'/player/'.$pl['id'].'/skill') ?>">
+            <div class="d-inline-flex flex-column align-items-center gap-1">
+              <form method="post" action="<?= url('competition/'.$c['id'].'/player/'.$pl['id'].'/skill') ?>"
+                    class="d-inline-flex align-items-center gap-1">
                 <?= csrf_field() ?>
-                <input type="hidden" name="skill" value="<?= $is_tennis ? number_format($reg_skill, 1, '.', '') : (int)$reg_skill ?>">
-                <button type="submit" class="btn btn-link btn-sm p-0 text-warning lh-1" title="Auf aktuellen Registerwert setzen">
-                  <i class="bi bi-arrow-clockwise"></i>
+                <input type="number" name="skill"
+                       value="<?= $is_tennis ? number_format($comp_skill, 1) : (int)$comp_skill ?>"
+                       min="0"<?= $is_tennis ? ' step="0.1"' : '' ?>
+                       class="form-control form-control-sm text-center<?= $skill_diff ? ' border-warning' : '' ?>" style="width:5rem">
+                <button type="submit" class="btn btn-outline-secondary btn-sm py-0 px-1" title="Speichern">
+                  <i class="bi bi-check-lg"></i>
                 </button>
               </form>
+              <?php if ($skill_diff): ?>
+              <div class="d-flex align-items-center gap-1 text-warning small">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                <span>Aktuell: <?= $is_tennis ? number_format($reg_skill, 1) : (int)$reg_skill ?></span>
+                <form method="post" action="<?= url('competition/'.$c['id'].'/player/'.$pl['id'].'/skill') ?>">
+                  <?= csrf_field() ?>
+                  <input type="hidden" name="skill" value="<?= $is_tennis ? number_format($reg_skill, 1, '.', '') : (int)$reg_skill ?>">
+                  <button type="submit" class="btn btn-link btn-sm p-0 text-warning lh-1" title="Auf aktuellen Registerwert setzen">
+                    <i class="bi bi-arrow-clockwise"></i>
+                  </button>
+                </form>
+              </div>
+              <?php endif; ?>
             </div>
-            <?php endif; ?>
             <?php else: ?>
             <?php if ($comp_skill): $sv = $is_tennis ? number_format($comp_skill, 1) : (int)$comp_skill; ?>
             <span class="badge bg-<?= $skill_diff ? 'warning text-dark' : 'secondary' ?>"
