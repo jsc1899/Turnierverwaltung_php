@@ -236,18 +236,33 @@ ob_start(); ?>
           <td class="small text-muted"><?= e($d['p1name']) ?><?php if ($d['p1club']): ?> <small class="text-muted">(<?= e($d['p1club']) ?>)</small><?php endif; ?></td>
           <td class="small text-muted"><?= e($d['p2name']) ?><?php if ($d['p2club']): ?> <small class="text-muted">(<?= e($d['p2club']) ?>)</small><?php endif; ?></td>
           <td class="text-center" data-sort="<?= (float)$d['skill'] ?>">
+            <?php
+              $d_comp  = (float)($d['skill'] ?? 0);
+              $d_reg   = (float)($d['double_skill'] ?? 0);
+              $d_diff  = abs($d_comp - $d_reg) > 0.049;
+            ?>
             <?php if (can_edit()): ?>
             <form method="post" action="<?= url('competition/'.$c['id'].'/double/'.$d['id'].'/skill') ?>"
                   class="d-inline-flex align-items-center gap-1">
               <?= csrf_field() ?>
-              <input type="number" name="skill" value="<?= (int)($d['skill'] ?? 0) ?>"
-                     min="0" class="form-control form-control-sm text-center" style="width:5rem">
+              <input type="number" name="skill" value="<?= (int)$d_comp ?>"
+                     min="0" class="form-control form-control-sm text-center<?= $d_diff ? ' border-warning' : '' ?>" style="width:5rem">
               <button type="submit" class="btn btn-outline-secondary btn-sm py-0 px-1" title="Speichern">
                 <i class="bi bi-check-lg"></i>
               </button>
             </form>
+            <?php if ($d_diff): ?>
+            <div class="text-warning small" title="Spielerregister: <?= (int)$d_reg ?>">
+              <i class="bi bi-exclamation-triangle-fill"></i> Reg: <?= (int)$d_reg ?>
+            </div>
+            <?php endif; ?>
             <?php else: ?>
-            <?php if ($d['skill']): ?><span class="badge bg-secondary"><?= (int)$d['skill'] ?></span><?php endif; ?>
+            <?php if ($d_comp): ?>
+            <span class="badge bg-<?= $d_diff ? 'warning text-dark' : 'secondary' ?>"
+                  <?= $d_diff ? 'title="Spielerregister: ' . (int)$d_reg . '"' : '' ?>>
+              <?= (int)$d_comp ?>
+            </span>
+            <?php endif; ?>
             <?php endif; ?>
           </td>
           <td class="small text-muted" data-sort="<?= e($d['reg_date']) ?>"><?= e(fmtdate($d['reg_date'])) ?></td>
@@ -369,21 +384,35 @@ ob_start(); ?>
             <?= $pl['reg_date'] ? date('d.m.Y', strtotime($pl['reg_date'])) : '—' ?>
           </td>
           <td class="text-center" data-sort="<?= $pl['skill'] ?? 0 ?>">
-            <?php if (can_edit()): $is_tennis = ($t['sport'] ?? '') === 'tennis'; ?>
+            <?php
+              $is_tennis   = ($t['sport'] ?? '') === 'tennis';
+              $reg_skill   = (float)($pl['registry_skill'] ?? 0);
+              $comp_skill  = (float)($pl['skill'] ?? 0);
+              $skill_diff  = abs($comp_skill - $reg_skill) > 0.049;
+            ?>
+            <?php if (can_edit()): ?>
             <form method="post" action="<?= url('competition/'.$c['id'].'/player/'.$pl['id'].'/skill') ?>"
                   class="d-inline-flex align-items-center gap-1">
               <?= csrf_field() ?>
               <input type="number" name="skill"
-                     value="<?= $is_tennis ? number_format((float)($pl['skill'] ?? 0), 1) : (int)($pl['skill'] ?? 0) ?>"
+                     value="<?= $is_tennis ? number_format($comp_skill, 1) : (int)$comp_skill ?>"
                      min="0"<?= $is_tennis ? ' step="0.1"' : '' ?>
-                     class="form-control form-control-sm text-center" style="width:5rem">
+                     class="form-control form-control-sm text-center<?= $skill_diff ? ' border-warning' : '' ?>" style="width:5rem">
               <button type="submit" class="btn btn-outline-secondary btn-sm py-0 px-1" title="Speichern">
                 <i class="bi bi-check-lg"></i>
               </button>
             </form>
+            <?php if ($skill_diff): ?>
+            <div class="text-warning small" title="Spielerregister: <?= $is_tennis ? number_format($reg_skill, 1) : (int)$reg_skill ?>">
+              <i class="bi bi-exclamation-triangle-fill"></i> Reg: <?= $is_tennis ? number_format($reg_skill, 1) : (int)$reg_skill ?>
+            </div>
+            <?php endif; ?>
             <?php else: ?>
-            <?php if ($pl['skill']): $sv = ($t['sport'] ?? '') === 'tennis' ? number_format((float)$pl['skill'], 1) : (int)$pl['skill']; ?>
-            <span class="badge bg-secondary"><?= $sv ?></span>
+            <?php if ($comp_skill): $sv = $is_tennis ? number_format($comp_skill, 1) : (int)$comp_skill; ?>
+            <span class="badge bg-<?= $skill_diff ? 'warning text-dark' : 'secondary' ?>"
+                  <?= $skill_diff ? 'title="Spielerregister: ' . ($is_tennis ? number_format($reg_skill, 1) : (int)$reg_skill) . '"' : '' ?>>
+              <?= $sv ?>
+            </span>
             <?php endif; ?>
             <?php endif; ?>
           </td>

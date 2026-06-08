@@ -111,6 +111,10 @@ function show(array $p): void {
         $all_players  = db_fetchall("SELECT * FROM player ORDER BY name, firstname");
         $unassigned   = array_filter($all_players, fn($pl) => !in_array($pl['id'], $assigned_ids));
         $sport        = $t ? ($t['sport'] ?? '') : '';
+        foreach ($assigned as &$pl) {
+            $pl['registry_skill'] = _get_player_skill($pl['id'], $sport);
+        }
+        unset($pl);
         foreach ($unassigned as $pl) {
             $unassigned_skills[$pl['id']] = _get_player_skill($pl['id'], $sport);
         }
