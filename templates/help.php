@@ -150,13 +150,13 @@ ob_start(); ?>
       <ul>
         <li><strong>Name</strong> — Bezeichnung des Bewerbs (z.B. „Herren Einzel")</li>
         <li><strong>Modus</strong> — Gruppenphase + KO, Nur KO-Runde oder Doppel-KO</li>
-        <li><strong>Gruppengröße</strong> — Anzahl Spieler pro Gruppe (Gruppenphase)</li>
+        <li><strong>Gruppengröße</strong> — Anzahl Spieler pro Gruppe (Gruppenphase), 3–8 Spieler</li>
         <li><strong>KO-Aufstieg</strong> — Wie viele Spieler pro Gruppe in die KO-Runde aufsteigen (0 = nur Gruppenphase)</li>
-        <li><strong>Platz-3-Spiel</strong> — Ob die Halbfinalverlierer um Platz 3 spielen</li>
+        <li><strong>Platz-3-Spiel</strong> — Ob die Halbfinalverlierer um Platz 3 spielen; ohne Platz-3-Spiel werden beide Halbfinalverlierer gemeinsam als 3. geführt</li>
         <li><strong>Max. Teilnehmer</strong> — Obergrenze für Teilnehmer (0 = unbegrenzt); bei Doppelbewerben zählen Doppel, bei Einzelbewerben Spieler</li>
         <li><strong>Anmeldungen offen</strong> — Ob der Bewerb im Anmeldeformular wählbar ist</li>
         <li><strong>Setzung anzeigen</strong> — Ob Setzungsnummern im KO-Raster sichtbar sind (nur KO-Modi)</li>
-        <li><strong>Setzungsreihenfolge</strong> — Höhere Spielstärke = stärker (Standard) oder niedrigere = stärker (Tennis)</li>
+        <li><strong>Setzungsreihenfolge</strong> — Höhere Spielstärke = stärker (Standard) oder niedrigere = stärker (Tennis); gilt für die Gruppenauslosung, den KO-Tiebreaker und die KO-Setzung</li>
       </ul>
 
       <h5 class="mt-3">Doppelbewerb</h5>
@@ -180,7 +180,8 @@ ob_start(); ?>
 
       <h5 class="mt-3">Spieler anlegen und bearbeiten</h5>
       <ul>
-        <li>Name, Vorname, Verein, Geschlecht, Lizenznummer und E-Mail</li>
+        <li><strong>Pflichtfeld:</strong> Name</li>
+        <li><strong>Optional:</strong> Vorname, Verein, Geschlecht, Pass-Nr., E-Mail</li>
         <li><strong>Spielstärke</strong> — Globaler Standardwert; kann pro Bewerb überschrieben werden</li>
       </ul>
 
@@ -235,15 +236,21 @@ ob_start(); ?>
       <h2 class="h4 border-bottom pb-2">Auslosung</h2>
 
       <h5 id="gruppenphase" class="mt-3">Gruppenphase</h5>
-      <p>Voraussetzung: Modus <em>Gruppenphase + KO</em>, mindestens so viele Spieler wie eine Gruppenanzahl × Gruppengröße.</p>
+      <p>Voraussetzung: Modus <em>Gruppenphase + KO</em>, mindestens so viele Spieler wie eine Gruppenanzahl × Gruppengröße (3–8 Spieler pro Gruppe).</p>
       <ol>
-        <li>Klicke auf <strong>Gruppen auslosen</strong> — Spieler werden gleichmäßig auf die Gruppen verteilt</li>
+        <li>Klicke auf <strong>Gruppen auslosen</strong> — Spieler werden nach Spielstärke gereiht (Setzungsreihenfolge beachten) und gleichmäßig auf die Gruppen verteilt</li>
         <li>Die Gruppenreihenfolge kann per Drag &amp; Drop angepasst werden (<strong>Gruppen neu ordnen</strong>)</li>
-        <li>Alle Gruppenspiele werden automatisch als Round-Robin-Spielplan erzeugt</li>
+        <li>Alle Gruppenspiele werden automatisch als Round-Robin-Spielplan nach FIDE-Berger-System erzeugt — die Spielreihenfolge sorgt dafür, dass kein Spieler unnötig oft direkt hintereinander spielt</li>
         <li>Ergebnisse erfassen → Tabelle wird automatisch berechnet</li>
         <li>Wenn alle Gruppenspiele eingetragen sind, erscheint <strong>KO-Runde auslosen</strong></li>
       </ol>
-      <p>Die Gruppenplatzierung (Wertung: Sieg=2 Pkt., Unentschieden=1 Pkt., Niederlage=0 Pkt.) bestimmt, welche Spieler in die KO-Runde aufsteigen. Tiebreaker: Tordifferenz → erzielte Tore.</p>
+      <p>Die Gruppenplatzierung (Wertung: Sieg=2 Pkt., Unentschieden=1 Pkt., Niederlage=0 Pkt.) bestimmt, welche Spieler in die KO-Runde aufsteigen. Tiebreaker-Reihenfolge bei Punktegleichstand:</p>
+      <ol class="small">
+        <li>Direkter Vergleich (Mini-Tabelle nur aus den Spielen der punktegleichen Spieler): Punkte → Tordifferenz → erzielte Tore</li>
+        <li>Gesamte Tordifferenz aller Gruppenspiele</li>
+        <li>Gesamte erzielte Tore</li>
+        <li>Spielstärke (Richtung je nach Setzungsreihenfolge: höher = besser bzw. niedriger = besser)</li>
+      </ol>
 
       <h5 id="ko" class="mt-3">KO-Runde (nach Gruppenphase)</h5>
       <p>Nach Abschluss der Gruppenphase werden die qualifizierten Spieler (Erst- und Zweitplatzierte jeder Gruppe, je nach Einstellung) in ein KO-Bracket ausgelost. Gesetzt werden sie nach Gruppenplatzierung — Gruppensieger gegen Gruppenzweite aus anderen Gruppen, um mögliche Wiederholungsspiele zu vermeiden.</p>
