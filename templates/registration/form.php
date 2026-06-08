@@ -42,8 +42,8 @@
               </select>
             </div>
             <div class="col-md-3">
-              <label class="form-label">Pass-Nr. <span class="text-danger">*</span></label>
-              <input type="text" name="pass_nr" class="form-control" required value="<?= e(post('pass_nr')) ?>">
+              <label class="form-label">Pass-Nr.</label>
+              <input type="text" name="pass_nr" class="form-control" value="<?= e(post('pass_nr')) ?>">
             </div>
             <div class="col-md-8">
               <label class="form-label">E-Mail <span class="text-danger">*</span></label>

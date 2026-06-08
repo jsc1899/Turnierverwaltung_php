@@ -126,12 +126,12 @@ ob_start(); ?>
                       </select>
                     </div>
                     <div class="col-3">
-                      <label class="form-label">Pass-Nr. <span class="text-danger">*</span></label>
-                      <input type="text" name="pass_nr" class="form-control" value="<?= e($p['pass_nr']??'') ?>" required>
+                      <label class="form-label">Pass-Nr.</label>
+                      <input type="text" name="pass_nr" class="form-control" value="<?= e($p['pass_nr']??'') ?>">
                     </div>
                     <div class="col-12">
-                      <label class="form-label">E-Mail <span class="text-danger">*</span></label>
-                      <input type="email" name="email" class="form-control" value="<?= e($p['email']??'') ?>" required>
+                      <label class="form-label">E-Mail</label>
+                      <input type="email" name="email" class="form-control" value="<?= e($p['email']??'') ?>">
                     </div>
                     <div class="col-12">
                       <label class="form-label">Spielstärken</label>
@@ -299,13 +299,13 @@ ob_start(); ?>
               </select>
             </div>
             <div class="col">
-              <label class="form-label">Pass-Nr. <span class="text-danger">*</span></label>
-              <input type="text" name="pass_nr" class="form-control" required>
+              <label class="form-label">Pass-Nr.</label>
+              <input type="text" name="pass_nr" class="form-control">
             </div>
           </div>
           <div class="mb-2">
-            <label class="form-label">E-Mail <span class="text-danger">*</span></label>
-            <input type="email" name="email" class="form-control" required>
+            <label class="form-label">E-Mail</label>
+            <input type="email" name="email" class="form-control">
           </div>
           <div class="mb-3">
             <label class="form-label">Spielstärken</label>

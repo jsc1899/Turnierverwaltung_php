@@ -54,7 +54,6 @@ function register_form(array $p): void {
         if (!$t['registrations_open']) $errors[] = 'Nennungen für dieses Turnier sind derzeit geschlossen.';
         if (!$lastname)  $errors[] = 'Nachname erforderlich.';
         if (!$firstname) $errors[] = 'Vorname erforderlich.';
-        if (!$pass_nr)   $errors[] = 'Pass-Nr. erforderlich.';
         if (!$email)     $errors[] = 'E-Mail erforderlich.';
         if ($skill <= 0) $errors[] = 'Spielstärke erforderlich (muss größer als 0 sein).';
         if (!$comp_ids)  $errors[] = 'Mindestens ein Bewerb muss ausgewählt werden.';

@@ -160,8 +160,8 @@ function new_player(array $p): void {
     $pass_nr   = trim(post('pass_nr'));
     $email     = trim(post('email'));
 
-    if (!$name || !$firstname || !$pass_nr || !$email) {
-        flash('danger', 'Nachname, Vorname, Pass-Nr. und E-Mail sind Pflichtfelder.');
+    if (!$name || !$firstname) {
+        flash('danger', 'Nachname und Vorname sind Pflichtfelder.');
         redirect('players#spieler');
         return;
     }
@@ -184,8 +184,8 @@ function edit(array $p): void {
     $pass_nr   = trim(post('pass_nr'));
     $email     = trim(post('email'));
 
-    if (!$name || !$firstname || !$pass_nr || !$email) {
-        flash('danger', 'Nachname, Vorname, Pass-Nr. und E-Mail sind Pflichtfelder.');
+    if (!$name || !$firstname) {
+        flash('danger', 'Nachname und Vorname sind Pflichtfelder.');
         redirect('players#spieler');
         return;
     }
