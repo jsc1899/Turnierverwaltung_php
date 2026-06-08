@@ -652,6 +652,32 @@ function remove_double(array $p): void {
     redirect('competition/' . $p['id'] . '#spieler');
 }
 
+function update_player_skill(array $p): void {
+    require_edit();
+    csrf_verify();
+    $cid   = (int)$p['id'];
+    $pid   = (int)$p['pid'];
+    $skill = max(0, (float)post('skill', 0));
+    db_execute(
+        "UPDATE competition_player SET skill=? WHERE competition_id=? AND player_id=?",
+        [$skill, $cid, $pid]
+    );
+    redirect('competition/' . $cid . '#spieler');
+}
+
+function update_double_skill(array $p): void {
+    require_edit();
+    csrf_verify();
+    $cid   = (int)$p['id'];
+    $did   = (int)$p['did'];
+    $skill = max(0, (float)post('skill', 0));
+    db_execute(
+        "UPDATE competition_double SET skill=? WHERE competition_id=? AND double_id=?",
+        [$skill, $cid, $did]
+    );
+    redirect('competition/' . $cid . '#spieler');
+}
+
 function draw_groups(array $p): void {
     require_edit();
     csrf_verify();

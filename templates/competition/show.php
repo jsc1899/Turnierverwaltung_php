@@ -236,7 +236,19 @@ ob_start(); ?>
           <td class="small text-muted"><?= e($d['p1name']) ?><?php if ($d['p1club']): ?> <small class="text-muted">(<?= e($d['p1club']) ?>)</small><?php endif; ?></td>
           <td class="small text-muted"><?= e($d['p2name']) ?><?php if ($d['p2club']): ?> <small class="text-muted">(<?= e($d['p2club']) ?>)</small><?php endif; ?></td>
           <td class="text-center" data-sort="<?= (float)$d['skill'] ?>">
+            <?php if (can_edit()): ?>
+            <form method="post" action="<?= url('competition/'.$c['id'].'/double/'.$d['id'].'/skill') ?>"
+                  class="d-inline-flex align-items-center gap-1">
+              <?= csrf_field() ?>
+              <input type="number" name="skill" value="<?= (int)($d['skill'] ?? 0) ?>"
+                     min="0" class="form-control form-control-sm text-center" style="width:5rem">
+              <button type="submit" class="btn btn-outline-secondary btn-sm py-0 px-1" title="Speichern">
+                <i class="bi bi-check-lg"></i>
+              </button>
+            </form>
+            <?php else: ?>
             <?php if ($d['skill']): ?><span class="badge bg-secondary"><?= (int)$d['skill'] ?></span><?php endif; ?>
+            <?php endif; ?>
           </td>
           <td class="small text-muted" data-sort="<?= e($d['reg_date']) ?>"><?= e(fmtdate($d['reg_date'])) ?></td>
           <?php if ($c['phase'] === 'setup'): ?>
@@ -357,9 +369,22 @@ ob_start(); ?>
             <?= $pl['reg_date'] ? date('d.m.Y', strtotime($pl['reg_date'])) : '—' ?>
           </td>
           <td class="text-center" data-sort="<?= $pl['skill'] ?? 0 ?>">
-            <?php if ($pl['skill']):
-              $sv = ($t['sport'] ?? '') === 'tennis' ? number_format((float)$pl['skill'], 1) : (int)$pl['skill']; ?>
+            <?php if (can_edit()): $is_tennis = ($t['sport'] ?? '') === 'tennis'; ?>
+            <form method="post" action="<?= url('competition/'.$c['id'].'/player/'.$pl['id'].'/skill') ?>"
+                  class="d-inline-flex align-items-center gap-1">
+              <?= csrf_field() ?>
+              <input type="number" name="skill"
+                     value="<?= $is_tennis ? number_format((float)($pl['skill'] ?? 0), 1) : (int)($pl['skill'] ?? 0) ?>"
+                     min="0"<?= $is_tennis ? ' step="0.1"' : '' ?>
+                     class="form-control form-control-sm text-center" style="width:5rem">
+              <button type="submit" class="btn btn-outline-secondary btn-sm py-0 px-1" title="Speichern">
+                <i class="bi bi-check-lg"></i>
+              </button>
+            </form>
+            <?php else: ?>
+            <?php if ($pl['skill']): $sv = ($t['sport'] ?? '') === 'tennis' ? number_format((float)$pl['skill'], 1) : (int)$pl['skill']; ?>
             <span class="badge bg-secondary"><?= $sv ?></span>
+            <?php endif; ?>
             <?php endif; ?>
           </td>
           <?php if ($c['phase'] === 'setup'): ?>
