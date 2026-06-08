@@ -71,6 +71,50 @@ function send_reg_manage_mail(string $to, string $token): void {
     }
 }
 
+function send_change_request_processed_mail(string $to, string $name, string $tournament,
+                                              string $request_type, array $comp_results, ?string $token): void {
+    $body  = '<p>Hallo ' . htmlspecialchars($name) . ',</p>';
+    if ($request_type === 'withdraw') {
+        $body .= '<p>dein Rückzugsantrag für <strong>' . htmlspecialchars($tournament)
+               . '</strong> wurde bestätigt. Deine Nennung wurde zurückgezogen.</p>';
+    } else {
+        $body .= '<p>dein Änderungsantrag für <strong>' . htmlspecialchars($tournament) . '</strong> wurde bearbeitet.</p>';
+        $added        = array_column(array_filter($comp_results, fn($c) => $c['action'] === 'add'    && $c['status'] === 'confirmed'), 'name');
+        $removed      = array_column(array_filter($comp_results, fn($c) => $c['action'] === 'remove' && $c['status'] === 'confirmed'), 'name');
+        $rejected_add = array_column(array_filter($comp_results, fn($c) => $c['action'] === 'add'    && $c['status'] === 'rejected'),  'name');
+        $rejected_rem = array_column(array_filter($comp_results, fn($c) => $c['action'] === 'remove' && $c['status'] === 'rejected'),  'name');
+        if ($added) {
+            $body .= '<p><strong>Angemeldet:</strong></p><ul>';
+            foreach ($added as $c) $body .= '<li>' . htmlspecialchars($c) . '</li>';
+            $body .= '</ul>';
+        }
+        if ($removed) {
+            $body .= '<p><strong>Abgemeldet:</strong></p><ul>';
+            foreach ($removed as $c) $body .= '<li>' . htmlspecialchars($c) . '</li>';
+            $body .= '</ul>';
+        }
+        if ($rejected_add) {
+            $body .= '<p><strong>Anmeldung abgelehnt:</strong></p><ul>';
+            foreach ($rejected_add as $c) $body .= '<li>' . htmlspecialchars($c) . '</li>';
+            $body .= '</ul>';
+        }
+        if ($rejected_rem) {
+            $body .= '<p><strong>Abmeldung abgelehnt:</strong></p><ul>';
+            foreach ($rejected_rem as $c) $body .= '<li>' . htmlspecialchars($c) . '</li>';
+            $body .= '</ul>';
+        }
+    }
+    if ($token) {
+        $link  = url('nennung/verwalten/' . urlencode($token));
+        $body .= '<p>Mit folgendem Link kannst du deine Nennungen verwalten (gültig 7 Tage):</p>'
+               . '<p><a href="' . $link . '">' . $link . '</a></p>';
+    }
+    $sent = send_mail($to, 'Turnierverwaltung – Nennungsänderung bearbeitet', $body);
+    if (!$sent) {
+        flash('info', 'Dev-Mail an ' . e($to) . ': Änderungsantrag für ' . htmlspecialchars($tournament) . ' bearbeitet.', true);
+    }
+}
+
 function send_reg_processed_mail(string $to, string $name, string $tournament,
                                   array $confirmed, array $rejected, ?string $token): void {
     $body  = '<p>Hallo ' . htmlspecialchars($name) . ',</p>';

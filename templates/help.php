@@ -152,7 +152,7 @@ ob_start(); ?>
         <li><strong>Gruppengröße</strong> — Anzahl Spieler pro Gruppe (Gruppenphase)</li>
         <li><strong>KO-Aufstieg</strong> — Wie viele Spieler pro Gruppe in die KO-Runde aufsteigen (0 = nur Gruppenphase)</li>
         <li><strong>Platz-3-Spiel</strong> — Ob die Halbfinalverlierer um Platz 3 spielen</li>
-        <li><strong>Max. Spieler</strong> — Obergrenze für Anmeldungen (0 = unbegrenzt)</li>
+        <li><strong>Max. Teilnehmer</strong> — Obergrenze für Teilnehmer (0 = unbegrenzt); bei Doppelbewerben zählen Doppel, bei Einzelbewerben Spieler</li>
         <li><strong>Anmeldungen offen</strong> — Ob der Bewerb im Anmeldeformular wählbar ist</li>
         <li><strong>Setzung anzeigen</strong> — Ob Setzungsnummern im KO-Raster sichtbar sind (nur KO-Modi)</li>
         <li><strong>Setzungsreihenfolge</strong> — Höhere Spielstärke = stärker (Standard) oder niedrigere = stärker (Tennis)</li>

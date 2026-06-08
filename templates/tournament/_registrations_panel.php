@@ -64,6 +64,9 @@
           <span class="badge bg-danger" style="min-width:6rem">abgelehnt</span>
         <?php endif; ?>
         <span class="small fw-semibold"><?= e($comp['name']) ?></span>
+        <?php if (!empty($comp['is_doubles']) && !empty($comp['partner_name'])): ?>
+        <span class="text-muted small"><i class="bi bi-people me-1"></i>Partner: <?= e($comp['partner_name']) ?></span>
+        <?php endif; ?>
         <?php if ($comp['status'] === 'pending'): ?>
         <div class="d-flex gap-1 ms-auto">
           <form method="post" action="<?= url('registration/' . $r['id'] . '/comp/' . $comp['cid'] . '/confirm') ?>">
@@ -135,6 +138,9 @@
         </span>
         <?php endif; ?>
         <span class="small fw-semibold"><?= e($comp['name']) ?></span>
+        <?php if (!empty($comp['is_doubles']) && $comp['action'] === 'add' && !empty($comp['partner_name'])): ?>
+        <span class="text-muted small"><i class="bi bi-people me-1"></i>Partner: <?= e($comp['partner_name']) ?></span>
+        <?php endif; ?>
         <?php if ($comp['status'] === 'pending'): ?>
         <div class="d-flex gap-1 ms-auto">
           <form method="post" action="<?= url('reg-change/' . $cr['id'] . '/comp/' . $comp['competition_id'] . '/confirm') ?>">

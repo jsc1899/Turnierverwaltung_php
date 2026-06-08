@@ -1,4 +1,4 @@
-<?php ob_start(); ?>
+<?php ob_start(); $doubles_pairs = []; ?>
 <div class="row justify-content-center">
   <div class="col-lg-8">
     <h2 class="mb-1"><i class="bi bi-person-gear me-2"></i>Meine Nennungen</h2>
@@ -30,7 +30,10 @@
         <div class="mb-3">
           <div class="text-muted small mb-1">Aktuell zugeteilte Bewerbe:</div>
           <?php foreach ($item['competitions'] as $c): ?>
-          <span class="badge bg-secondary me-1"><?= e($c['name']) ?></span>
+          <span class="badge <?= !empty($c['is_doubles']) ? 'bg-info text-dark' : 'bg-secondary' ?> me-1">
+            <?php if (!empty($c['is_doubles'])): ?><i class="bi bi-people me-1"></i><?php endif; ?>
+            <?= e($c['name']) ?>
+          </span>
           <?php endforeach; ?>
         </div>
         <?php else: ?>
@@ -88,10 +91,29 @@
                        <?= !$ac['registrations_open'] ? 'disabled' : '' ?>>
                 <label class="form-check-label" for="chcomp-<?= $r['id'] ?>-<?= $ac['id'] ?>">
                   <?= e($ac['name']) ?>
+                  <?php if (!empty($ac['is_doubles'])): ?>
+                  <span class="badge bg-info text-dark ms-1">Doppelbewerb</span>
+                  <?php endif; ?>
                   <?php if (!$ac['registrations_open']): ?>
                   <span class="badge bg-secondary ms-1" style="font-size:.7rem">geschlossen</span>
                   <?php endif; ?>
                 </label>
+                <?php if (!empty($ac['is_doubles']) && $ac['registrations_open']): ?>
+                <?php
+                $is_current  = in_array($ac['id'], $current_cids);
+                $existing_pn = $ac['partner_name'] ?? '';
+                $doubles_pairs[] = [$r['id'], $ac['id'], $is_current || $existing_pn !== ''];
+                ?>
+                <div id="mg-partner-<?= $r['id'] ?>-<?= $ac['id'] ?>"
+                     class="ms-4 mt-1"
+                     style="<?= ($is_current || $existing_pn !== '') ? '' : 'display:none' ?>">
+                  <input type="text" name="partner_name[<?= $ac['id'] ?>]"
+                         class="form-control form-control-sm"
+                         placeholder="Gewünschter Doppelpartner (optional)"
+                         maxlength="255"
+                         value="<?= e($existing_pn) ?>">
+                </div>
+                <?php endif; ?>
               </div>
               <?php endforeach; ?>
               <div class="mt-3 d-flex gap-2">
@@ -124,4 +146,20 @@
 </div>
 <?php
 $content = ob_get_clean();
+if ($doubles_pairs) {
+    $pairs_json = json_encode(array_values($doubles_pairs));
+    $extra_js = '<script>
+document.addEventListener("DOMContentLoaded", function() {
+  var pairs = ' . $pairs_json . ';
+  pairs.forEach(function(p) {
+    var cb  = document.getElementById("chcomp-" + p[0] + "-" + p[1]);
+    var box = document.getElementById("mg-partner-" + p[0] + "-" + p[1]);
+    if (!cb || !box) return;
+    cb.addEventListener("change", function() {
+      box.style.display = cb.checked ? "block" : "none";
+    });
+  });
+});
+</script>';
+}
 require __DIR__ . '/../_base.php';

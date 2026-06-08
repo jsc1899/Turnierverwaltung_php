@@ -17,8 +17,10 @@ function dko_lb_round_count(int $cap, int $lb_round): int {
     return $cap >> ((int)ceil($lb_round / 2) + 1);
 }
 
-function dko_set_player(int $cid, string $bracket, int $round, int $pos, int $slot, int $pid): void {
-    $col = $slot === 1 ? 'player1_id' : 'player2_id';
+function dko_set_player(int $cid, string $bracket, int $round, int $pos, int $slot, int $pid, bool $is_doubles = false): void {
+    $col = $is_doubles
+        ? ($slot === 1 ? 'double1_id' : 'double2_id')
+        : ($slot === 1 ? 'player1_id' : 'player2_id');
     db_execute(
         "UPDATE `match` SET `$col`=? WHERE competition_id=? AND bracket=? AND ko_round=? AND ko_position=?",
         [$pid, $cid, $bracket, $round, $pos]
@@ -28,7 +30,7 @@ function dko_set_player(int $cid, string $bracket, int $round, int $pos, int $sl
 // Advance winner (and optionally drop loser to LB) after a match result.
 // $is_bye = true when player2 was null (bye match in WB R1 — no LB drop).
 function dko_advance(int $cid, int $cap, string $bracket, int $round, int $pos,
-                     int $winner_id, ?int $loser_id, bool $is_bye): void
+                     int $winner_id, ?int $loser_id, bool $is_bye, bool $is_doubles = false): void
 {
     $k        = (int)log($cap, 2);
     $lb_total = 2 * ($k - 1);
@@ -36,9 +38,9 @@ function dko_advance(int $cid, int $cap, string $bracket, int $round, int $pos,
     if ($bracket === 'W') {
         // Advance winner in WB
         if ($round < $k) {
-            dko_set_player($cid, 'W', $round + 1, $pos >> 1, ($pos % 2 === 0) ? 1 : 2, $winner_id);
+            dko_set_player($cid, 'W', $round + 1, $pos >> 1, ($pos % 2 === 0) ? 1 : 2, $winner_id, $is_doubles);
         } else {
-            dko_set_player($cid, 'GF', 1, 0, 1, $winner_id);
+            dko_set_player($cid, 'GF', 1, 0, 1, $winner_id, $is_doubles);
         }
         // Drop loser to LB
         if (!$is_bye && $loser_id !== null) {
@@ -46,15 +48,15 @@ function dko_advance(int $cid, int $cap, string $bracket, int $round, int $pos,
             if ($round === 1) {
                 // Fold: top-half losers → player1, bottom-half → player2 (mirrored pos)
                 if ($pos < $n_wb1 / 2) {
-                    dko_set_player($cid, 'L', 1, $pos, 1, $loser_id);
+                    dko_set_player($cid, 'L', 1, $pos, 1, $loser_id, $is_doubles);
                 } else {
-                    dko_set_player($cid, 'L', 1, $n_wb1 - 1 - $pos, 2, $loser_id);
+                    dko_set_player($cid, 'L', 1, $n_wb1 - 1 - $pos, 2, $loser_id, $is_doubles);
                 }
             } else {
                 // WB Rr (r≥2) → LB R(2r-2), reversed position, player2
                 $lb_round   = 2 * ($round - 1);
                 $wb_r_count = $cap >> $round;
-                dko_set_player($cid, 'L', $lb_round, $wb_r_count - 1 - $pos, 2, $loser_id);
+                dko_set_player($cid, 'L', $lb_round, $wb_r_count - 1 - $pos, 2, $loser_id, $is_doubles);
             }
         }
     } elseif ($bracket === 'L') {
@@ -62,14 +64,14 @@ function dko_advance(int $cid, int $cap, string $bracket, int $round, int $pos,
             $next_r = $round + 1;
             if ($round % 2 === 1) {
                 // Minor → Major: same position, player1
-                dko_set_player($cid, 'L', $next_r, $pos, 1, $winner_id);
+                dko_set_player($cid, 'L', $next_r, $pos, 1, $winner_id, $is_doubles);
             } else {
                 // Major → Minor: halve position, player slot by parity
-                dko_set_player($cid, 'L', $next_r, $pos >> 1, ($pos % 2 === 0) ? 1 : 2, $winner_id);
+                dko_set_player($cid, 'L', $next_r, $pos >> 1, ($pos % 2 === 0) ? 1 : 2, $winner_id, $is_doubles);
             }
         } else {
             // LB Final winner → GF player2
-            dko_set_player($cid, 'GF', 1, 0, 2, $winner_id);
+            dko_set_player($cid, 'GF', 1, 0, 2, $winner_id, $is_doubles);
         }
     }
     // GF: no further advancement
@@ -77,7 +79,7 @@ function dko_advance(int $cid, int $cap, string $bracket, int $round, int $pos,
 
 // ── Draw ──────────────────────────────────────────────────────────────────────
 
-function draw_double_ko(int $cid, array $seedings): void {
+function draw_double_ko(int $cid, array $seedings, bool $is_doubles = false): void {
     $n   = count($seedings);
     $cap = next_power_of_2($n);
     $k   = (int)log($cap, 2);
@@ -134,16 +136,18 @@ function draw_double_ko(int $cid, array $seedings): void {
         "SELECT * FROM `match` WHERE competition_id=? AND bracket='W' AND ko_round=1 ORDER BY ko_position",
         [$cid]
     );
+    $p1col = $is_doubles ? 'double1_id' : 'player1_id';
+    $p2col = $is_doubles ? 'double2_id' : 'player2_id';
     foreach ($wb1 as $i => $m) {
         $p1 = $bracket_arr[$i * 2]     ?? null;
         $p2 = $bracket_arr[$i * 2 + 1] ?? null;
-        db_execute("UPDATE `match` SET player1_id=?, player2_id=? WHERE id=?", [$p1, $p2, $m['id']]);
+        db_execute("UPDATE `match` SET `$p1col`=?, `$p2col`=? WHERE id=?", [$p1, $p2, $m['id']]);
         if ($p1 !== null && $p2 === null) {
             db_execute("UPDATE `match` SET played=1, score1=1, score2=0 WHERE id=?", [$m['id']]);
-            dko_advance($cid, $cap, 'W', 1, $i, (int)$p1, null, true);
+            dko_advance($cid, $cap, 'W', 1, $i, (int)$p1, null, true, $is_doubles);
         } elseif ($p1 === null && $p2 !== null) {
             db_execute("UPDATE `match` SET played=1, score1=0, score2=1 WHERE id=?", [$m['id']]);
-            dko_advance($cid, $cap, 'W', 1, $i, (int)$p2, null, true);
+            dko_advance($cid, $cap, 'W', 1, $i, (int)$p2, null, true, $is_doubles);
         }
     }
 
@@ -167,12 +171,17 @@ function recompute_double_ko(int $cid): void {
     $k        = (int)log($cap, 2);
     $lb_total = 2 * ($k - 1);
 
-    // Clear all non-WB-R1 player slots
-    db_execute("UPDATE `match` SET player1_id=NULL, player2_id=NULL
+    $c = db_fetch("SELECT is_doubles FROM competition WHERE id=?", [$cid]);
+    $is_doubles = $c && !empty($c['is_doubles']);
+    $p1col = $is_doubles ? 'double1_id' : 'player1_id';
+    $p2col = $is_doubles ? 'double2_id' : 'player2_id';
+
+    // Clear all non-WB-R1 participant slots
+    db_execute("UPDATE `match` SET player1_id=NULL, player2_id=NULL, double1_id=NULL, double2_id=NULL
                 WHERE competition_id=? AND bracket='W' AND ko_round > 1", [$cid]);
-    db_execute("UPDATE `match` SET player1_id=NULL, player2_id=NULL
+    db_execute("UPDATE `match` SET player1_id=NULL, player2_id=NULL, double1_id=NULL, double2_id=NULL
                 WHERE competition_id=? AND bracket='L'", [$cid]);
-    db_execute("UPDATE `match` SET player1_id=NULL, player2_id=NULL
+    db_execute("UPDATE `match` SET player1_id=NULL, player2_id=NULL, double1_id=NULL, double2_id=NULL
                 WHERE competition_id=? AND bracket='GF'", [$cid]);
 
     // Re-propagate WB rounds 1..k
@@ -183,18 +192,18 @@ function recompute_double_ko(int $cid): void {
         );
         foreach ($matches as $m) {
             if ($r === 1) {
-                $p1_bye = ($m['player2_id'] === null && $m['player1_id'] !== null);
-                $p2_bye = ($m['player1_id'] === null && $m['player2_id'] !== null);
+                $p1_bye = ($m[$p2col] === null && $m[$p1col] !== null);
+                $p2_bye = ($m[$p1col] === null && $m[$p2col] !== null);
                 if ($p1_bye || $p2_bye) {
-                    $bye_pid = $p1_bye ? (int)$m['player1_id'] : (int)$m['player2_id'];
-                    dko_advance($cid, $cap, 'W', 1, (int)$m['ko_position'], $bye_pid, null, true);
+                    $bye_pid = $p1_bye ? (int)$m[$p1col] : (int)$m[$p2col];
+                    dko_advance($cid, $cap, 'W', 1, (int)$m['ko_position'], $bye_pid, null, true, $is_doubles);
                     continue;
                 }
             }
-            if (!$m['player1_id'] || !$m['player2_id']) continue;
-            $winner = (int)($m['score1'] > $m['score2'] ? $m['player1_id'] : $m['player2_id']);
-            $loser  = (int)($m['score1'] > $m['score2'] ? $m['player2_id'] : $m['player1_id']);
-            dko_advance($cid, $cap, 'W', $r, (int)$m['ko_position'], $winner, $loser, false);
+            if (!$m[$p1col] || !$m[$p2col]) continue;
+            $winner = (int)($m['score1'] > $m['score2'] ? $m[$p1col] : $m[$p2col]);
+            $loser  = (int)($m['score1'] > $m['score2'] ? $m[$p2col] : $m[$p1col]);
+            dko_advance($cid, $cap, 'W', $r, (int)$m['ko_position'], $winner, $loser, false, $is_doubles);
         }
     }
 
@@ -205,9 +214,9 @@ function recompute_double_ko(int $cid): void {
             [$cid, $r]
         );
         foreach ($matches as $m) {
-            if (!$m['player1_id'] || !$m['player2_id']) continue;
-            $winner = (int)($m['score1'] > $m['score2'] ? $m['player1_id'] : $m['player2_id']);
-            dko_advance($cid, $cap, 'L', $r, (int)$m['ko_position'], $winner, null, false);
+            if (!$m[$p1col] || !$m[$p2col]) continue;
+            $winner = (int)($m['score1'] > $m['score2'] ? $m[$p1col] : $m[$p2col]);
+            dko_advance($cid, $cap, 'L', $r, (int)$m['ko_position'], $winner, null, false, $is_doubles);
         }
     }
 }

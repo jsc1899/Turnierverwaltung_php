@@ -194,6 +194,38 @@ function init_db(): void {
             window_start DATETIME DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (ip, action)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+        CREATE TABLE IF NOT EXISTS `double` (
+            id            INT AUTO_INCREMENT PRIMARY KEY,
+            tournament_id INT NOT NULL,
+            player1_id    INT NOT NULL,
+            player2_id    INT NOT NULL,
+            name          VARCHAR(500) DEFAULT '',
+            skill         DECIMAL(8,1) DEFAULT 0,
+            created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (tournament_id) REFERENCES tournament(id) ON DELETE CASCADE,
+            FOREIGN KEY (player1_id)    REFERENCES player(id)    ON DELETE CASCADE,
+            FOREIGN KEY (player2_id)    REFERENCES player(id)    ON DELETE CASCADE,
+            UNIQUE KEY uq_double_pair (tournament_id, player1_id, player2_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+        CREATE TABLE IF NOT EXISTS competition_double (
+            competition_id INT NOT NULL,
+            double_id      INT NOT NULL,
+            skill          DECIMAL(8,1) DEFAULT 0,
+            created_at     VARCHAR(50) DEFAULT '',
+            PRIMARY KEY (competition_id, double_id),
+            FOREIGN KEY (competition_id) REFERENCES competition(id) ON DELETE CASCADE,
+            FOREIGN KEY (double_id)      REFERENCES `double`(id)   ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+        CREATE TABLE IF NOT EXISTS group_double (
+            group_id  INT NOT NULL,
+            double_id INT NOT NULL,
+            PRIMARY KEY (group_id, double_id),
+            FOREIGN KEY (group_id)  REFERENCES grp(id)     ON DELETE CASCADE,
+            FOREIGN KEY (double_id) REFERENCES `double`(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ");
 
     // Migrations für bestehende Datenbanken (try-catch: Spalte existiert ggf. schon)
@@ -206,11 +238,56 @@ function init_db(): void {
         "ALTER TABLE `match` ADD COLUMN bracket VARCHAR(3) NULL DEFAULT NULL",
         "ALTER TABLE competition ADD COLUMN show_seeding TINYINT(1) DEFAULT 1",
         "ALTER TABLE competition ADD COLUMN seeding_order VARCHAR(4) DEFAULT 'desc'",
+        "ALTER TABLE competition ADD COLUMN is_doubles TINYINT(1) DEFAULT 0",
+        "ALTER TABLE `match` ADD COLUMN double1_id INT NULL DEFAULT NULL",
+        "ALTER TABLE `match` ADD COLUMN double2_id INT NULL DEFAULT NULL",
+        "ALTER TABLE `double` MODIFY COLUMN tournament_id INT NULL DEFAULT NULL",
+        "ALTER TABLE registration_competition ADD COLUMN partner_name VARCHAR(255) DEFAULT ''",
+        "ALTER TABLE registration_change_competition ADD COLUMN partner_name VARCHAR(255) DEFAULT ''",
     ];
     foreach ($migrations as $sql) {
         try { $pdo->exec($sql); } catch (\PDOException $e) { /* Spalte/Typ bereits korrekt */ }
     }
 
+    // Migration: double-Unique-Key auf (player1_id, player2_id) reduzieren.
+    // Reihenfolge: tournament_id-FK droppen → alten Key droppen → neuen Key anlegen.
+    $has_old_uk = (bool)$pdo->query(
+        "SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
+         WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='double'
+         AND INDEX_NAME='uq_double_pair' AND COLUMN_NAME='tournament_id'"
+    )->fetch();
+    if ($has_old_uk) {
+        $create_sql = $pdo->query("SHOW CREATE TABLE `double`")->fetchColumn(1);
+        if (preg_match('/CONSTRAINT\s+`([^`]+)`\s+FOREIGN KEY\s+\(`tournament_id`\)/', $create_sql, $fk_m)) {
+            try { $pdo->exec("ALTER TABLE `double` DROP FOREIGN KEY `{$fk_m[1]}`"); } catch (\PDOException $e) {}
+        }
+        try { $pdo->exec("ALTER TABLE `double` DROP KEY `uq_double_pair`"); } catch (\PDOException $e) {}
+        try { $pdo->exec("ALTER TABLE `double` ADD UNIQUE KEY `uq_double_pair` (`player1_id`, `player2_id`)"); } catch (\PDOException $e) {}
+    }
+
     // Admin-Rolle sicherstellen
     db_execute("UPDATE user SET role = 'admin' WHERE email = ?", [ADMIN_EMAIL]);
+
+    // competition_double.skill neu berechnen (Tennis-Standard 10.0 wenn kein Eintrag)
+    try {
+        $pdo->exec("
+            UPDATE competition_double cd
+            JOIN `double` d ON d.id = cd.double_id
+            JOIN competition c ON c.id = cd.competition_id
+            JOIN tournament t ON t.id = c.tournament_id
+            SET cd.skill = (
+                COALESCE(
+                    (SELECT ps.skill FROM player_skill ps
+                     WHERE ps.player_id = d.player1_id AND ps.sport = t.sport LIMIT 1),
+                    IF(t.sport = 'tennis', 10.0, 0)
+                ) +
+                COALESCE(
+                    (SELECT ps.skill FROM player_skill ps
+                     WHERE ps.player_id = d.player2_id AND ps.sport = t.sport LIMIT 1),
+                    IF(t.sport = 'tennis', 10.0, 0)
+                )
+            )
+            WHERE t.sport != '' AND t.sport IS NOT NULL
+        ");
+    } catch (\PDOException $e) { /* competition_double existiert noch nicht */ }
 }

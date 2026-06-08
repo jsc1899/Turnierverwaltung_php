@@ -72,12 +72,27 @@
                    <?= $full ? 'disabled' : '' ?>>
             <label class="form-check-label" for="comp<?= $c['id'] ?>">
               <?= e($c['name']) ?>
+              <?php if (!empty($c['is_doubles'])): ?>
+              <span class="badge bg-info text-dark ms-1">Doppelbewerb</span>
+              <?php endif; ?>
               <?php if ($full): ?>
               <span class="badge bg-danger ms-1">voll</span>
               <?php elseif ($c['max_players']): ?>
               <span class="text-muted small ms-1">(<?= $comp_counts[$c['id']] ?>/<?= $c['max_players'] ?>)</span>
               <?php endif; ?>
             </label>
+            <?php if (!empty($c['is_doubles'])): ?>
+            <div class="ms-4 mt-1">
+              <div class="text-muted small mb-1">Einzelanmeldung möglich – der Admin weist einen Partner zu.</div>
+              <div id="partner-field-<?= $c['id'] ?>" style="display:none">
+                <input type="text" name="partner_name[<?= $c['id'] ?>]"
+                       class="form-control form-control-sm"
+                       placeholder="Gewünschter Doppelpartner (optional)"
+                       maxlength="255"
+                       value="<?= e($_POST['partner_name'][$c['id']] ?? '') ?>">
+              </div>
+            </div>
+            <?php endif; ?>
           </div>
           <?php endforeach; ?>
           <?php else: ?>
@@ -100,4 +115,23 @@
 </div>
 <?php
 $content = ob_get_clean();
+// Partner-Felder bei Doppelbewerben ein-/ausblenden
+$doubles_ids = array_column(array_filter($comps ?? [], fn($c) => !empty($c['is_doubles'])), 'id');
+if ($doubles_ids) {
+    $extra_js = '<script>
+(function(){
+  var ids=' . json_encode(array_values($doubles_ids)) . ';
+  function sync(cid){
+    var cb=document.getElementById("comp"+cid);
+    var box=document.getElementById("partner-field-"+cid);
+    if(cb&&box) box.style.display=cb.checked?"block":"none";
+  }
+  ids.forEach(function(cid){
+    sync(cid);
+    var cb=document.getElementById("comp"+cid);
+    if(cb) cb.addEventListener("change",function(){ sync(cid); });
+  });
+})();
+</script>';
+}
 require __DIR__ . '/../_base.php';

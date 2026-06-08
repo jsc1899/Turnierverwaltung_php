@@ -18,9 +18,15 @@ function register_form(array $p): void {
     );
     $comp_counts = [];
     foreach ($comps as $c) {
-        $comp_counts[$c['id']] = db_fetch(
-            "SELECT COUNT(*) as n FROM competition_player WHERE competition_id=?", [$c['id']]
-        )['n'];
+        if (!empty($c['is_doubles'])) {
+            $comp_counts[$c['id']] = db_fetch(
+                "SELECT COUNT(*) as n FROM competition_double WHERE competition_id=?", [$c['id']]
+            )['n'];
+        } else {
+            $comp_counts[$c['id']] = db_fetch(
+                "SELECT COUNT(*) as n FROM competition_player WHERE competition_id=?", [$c['id']]
+            )['n'];
+        }
     }
 
     if (is_post()) {
@@ -94,9 +100,15 @@ function register_form(array $p): void {
                 "INSERT INTO registration (tournament_id,lastname,firstname,club,gender,pass_nr,skill,email) VALUES (?,?,?,?,?,?,?,?)",
                 [$tid, $lastname, $firstname, $club, $gender, $pass_nr, $skill, $email]
             );
+            $comps_map     = array_column($comps, null, 'id');
+            $partner_names = $_POST['partner_name'] ?? [];
             foreach ($comp_ids as $cid) {
-                db_execute("INSERT INTO registration_competition (registration_id,competition_id,status) VALUES (?,?,'pending')",
-                    [(int)$rid, (int)$cid]);
+                $is_d  = !empty($comps_map[(int)$cid]['is_doubles']);
+                $pname = $is_d ? trim($partner_names[(int)$cid] ?? '') : '';
+                db_execute(
+                    "INSERT INTO registration_competition (registration_id,competition_id,status,partner_name) VALUES (?,?,'pending',?)",
+                    [(int)$rid, (int)$cid, $pname]
+                );
             }
             flash('success', 'Nennung erfolgreich eingereicht! Sie erhalten eine Bestätigung vom Veranstalter.');
             redirect('tournament/' . $tid . '/register');
@@ -268,24 +280,33 @@ function manage_view(array $p): void {
 
     $items = [];
     foreach ($regs as $r) {
-        // Aktuelle Bewerbszuteilungen aus competition_player — Zuordnung über Name der Registrierung
         $rcomps = db_fetchall(
-            "SELECT DISTINCT c.id, c.name FROM competition c
-             JOIN competition_player cp ON cp.competition_id = c.id
-             JOIN player pl ON pl.id = cp.player_id
+            "SELECT DISTINCT c.id, c.name, c.is_doubles
+             FROM competition c
+             JOIN player pl ON pl.name = ? AND pl.firstname = ?
              WHERE c.tournament_id = ?
-               AND pl.name = ? AND pl.firstname = ?
+               AND (
+                 EXISTS (SELECT 1 FROM competition_player cp WHERE cp.competition_id = c.id AND cp.player_id = pl.id)
+                 OR EXISTS (
+                   SELECT 1 FROM competition_double cd
+                   JOIN `double` d ON d.id = cd.double_id
+                   WHERE cd.competition_id = c.id AND (d.player1_id = pl.id OR d.player2_id = pl.id)
+                 )
+               )
              ORDER BY c.name",
-            [$r['tournament_id'], $r['lastname'], $r['firstname']]
+            [$r['lastname'], $r['firstname'], $r['tournament_id']]
         );
         $pending_req = db_fetch(
             "SELECT * FROM registration_change_request WHERE registration_id=? AND status='pending'",
             [$r['id']]
         );
         $all_comps = db_fetchall(
-            "SELECT id, name, registrations_open FROM competition
-             WHERE tournament_id = ? ORDER BY name",
-            [$r['tournament_id']]
+            "SELECT c.id, c.name, c.registrations_open, c.is_doubles,
+                    COALESCE(rc.partner_name, '') as partner_name
+             FROM competition c
+             LEFT JOIN registration_competition rc ON rc.competition_id = c.id AND rc.registration_id = ?
+             WHERE c.tournament_id = ? ORDER BY c.name",
+            [$r['id'], $r['tournament_id']]
         );
         $items[] = [
             'reg'          => $r,
@@ -373,22 +394,31 @@ function manage_change(array $p): void {
         return;
     }
 
-    // Aktuelle Bewerbszuteilungen aus competition_player — Zuordnung über Name der Registrierung
     $player = db_fetch(
-        "SELECT pl.id FROM player pl
-         WHERE pl.name = ? AND pl.firstname = ?
-         LIMIT 1",
+        "SELECT pl.id FROM player pl WHERE pl.name = ? AND pl.firstname = ? LIMIT 1",
         [$r['lastname'], $r['firstname']]
     );
-    $current_cids = $player ? array_column(
-        db_fetchall(
-            "SELECT cp.competition_id FROM competition_player cp
-             JOIN competition c ON c.id = cp.competition_id
-             WHERE cp.player_id = ? AND c.tournament_id = ?",
-            [$player['id'], $r['tournament_id']]
-        ),
-        'competition_id'
-    ) : [];
+    $current_cids = [];
+    if ($player) {
+        $pid_c = (int)$player['id'];
+        $current_cids = array_column(
+            db_fetchall(
+                "SELECT DISTINCT c.id as competition_id
+                 FROM competition c
+                 WHERE c.tournament_id = ?
+                   AND (
+                     EXISTS (SELECT 1 FROM competition_player cp WHERE cp.competition_id = c.id AND cp.player_id = ?)
+                     OR EXISTS (
+                       SELECT 1 FROM competition_double cd
+                       JOIN `double` d ON d.id = cd.double_id
+                       WHERE cd.competition_id = c.id AND (d.player1_id = ? OR d.player2_id = ?)
+                     )
+                   )",
+                [$r['tournament_id'], $pid_c, $pid_c, $pid_c]
+            ),
+            'competition_id'
+        );
+    }
 
     if (empty($new_cids)) {
         // Leere Auswahl = Rückzug
@@ -403,6 +433,20 @@ function manage_change(array $p): void {
 
     $to_add    = array_diff($new_cids, $current_cids);
     $to_remove = array_diff($current_cids, $new_cids);
+
+    // Partner-Name für bereits zugeteilte Doppelbewerbe direkt aktualisieren
+    $partner_names  = $_POST['partner_name'] ?? [];
+    $staying_cids   = array_intersect($new_cids, $current_cids);
+    foreach ($staying_cids as $stay_cid) {
+        $stay_comp = db_fetch("SELECT is_doubles FROM competition WHERE id=?", [$stay_cid]);
+        if (!empty($stay_comp['is_doubles'])) {
+            $pname = trim($partner_names[$stay_cid] ?? '');
+            db_execute(
+                "UPDATE registration_competition SET partner_name=? WHERE registration_id=? AND competition_id=?",
+                [$pname, $rid, $stay_cid]
+            );
+        }
+    }
 
     if (empty($to_add) && empty($to_remove)) {
         flash('info', 'Keine Änderung gegenüber aktueller Zuordnung festgestellt.');
@@ -428,14 +472,17 @@ function manage_change(array $p): void {
         return;
     }
 
-    $rcr_id = db_insert(
+    $rcr_id       = db_insert(
         "INSERT INTO registration_change_request (registration_id, request_type) VALUES (?, 'modify')",
         [$rid]
     );
+    $partner_names = $_POST['partner_name'] ?? [];
     foreach ($to_add as $cid) {
+        $comp  = db_fetch("SELECT is_doubles FROM competition WHERE id=?", [$cid]);
+        $pname = !empty($comp['is_doubles']) ? trim($partner_names[$cid] ?? '') : '';
         db_execute(
-            "INSERT INTO registration_change_competition (change_request_id, competition_id, action) VALUES (?,?,'add')",
-            [$rcr_id, $cid]
+            "INSERT INTO registration_change_competition (change_request_id, competition_id, action, partner_name) VALUES (?,?,'add',?)",
+            [$rcr_id, $cid, $pname]
         );
     }
     foreach ($to_remove as $cid) {
@@ -464,6 +511,7 @@ function change_confirm_all(array $p): void {
         $full_comps = _process_change_approve_all($rcr_id, $rcr['registration_id']);
     }
     db_execute("UPDATE registration_change_request SET status='confirmed' WHERE id=?", [$rcr_id]);
+    _notify_change_request_status($rcr_id);
     if ($full_comps) {
         flash('warning', 'Spieler nicht zugeordnet (Bewerb voll): ' . implode(', ', $full_comps));
     }
@@ -479,6 +527,7 @@ function change_reject_all(array $p): void {
     if (!$rcr) { redirect(''); return; }
     db_execute("UPDATE registration_change_competition SET status='rejected' WHERE change_request_id=? AND status='pending'", [$rcr_id]);
     db_execute("UPDATE registration_change_request SET status='rejected' WHERE id=?", [$rcr_id]);
+    _notify_change_request_status($rcr_id);
     flash('info', 'Antrag abgelehnt.');
     redirect('tournament/' . $rcr['tournament_id']);
 }
@@ -500,16 +549,22 @@ function change_confirm_comp(array $p): void {
                 if (!$added) {
                     flash('warning', 'Bewerb ist voll — Spieler wurde nicht zugeordnet.');
                 }
+                _sync_registration_competition($rcr['rid'], $cid, $comp_entry['partner_name'] ?? '');
             }
         } elseif ($comp_entry['action'] === 'remove') {
             $r = db_fetch("SELECT * FROM registration WHERE id=?", [$rcr['rid']]);
             if ($r) {
                 $pid = _find_player($r);
-                if ($pid) db_execute("DELETE FROM competition_player WHERE competition_id=? AND player_id=?", [$cid, $pid]);
+                if ($pid) {
+                    db_execute("DELETE FROM competition_player WHERE competition_id=? AND player_id=?", [$cid, $pid]);
+                    _remove_player_from_competition_doubles($pid, $cid);
+                }
             }
         }
         db_execute("UPDATE registration_change_competition SET status='confirmed' WHERE change_request_id=? AND competition_id=?", [$rcr_id, $cid]);
         _maybe_close_change_request($rcr_id);
+        $closed_status = db_fetch("SELECT status FROM registration_change_request WHERE id=?", [$rcr_id])['status'] ?? 'pending';
+        if ($closed_status !== 'pending') _notify_change_request_status($rcr_id);
     }
     flash('success', 'Bewerb bestätigt.');
     redirect('tournament/' . $rcr['tournament_id']);
@@ -523,11 +578,74 @@ function change_reject_comp(array $p): void {
     if (!$rcr) { redirect(''); return; }
     db_execute("UPDATE registration_change_competition SET status='rejected' WHERE change_request_id=? AND competition_id=?", [$rcr_id, $cid]);
     _maybe_close_change_request($rcr_id);
+    $closed_status = db_fetch("SELECT status FROM registration_change_request WHERE id=?", [$rcr_id])['status'] ?? 'pending';
+    if ($closed_status !== 'pending') _notify_change_request_status($rcr_id);
     flash('info', 'Bewerb abgelehnt.');
     redirect('tournament/' . $rcr['tournament_id']);
 }
 
 // ── Internal helpers ───────────────────────────────────────────────────────────
+
+function _sync_registration_competition(int $rid, int $cid, string $partner_name = ''): void {
+    db_execute(
+        "INSERT INTO registration_competition (registration_id, competition_id, status, partner_name)
+         VALUES (?,?,'confirmed',?)
+         ON DUPLICATE KEY UPDATE status='confirmed', partner_name = VALUES(partner_name)",
+        [$rid, $cid, $partner_name]
+    );
+    db_execute("UPDATE registration SET status='confirmed' WHERE id=? AND status='rejected'", [$rid]);
+}
+
+function _remove_player_from_competition_doubles(int $pid, int $cid): void {
+    $comp = db_fetch("SELECT tournament_id FROM competition WHERE id=?", [$cid]);
+
+    // Collect partner player IDs before deleting
+    $doubles = db_fetchall(
+        "SELECT d.player1_id, d.player2_id FROM competition_double cd
+         JOIN `double` d ON d.id = cd.double_id
+         WHERE cd.competition_id = ? AND (d.player1_id = ? OR d.player2_id = ?)",
+        [$cid, $pid, $pid]
+    );
+
+    db_execute(
+        "DELETE cd FROM competition_double cd
+         JOIN `double` d ON d.id = cd.double_id
+         WHERE cd.competition_id = ?
+           AND (d.player1_id = ? OR d.player2_id = ?)",
+        [$cid, $pid, $pid]
+    );
+
+    // Reset partner's registration_competition back to pending so they no longer appear in
+    // "confirmed without partner" and the admin can re-process them
+    if ($comp) {
+        foreach ($doubles as $double) {
+            $partner_pid = ((int)$double['player1_id'] === $pid)
+                ? (int)$double['player2_id']
+                : (int)$double['player1_id'];
+            $pl = db_fetch("SELECT name, firstname, pass_nr FROM player WHERE id=?", [$partner_pid]);
+            if (!$pl) continue;
+            $partner_reg = db_fetch(
+                "SELECT r.id FROM registration r
+                 WHERE r.tournament_id = ? AND r.status IN ('confirmed','pending')
+                   AND ((r.pass_nr != '' AND r.pass_nr = ?)
+                        OR (r.lastname = ? AND r.firstname = ?))
+                 LIMIT 1",
+                [$comp['tournament_id'], $pl['pass_nr'], $pl['name'], $pl['firstname']]
+            );
+            if ($partner_reg) {
+                db_execute(
+                    "UPDATE registration_competition SET status='pending'
+                     WHERE registration_id=? AND competition_id=? AND status='confirmed'",
+                    [$partner_reg['id'], $cid]
+                );
+                db_execute(
+                    "UPDATE registration SET status='pending' WHERE id=? AND status='confirmed'",
+                    [$partner_reg['id']]
+                );
+            }
+        }
+    }
+}
 
 function _reg_belongs_to_email(array $r, string $email): bool {
     if (!empty($r['email']) && strtolower($r['email']) === $email) return true;
@@ -641,6 +759,7 @@ function _process_withdraw(int $rid, int $tid): void {
             );
             foreach ($cids as $cid) {
                 db_execute("DELETE FROM competition_player WHERE competition_id=? AND player_id=?", [$cid, $pid]);
+                _remove_player_from_competition_doubles($pid, $cid);
             }
         }
     }
@@ -660,14 +779,41 @@ function _process_change_approve_all(int $rcr_id, int $rid): array {
                 $comp = db_fetch("SELECT name FROM competition WHERE id=?", [$entry['competition_id']]);
                 $full_comps[] = $comp ? $comp['name'] : "Bewerb #{$entry['competition_id']}";
             }
+            _sync_registration_competition($rid, $entry['competition_id'], $entry['partner_name'] ?? '');
         } elseif ($entry['action'] === 'remove') {
             db_execute("DELETE FROM competition_player WHERE competition_id=? AND player_id=?",
                 [$entry['competition_id'], $pid]);
+            _remove_player_from_competition_doubles($pid, $entry['competition_id']);
         }
         db_execute("UPDATE registration_change_competition SET status='confirmed' WHERE change_request_id=? AND competition_id=?",
             [$rcr_id, $entry['competition_id']]);
     }
     return $full_comps;
+}
+
+function _notify_change_request_status(int $rcr_id): void {
+    $rcr = db_fetch(
+        "SELECT rcr.*, r.email, r.firstname, r.lastname, r.tournament_id
+         FROM registration_change_request rcr
+         JOIN registration r ON r.id = rcr.registration_id
+         WHERE rcr.id=?",
+        [$rcr_id]
+    );
+    if (!$rcr || empty($rcr['email'])) return;
+    $t = db_fetch("SELECT name FROM tournament WHERE id=?", [$rcr['tournament_id']]);
+    $comp_results = db_fetchall(
+        "SELECT rcc.action, rcc.status, c.name
+         FROM registration_change_competition rcc
+         JOIN competition c ON c.id = rcc.competition_id
+         WHERE rcc.change_request_id=?",
+        [$rcr_id]
+    );
+    $name  = trim($rcr['firstname'] . ' ' . $rcr['lastname']);
+    $token = make_manage_email_token($rcr['email']);
+    send_change_request_processed_mail(
+        $rcr['email'], $name, $t ? $t['name'] : '',
+        $rcr['request_type'], $comp_results, $token
+    );
 }
 
 function _maybe_close_change_request(int $rcr_id): void {

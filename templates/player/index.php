@@ -4,7 +4,8 @@ ob_start(); ?>
 <div class="d-flex align-items-center mb-1 gap-2">
   <h2 class="mb-0"><i class="bi bi-person-lines-fill me-2"></i>Spielerregister</h2>
   <?php if (can_edit()): ?>
-  <button class="btn btn-primary btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#newPlayerModal">
+  <button class="btn btn-primary btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#newPlayerModal"
+          id="btn-new-player">
     <i class="bi bi-person-plus me-1"></i>Neuer Spieler
   </button>
   <a href="<?= url('players/import') ?>" class="btn btn-outline-secondary btn-sm">
@@ -12,10 +13,27 @@ ob_start(); ?>
   </a>
   <?php endif; ?>
 </div>
-<p class="text-muted small mb-4">Stammdaten und Spielstärken aller registrierten Spieler.</p>
+<p class="text-muted small mb-3">Stammdaten und Spielstärken aller registrierten Spieler.</p>
 
-<div class="row g-4">
-  <div class="col-12">
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-0" id="players-tabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="tab-players-btn"
+            data-bs-toggle="tab" data-bs-target="#tab-spieler" type="button" role="tab">
+      <i class="bi bi-people me-1"></i>Spieler (<?= count($players) ?>)
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tab-doppel-btn"
+            data-bs-toggle="tab" data-bs-target="#tab-doppel" type="button" role="tab">
+      <i class="bi bi-people-fill me-1"></i>Doppel (<?= count($all_doubles) ?>)
+    </button>
+  </li>
+</ul>
+<div class="tab-content border border-top-0 rounded-bottom mb-4">
+
+  <!-- ── Tab: Spieler ── -->
+  <div class="tab-pane fade show active p-3" id="tab-spieler" role="tabpanel">
     <?php if ($players): ?>
     <div class="d-flex align-items-center mb-2">
       <span class="text-muted small"><?= count($players) ?> Einträge</span>
@@ -146,7 +164,106 @@ ob_start(); ?>
     <p class="text-muted">Noch keine Spieler im Register.</p>
     <?php endif; ?>
   </div>
-</div>
+
+  <!-- ── Tab: Doppel ── -->
+  <div class="tab-pane fade p-3" id="tab-doppel" role="tabpanel">
+    <?php $sport_labels = ['tischtennis'=>'Tischtennis','tennis'=>'Tennis','fussball'=>'Fußball','cornhole'=>'Cornhole']; ?>
+    <?php if ($all_doubles): ?>
+    <div class="table-responsive mb-3">
+      <table class="table table-sm table-hover align-middle mb-0" data-sortable>
+        <thead class="table-light">
+          <tr>
+            <th>Name</th><th>Spieler 1</th><th>Spieler 2</th><th>Spielstärke</th>
+            <?php if (can_edit()): ?><th class="no-sort"></th><?php endif; ?>
+          </tr>
+        </thead>
+        <tbody>
+        <?php foreach ($all_doubles as $d): ?>
+        <?php $dsums = $double_sport_skills[$d['id']] ?? []; ?>
+        <tr>
+          <td class="fw-semibold small"><?= e($d['name']) ?></td>
+          <td class="small text-muted">
+            <?= e($d['p1name']) ?>
+            <?php if ($d['p1club']): ?><span class="text-muted"> (<?= e($d['p1club']) ?>)</span><?php endif; ?>
+          </td>
+          <td class="small text-muted">
+            <?= e($d['p2name']) ?>
+            <?php if ($d['p2club']): ?><span class="text-muted"> (<?= e($d['p2club']) ?>)</span><?php endif; ?>
+          </td>
+          <td class="small" data-sort="<?= array_sum($dsums) ?>">
+            <?php foreach ($dsums as $sport => $sum): if ($sum <= 0) continue; ?>
+            <span class="badge bg-secondary me-1" title="<?= e($sport_labels[$sport] ?? $sport) ?>">
+              <?= e($sport_icons[$sport] ?? $sport) ?> <?= $sum == (int)$sum ? (int)$sum : $sum ?>
+            </span>
+            <?php endforeach; ?>
+            <?php if (!array_filter($dsums)): ?>—<?php endif; ?>
+          </td>
+          <?php if (can_edit()): ?>
+          <td class="text-end text-nowrap">
+            <button class="btn btn-outline-secondary btn-sm py-0 px-1 me-1"
+                    data-bs-toggle="modal" data-bs-target="#editDoubleModal<?= $d['id'] ?>" title="Bearbeiten">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <form method="post" action="<?= url('players/double/'.$d['id'].'/delete') ?>"
+                  class="d-inline"
+                  onsubmit="return confirm('Doppel „<?= e($d['name']) ?>" wirklich löschen?')">
+              <?= csrf_field() ?>
+              <button class="btn btn-outline-danger btn-sm py-0 px-1" title="Löschen">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+          </td>
+          <?php endif; ?>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+    <?php else: ?>
+    <p class="text-muted small">Noch keine Doppel gebildet.</p>
+    <?php endif; ?>
+
+    <?php if (can_edit() && count($players) >= 2): ?>
+    <div class="border-top pt-3">
+      <h6 class="mb-3"><i class="bi bi-plus-circle me-1"></i>Neues Doppel bilden</h6>
+      <form method="post" action="<?= url('players/double/new') ?>" class="row g-2 align-items-end">
+        <?= csrf_field() ?>
+        <div class="col-sm-5">
+          <label class="form-label small">Spieler 1</label>
+          <select name="player1_id" id="new_p1" class="form-select form-select-sm" required onchange="calcDoubleSkill()">
+            <option value="">— auswählen —</option>
+            <?php foreach ($players as $pl): ?>
+            <option value="<?= $pl['id'] ?>">
+              <?= e(trim(($pl['firstname'] ? $pl['firstname'].' ' : '').$pl['name'])) ?>
+              <?php if ($pl['club']): ?>(<?= e($pl['club']) ?>)<?php endif; ?>
+            </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="col-sm-5">
+          <label class="form-label small">Spieler 2</label>
+          <select name="player2_id" id="new_p2" class="form-select form-select-sm" required onchange="calcDoubleSkill()">
+            <option value="">— auswählen —</option>
+            <?php foreach ($players as $pl): ?>
+            <option value="<?= $pl['id'] ?>">
+              <?= e(trim(($pl['firstname'] ? $pl['firstname'].' ' : '').$pl['name'])) ?>
+              <?php if ($pl['club']): ?>(<?= e($pl['club']) ?>)<?php endif; ?>
+            </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="col-sm-2">
+          <button class="btn btn-primary btn-sm w-100"><i class="bi bi-plus me-1"></i>Erstellen</button>
+        </div>
+        <div class="col-12" id="new_double_skills" style="display:none">
+          <small class="text-muted">Berechnete Stärke: <span id="new_double_skills_text"></span></small>
+        </div>
+      </form>
+    </div>
+    <?php endif; ?>
+  </div>
+
+</div><!-- tab-content -->
 
 <?php if (can_edit()): ?>
 <!-- Neuer Spieler Modal -->
@@ -210,6 +327,100 @@ ob_start(); ?>
   </div>
 </div>
 <?php endif; ?>
+
+<?php if (can_edit()): ?>
+<!-- Edit-Modals für jedes Doppel -->
+<?php foreach ($all_doubles as $d): ?>
+<?php $dsums = $double_sport_skills[$d['id']] ?? []; ?>
+<div class="modal fade" id="editDoubleModal<?= $d['id'] ?>" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="<?= url('players/double/'.$d['id'].'/edit') ?>">
+        <?= csrf_field() ?>
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-pencil me-1"></i>Doppel bearbeiten</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Name</label>
+            <input type="text" name="name" class="form-control" value="<?= e($d['name']) ?>" required>
+          </div>
+          <?php if ($dsums): ?>
+          <div class="mb-3">
+            <label class="form-label">Spielstärke <span class="text-muted small">(automatisch)</span></label>
+            <div class="d-flex flex-wrap gap-2">
+              <?php foreach ($dsums as $sport => $sum): if ($sum <= 0) continue; ?>
+              <span class="badge bg-secondary fs-6">
+                <?= e($sport_icons[$sport] ?? $sport) ?>
+                <?= e($sport_labels[$sport] ?? $sport) ?>:
+                <?= $sum == (int)$sum ? (int)$sum : $sum ?>
+              </span>
+              <?php endforeach; ?>
+            </div>
+            <div class="form-text">
+              <?= e($d['p1name']) ?>: <?php foreach ($player_skills[$d['player1_id']] ?? [] as $sp => $sk): if ($sk <= 0) continue; ?>
+              <?= e($sport_labels[$sp] ?? $sp) ?> <?= $sk == (int)$sk ? (int)$sk : $sk ?><?php endforeach; ?> &nbsp;|&nbsp;
+              <?= e($d['p2name']) ?>: <?php foreach ($player_skills[$d['player2_id']] ?? [] as $sp => $sk): if ($sk <= 0) continue; ?>
+              <?= e($sport_labels[$sp] ?? $sp) ?> <?= $sk == (int)$sk ? (int)$sk : $sk ?><?php endforeach; ?>
+            </div>
+          </div>
+          <?php endif; ?>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+          <button type="submit" class="btn btn-primary">Speichern</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<?php endforeach; ?>
+<?php endif; ?>
+
+<script>
+var playerSkillsData = <?= json_encode($player_skills) ?>;
+var sportLabels = {'tischtennis':'Tischtennis','tennis':'Tennis','fussball':'Fußball','cornhole':'Cornhole'};
+var sportDefaults = {'tennis': 10.0};
+
+function calcDoubleSkill() {
+  var p1 = document.getElementById('new_p1')?.value;
+  var p2 = document.getElementById('new_p2')?.value;
+  var box = document.getElementById('new_double_skills');
+  var txt = document.getElementById('new_double_skills_text');
+  if (!p1 || !p2 || p1 === p2 || !box || !txt) { if (box) box.style.display='none'; return; }
+  var s1 = playerSkillsData[p1] || {};
+  var s2 = playerSkillsData[p2] || {};
+  var sports = Object.keys(Object.assign({}, s1, s2));
+  var parts = [];
+  sports.forEach(function(sp) {
+    var v1 = s1[sp] !== undefined ? parseFloat(s1[sp]) : (sportDefaults[sp] || 0);
+    var v2 = s2[sp] !== undefined ? parseFloat(s2[sp]) : (sportDefaults[sp] || 0);
+    var sum = v1 + v2;
+    if (sum > 0) parts.push((sportLabels[sp] || sp) + ': ' + (sum % 1 === 0 ? sum.toFixed(0) : sum.toFixed(1)));
+  });
+  if (parts.length) { txt.textContent = parts.join(' / '); box.style.display=''; }
+  else { box.style.display='none'; }
+}
+
+// Tab-Persistenz: Bootstrap erst nach $content geladen → DOMContentLoaded abwarten
+document.addEventListener('DOMContentLoaded', function() {
+  var STORE = 'players_active_tab';
+  var hash = window.location.hash;
+  var btnId = null;
+  if (hash === '#doppel')       btnId = 'tab-doppel-btn';
+  else if (hash === '#spieler') btnId = 'tab-players-btn';
+  else                          btnId = localStorage.getItem(STORE);
+
+  if (btnId) {
+    var btn = document.getElementById(btnId);
+    if (btn) bootstrap.Tab.getOrCreateInstance(btn).show();
+  }
+  document.querySelectorAll('#players-tabs button[data-bs-toggle="tab"]').forEach(function(b) {
+    b.addEventListener('shown.bs.tab', function() { localStorage.setItem(STORE, b.id); });
+  });
+});
+</script>
 <?php
 $content = ob_get_clean();
 require __DIR__ . '/../_base.php';

@@ -141,6 +141,36 @@ function upload_file(string $field, array $allowed_exts = ['pdf', 'jpg', 'jpeg',
     return $filename;
 }
 
+// ── Spielstärke-Helper ─────────────────────────────────────────────────────────
+
+function player_sport_skill(int $pid, string $sport): float {
+    static $defaults = ['tennis' => 10.0];
+    if ($sport) {
+        $row = db_fetch("SELECT skill FROM player_skill WHERE player_id=? AND sport=?", [$pid, $sport]);
+        if ($row) return (float)$row['skill'];
+        return $defaults[$sport] ?? 0.0;
+    }
+    $row = db_fetch("SELECT skill FROM player WHERE id=?", [$pid]);
+    return $row ? (float)$row['skill'] : 0.0;
+}
+
+// ── Doppel-Helper ──────────────────────────────────────────────────────────────
+
+function double_name(int $did): string {
+    $d = db_fetch(
+        "SELECT d.name,
+         TRIM(CONCAT(COALESCE(p1.firstname,''), IF(COALESCE(p1.firstname,'') != '', ' ', ''), p1.name)) as p1name,
+         TRIM(CONCAT(COALESCE(p2.firstname,''), IF(COALESCE(p2.firstname,'') != '', ' ', ''), p2.name)) as p2name
+         FROM `double` d
+         JOIN player p1 ON p1.id = d.player1_id
+         JOIN player p2 ON p2.id = d.player2_id
+         WHERE d.id = ?",
+        [$did]
+    );
+    if (!$d) return '?';
+    return $d['name'] ?: ($d['p1name'] . ' / ' . $d['p2name']);
+}
+
 // ── Render ─────────────────────────────────────────────────────────────────────
 
 function render(string $template, array $vars = []): void {

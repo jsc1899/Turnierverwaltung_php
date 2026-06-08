@@ -96,7 +96,11 @@ ob_start(); ?>
   <li class="nav-item" role="presentation">
     <button class="nav-link<?= !$settings_active ? ' active' : '' ?>" id="tab-players-btn"
             data-bs-toggle="tab" data-bs-target="#tab-players" type="button" role="tab">
+      <?php if ($is_doubles): ?>
+      <i class="bi bi-people-fill me-1"></i>Doppel (<?= count($assigned_doubles) ?>)
+      <?php else: ?>
       <i class="bi bi-people me-1"></i>Spieler (<?= count($assigned) ?>)
+      <?php endif; ?>
       <?php if ($c['max_players']): ?><span class="text-muted small">/ <?= (int)$c['max_players'] ?></span><?php endif; ?>
     </button>
   </li>
@@ -156,6 +160,20 @@ ob_start(); ?>
         </div>
       </div>
       <?php endif; ?>
+      <?php if ($c['phase'] === 'setup' && empty($is_doubles) && empty(count($assigned)) && empty(count($assigned_doubles))): ?>
+      <div class="col-auto">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="is_doubles" id="is_doubles"
+                 <?= ($c['is_doubles'] ?? 0) ? 'checked' : '' ?>>
+          <label class="form-check-label" for="is_doubles">Doppelbewerb</label>
+        </div>
+      </div>
+      <?php elseif ($c['is_doubles'] ?? 0): ?>
+      <div class="col-auto">
+        <span class="badge bg-info text-dark fs-6"><i class="bi bi-people-fill me-1"></i>Doppelbewerb</span>
+        <input type="hidden" name="is_doubles" value="1">
+      </div>
+      <?php endif; ?>
       <div class="col-auto">
         <div class="form-check">
           <input class="form-check-input" type="checkbox" name="registrations_open" id="regs_open"
@@ -164,7 +182,7 @@ ob_start(); ?>
         </div>
       </div>
       <div class="col-auto">
-        <label class="form-label">Max. Spieler</label>
+        <label class="form-label">Max. Teilnehmer</label>
         <input type="number" name="max_players" class="form-control form-control-sm" style="width:90px"
                value="<?= (int)$c['max_players'] ?>" min="0">
       </div>
@@ -173,21 +191,22 @@ ob_start(); ?>
       </div>
     </form>
     <?php if ($c['phase'] === 'setup'): ?>
-    <?php if (!in_array($c['mode'], ['ko_only','double_ko']) && count($assigned) >= 3): ?>
+    <?php $draw_count = $is_doubles ? count($assigned_doubles) : count($assigned); ?>
+    <?php if (!in_array($c['mode'], ['ko_only','double_ko']) && $draw_count >= 3): ?>
     <hr class="my-3">
     <form method="post" action="<?= url('competition/'.$c['id'].'/draw/groups') ?>">
       <?= csrf_field() ?>
       <button class="btn btn-primary btn-sm"><i class="bi bi-shuffle me-1"></i>Gruppen auslosen</button>
     </form>
     <?php endif; ?>
-    <?php if ($c['mode'] === 'ko_only' && count($assigned) >= 2): ?>
+    <?php if ($c['mode'] === 'ko_only' && $draw_count >= 2): ?>
     <hr class="my-3">
     <form method="post" action="<?= url('competition/'.$c['id'].'/draw/ko-direct') ?>">
       <?= csrf_field() ?>
       <button class="btn btn-primary btn-sm"><i class="bi bi-shuffle me-1"></i>KO-Bracket auslosen</button>
     </form>
     <?php endif; ?>
-    <?php if ($c['mode'] === 'double_ko' && count($assigned) >= 2): ?>
+    <?php if ($c['mode'] === 'double_ko' && $draw_count >= 2): ?>
     <hr class="my-3">
     <form method="post" action="<?= url('competition/'.$c['id'].'/draw/ko-direct') ?>">
       <?= csrf_field() ?>
@@ -197,8 +216,120 @@ ob_start(); ?>
     <?php endif; ?>
   </div>
 
-  <!-- Tab: Spielerliste -->
+  <!-- Tab: Spielerliste / Doppelliste -->
   <div class="tab-pane fade<?= !$settings_active ? ' show active' : '' ?> p-3" id="tab-players" role="tabpanel">
+    <?php if ($is_doubles): ?>
+    <!-- ── Doppel-Verwaltung ── -->
+    <?php if ($assigned_doubles): ?>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle mb-0" data-sortable>
+        <thead class="table-light">
+          <tr>
+            <th>Doppel</th><th>Spieler 1</th><th>Spieler 2</th><th class="text-center">St.</th><th>Angemeldet</th>
+            <?php if ($c['phase'] === 'setup'): ?><th class="no-sort"></th><?php endif; ?>
+          </tr>
+        </thead>
+        <tbody>
+        <?php foreach ($assigned_doubles as $d): ?>
+        <tr>
+          <td class="small fw-semibold"><?= e($d['name']) ?></td>
+          <td class="small text-muted"><?= e($d['p1name']) ?><?php if ($d['p1club']): ?> <small class="text-muted">(<?= e($d['p1club']) ?>)</small><?php endif; ?></td>
+          <td class="small text-muted"><?= e($d['p2name']) ?><?php if ($d['p2club']): ?> <small class="text-muted">(<?= e($d['p2club']) ?>)</small><?php endif; ?></td>
+          <td class="text-center" data-sort="<?= (float)$d['skill'] ?>">
+            <?php if ($d['skill']): ?><span class="badge bg-secondary"><?= (int)$d['skill'] ?></span><?php endif; ?>
+          </td>
+          <td class="small text-muted" data-sort="<?= e($d['reg_date']) ?>"><?= e(fmtdate($d['reg_date'])) ?></td>
+          <?php if ($c['phase'] === 'setup'): ?>
+          <td>
+            <form method="post" action="<?= url('competition/'.$c['id'].'/double/'.$d['id'].'/remove') ?>">
+              <?= csrf_field() ?>
+              <button class="btn btn-outline-danger btn-sm py-0 px-1"><i class="bi bi-x"></i></button>
+            </form>
+          </td>
+          <?php endif; ?>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+    <?php else: ?>
+    <p class="text-muted small">Noch keine Doppel eingetragen.</p>
+    <?php endif; ?>
+
+    <?php if ($c['phase'] === 'setup' && !empty($confirmed_regs) && can_edit()): ?>
+    <div class="mt-3 pt-3 border-top">
+      <h6 class="mb-2"><i class="bi bi-person-check me-1"></i>Bestätigte Nennungen <span class="text-muted small fw-normal">(noch ohne Partner)</span></h6>
+      <?php $pairable = array_filter($confirmed_regs, fn($r) => !empty($r['player_id'])); ?>
+      <table class="table table-sm align-middle mb-2">
+        <thead class="table-light"><tr><th>Name</th><th>Verein</th><th>Gewünschter Partner</th><th></th></tr></thead>
+        <tbody>
+        <?php foreach ($confirmed_regs as $r): ?>
+        <tr>
+          <td class="small"><?= e($r['firstname'] . ' ' . $r['lastname']) ?></td>
+          <td class="small text-muted"><?= e($r['club']) ?></td>
+          <td class="small text-muted"><?= $r['partner_name'] ? e($r['partner_name']) : '<span class="text-muted">—</span>' ?></td>
+          <td></td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+      <?php if (count($pairable) >= 2): ?>
+      <form method="post" action="<?= url('competition/'.$c['id'].'/double/pair') ?>" class="row g-2 align-items-end">
+        <?= csrf_field() ?>
+        <div class="col">
+          <select name="player1_id" class="form-select form-select-sm" required>
+            <option value="">Spieler 1 …</option>
+            <?php foreach ($pairable as $r): ?>
+            <option value="<?= $r['player_id'] ?>"><?= e($r['firstname'] . ' ' . $r['lastname']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="col">
+          <select name="player2_id" class="form-select form-select-sm" required>
+            <option value="">Spieler 2 …</option>
+            <?php foreach ($pairable as $r): ?>
+            <option value="<?= $r['player_id'] ?>"><?= e($r['firstname'] . ' ' . $r['lastname']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="col-auto">
+          <button class="btn btn-sm btn-success"><i class="bi bi-people-fill me-1"></i>Doppel bilden</button>
+        </div>
+      </form>
+      <?php else: ?>
+      <p class="text-muted small mb-0">Mindestens 2 Spieler müssen im Spielerregister vorhanden sein, um ein Doppel zu bilden.</p>
+      <?php endif; ?>
+    </div>
+    <?php endif; ?>
+
+    <?php if ($c['phase'] === 'setup'): ?>
+    <?php if ($unassigned_doubles): ?>
+    <div class="mt-3 pt-3 border-top">
+      <form method="post" action="<?= url('competition/'.$c['id'].'/double/add') ?>">
+        <?= csrf_field() ?>
+        <select name="double_ids[]" class="form-select form-select-sm mb-2" multiple size="4">
+          <?php foreach ($unassigned_doubles as $d): ?>
+          <option value="<?= $d['id'] ?>">
+            <?= e($d['name']) ?>
+            <?php if ($d['skill']): ?>· <?= (int)$d['skill'] ?><?php endif; ?>
+          </option>
+          <?php endforeach; ?>
+        </select>
+        <button class="btn btn-sm btn-primary w-100"><i class="bi bi-plus me-1"></i>Doppel hinzufügen</button>
+      </form>
+    </div>
+    <?php elseif (!$unassigned_doubles && $t): ?>
+    <div class="mt-3 pt-3 border-top">
+      <p class="text-muted small mb-1">Alle vorhandenen Doppel sind bereits eingetragen.</p>
+      <a href="<?= url('players#doppel') ?>" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-plus-circle me-1"></i>Doppel verwalten
+      </a>
+    </div>
+    <?php endif; ?>
+    <?php endif; ?>
+
+    <?php else: ?>
+    <!-- ── Spieler-Verwaltung (Einzelbewerb) ── -->
     <?php if ($assigned): ?>
     <div class="btn-group btn-group-sm mb-3">
       <a href="<?= url('competition/'.$c['id'].'/players/pdf') ?>" class="btn btn-outline-danger" target="_blank" title="PDF">
@@ -261,6 +392,7 @@ ob_start(); ?>
       </form>
     </div>
     <?php endif; ?>
+    <?php endif; /* end is_doubles/else */ ?>
   </div>
 
 </div>
@@ -845,6 +977,14 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
 <?php
 $extra_js = <<<'JS'
 <script>
+// Aktiven Tab aus URL-Hash wiederherstellen
+(function() {
+  if (window.location.hash === '#spieler') {
+    var btn = document.getElementById('tab-players-btn');
+    if (btn) bootstrap.Tab.getOrCreateInstance(btn).show();
+  }
+})();
+
 // ── Group Drag-and-Drop ──────────────────────────────────────────
 var grpDragEl = null, grpEditActive = false;
 function toggleGrpEdit() {

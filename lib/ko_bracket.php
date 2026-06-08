@@ -48,7 +48,14 @@ function seeded_match_order(int $num_matches): array {
 
 function advance_ko_winner(array $match): void {
     if ($match['score1'] === $match['score2']) return;
-    $winner_id  = $match['score1'] > $match['score2'] ? $match['player1_id'] : $match['player2_id'];
+    $is_doubles = !empty($match['double1_id']) || !empty($match['double2_id']);
+    if ($is_doubles) {
+        $winner_id = $match['score1'] > $match['score2'] ? $match['double1_id'] : $match['double2_id'];
+        $p1col = 'double1_id'; $p2col = 'double2_id';
+    } else {
+        $winner_id = $match['score1'] > $match['score2'] ? $match['player1_id'] : $match['player2_id'];
+        $p1col = 'player1_id'; $p2col = 'player2_id';
+    }
     $next_round = (int)($match['ko_round'] / 2);
     $next_pos   = (int)($match['ko_position'] / 2);
     $slot       = $match['ko_position'] % 2 === 0 ? 1 : 2;
@@ -57,23 +64,22 @@ function advance_ko_winner(array $match): void {
         [$match['competition_id'], $next_round, $next_pos]
     );
     if ($next_match) {
-        if ($slot === 1) {
-            db_execute("UPDATE `match` SET player1_id=? WHERE id=?", [$winner_id, $next_match['id']]);
-        } else {
-            db_execute("UPDATE `match` SET player2_id=? WHERE id=?", [$winner_id, $next_match['id']]);
-        }
+        $col = $slot === 1 ? $p1col : $p2col;
+        db_execute("UPDATE `match` SET `$col`=? WHERE id=?", [$winner_id, $next_match['id']]);
     }
 }
 
 function recompute_ko_from(int $cid, int $from_ko_round): void {
     db_execute(
-        "UPDATE `match` SET player1_id=NULL, player2_id=NULL, score1=NULL, score2=NULL, played=0
+        "UPDATE `match` SET player1_id=NULL, player2_id=NULL, double1_id=NULL, double2_id=NULL,
+         score1=NULL, score2=NULL, played=0
          WHERE competition_id=? AND group_id IS NULL AND ko_round < ? AND ko_round != 3",
         [$cid, $from_ko_round]
     );
     if ($from_ko_round >= 4) {
         db_execute(
-            "UPDATE `match` SET player1_id=NULL, player2_id=NULL, score1=NULL, score2=NULL, played=0
+            "UPDATE `match` SET player1_id=NULL, player2_id=NULL, double1_id=NULL, double2_id=NULL,
+             score1=NULL, score2=NULL, played=0
              WHERE competition_id=? AND ko_round=3",
             [$cid]
         );
@@ -89,16 +95,20 @@ function recompute_ko_from(int $cid, int $from_ko_round): void {
             if ($r === 4) {
                 $comp = db_fetch("SELECT third_place FROM competition WHERE id=?", [$cid]);
                 if ($comp && $comp['third_place']) {
-                    $loser_id = $m['score2'] > $m['score1'] ? $m['player1_id'] : $m['player2_id'];
-                    $third_m  = db_fetch(
+                    $is_doubles = !empty($m['double1_id']) || !empty($m['double2_id']);
+                    if ($is_doubles) {
+                        $loser_id = $m['score2'] > $m['score1'] ? $m['double1_id'] : $m['double2_id'];
+                        $p1col = 'double1_id'; $p2col = 'double2_id';
+                    } else {
+                        $loser_id = $m['score2'] > $m['score1'] ? $m['player1_id'] : $m['player2_id'];
+                        $p1col = 'player1_id'; $p2col = 'player2_id';
+                    }
+                    $third_m = db_fetch(
                         "SELECT * FROM `match` WHERE competition_id=? AND ko_round=3", [$cid]
                     );
                     if ($third_m) {
-                        if ($m['ko_position'] === 0) {
-                            db_execute("UPDATE `match` SET player1_id=? WHERE id=?", [$loser_id, $third_m['id']]);
-                        } else {
-                            db_execute("UPDATE `match` SET player2_id=? WHERE id=?", [$loser_id, $third_m['id']]);
-                        }
+                        $col = $m['ko_position'] === 0 ? $p1col : $p2col;
+                        db_execute("UPDATE `match` SET `$col`=? WHERE id=?", [$loser_id, $third_m['id']]);
                     }
                 }
             }

@@ -48,7 +48,11 @@ function show(array $p): void {
     $comps = db_fetchall("SELECT * FROM competition WHERE tournament_id = ? ORDER BY id", [$p['id']]);
     $comp_info = [];
     foreach ($comps as $c) {
-        $cnt = db_fetch("SELECT COUNT(*) as n FROM competition_player WHERE competition_id = ?", [$c['id']])['n'];
+        if (!empty($c['is_doubles'])) {
+            $cnt = db_fetch("SELECT COUNT(*) as n FROM competition_double WHERE competition_id=?", [$c['id']])['n'];
+        } else {
+            $cnt = db_fetch("SELECT COUNT(*) as n FROM competition_player WHERE competition_id=?", [$c['id']])['n'];
+        }
         $comp_info[] = ['comp' => $c, 'player_count' => $cnt];
     }
 
@@ -63,7 +67,7 @@ function show(array $p): void {
         );
         foreach ($regs as $r) {
             $rcomps = db_fetchall(
-                "SELECT c.id as cid, c.name, rc.status FROM competition c
+                "SELECT c.id as cid, c.name, c.is_doubles, rc.status, rc.partner_name FROM competition c
                  JOIN registration_competition rc ON rc.competition_id=c.id
                  WHERE rc.registration_id=? ORDER BY c.name",
                 [$r['id']]
@@ -82,7 +86,7 @@ function show(array $p): void {
         );
         foreach ($raw_crs as $rcr) {
             $comp_rows = db_fetchall(
-                "SELECT rcc.competition_id, rcc.action, rcc.status, c.name
+                "SELECT rcc.competition_id, rcc.action, rcc.status, rcc.partner_name, c.name, c.is_doubles
                  FROM registration_change_competition rcc
                  JOIN competition c ON c.id = rcc.competition_id
                  WHERE rcc.change_request_id=? ORDER BY rcc.action DESC, c.name",

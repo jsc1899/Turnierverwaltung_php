@@ -215,7 +215,7 @@ ob_start(); ?>
           <div class="card-body d-flex flex-column">
             <h6 class="card-title mb-1"><?= e($c['name']) ?></h6>
             <div class="text-muted small mb-2">
-              <i class="bi bi-people me-1"></i><?= $ci['player_count'] ?><?= $c['max_players'] ? '/' . $c['max_players'] : '' ?> Spieler
+              <i class="bi bi-<?= $c['is_doubles'] ? 'people-fill' : 'people' ?> me-1"></i><?= $ci['player_count'] ?><?= $c['max_players'] ? '/' . (int)$c['max_players'] : '' ?> <?= $c['is_doubles'] ? 'Doppel' : 'Spieler' ?>
               &nbsp;·&nbsp;
               <?php if ($c['mode'] === 'ko_only'): ?>
               KO-Runde
@@ -313,6 +313,14 @@ ob_start(); ?>
                 <option value="1">Gruppenerste → KO</option>
                 <option value="2" selected>Erste &amp; Zweite → KO</option>
               </select>
+            </div>
+          </div>
+          <div class="mb-3">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="is_doubles" id="new_is_doubles" value="1">
+              <label class="form-check-label" for="new_is_doubles">
+                <i class="bi bi-people-fill me-1"></i>Doppelbewerb
+              </label>
             </div>
           </div>
           <div class="d-flex gap-2 justify-content-end">

@@ -98,6 +98,11 @@ $routes = [
     ['POST',     '/reg-change/{id}/comp/{cid}/confirm',              'registration', 'change_confirm_comp'],
     ['POST',     '/reg-change/{id}/comp/{cid}/reject',               'registration', 'change_reject_comp'],
 
+    // Doubles
+    ['GET',      '/tournament/{tid}/doppel',                  'double',      'list_doubles'],
+    ['POST',     '/tournament/{tid}/doppel/neu',              'double',      'create_double'],
+    ['POST',     '/tournament/{tid}/doppel/{did}/loeschen',   'double',      'delete_double'],
+
     // Competitions
     ['GET|POST', '/tournament/{tid}/competition/new',        'competition', 'new_competition'],
     ['GET',      '/competition/{id}',                        'competition', 'show'],
@@ -105,6 +110,9 @@ $routes = [
     ['POST',     '/competition/{id}/delete',                 'competition', 'delete'],
     ['POST',     '/competition/{id}/player/add',             'competition', 'add_player'],
     ['POST',     '/competition/{id}/player/{pid}/remove',    'competition', 'remove_player'],
+    ['POST',     '/competition/{id}/double/add',             'competition', 'add_double'],
+    ['POST',     '/competition/{id}/double/pair',            'competition', 'pair_double_from_reg'],
+    ['POST',     '/competition/{id}/double/{did}/remove',    'competition', 'remove_double'],
     ['POST',     '/competition/{id}/draw/groups',            'competition', 'draw_groups'],
     ['POST',     '/competition/{id}/draw/ko',                'competition', 'draw_ko'],
     ['POST',     '/competition/{id}/draw/ko-direct',         'competition', 'draw_ko_direct'],
@@ -121,12 +129,15 @@ $routes = [
     ['POST',     '/competition/{id}/results/bulk',    'match_result', 'save_bulk'],
 
     // Players
-    ['GET',      '/players',                  'player', 'index'],
-    ['GET',      '/players/import/template',  'player', 'import_template'],
-    ['GET|POST', '/players/import',           'player', 'import_players'],
-    ['GET|POST', '/player/new',               'player', 'new_player'],
-    ['GET|POST', '/player/{id}/edit',         'player', 'edit'],
-    ['POST',     '/player/{id}/delete',       'player', 'delete'],
+    ['GET',      '/players',                        'player', 'index'],
+    ['GET',      '/players/import/template',        'player', 'import_template'],
+    ['GET|POST', '/players/import',                 'player', 'import_players'],
+    ['GET|POST', '/player/new',                     'player', 'new_player'],
+    ['GET|POST', '/player/{id}/edit',               'player', 'edit'],
+    ['POST',     '/player/{id}/delete',             'player', 'delete'],
+    ['POST',     '/players/double/new',             'player', 'create_double_global'],
+    ['POST',     '/players/double/{did}/edit',      'player', 'edit_double_global'],
+    ['POST',     '/players/double/{did}/delete',    'player', 'delete_double_global'],
 
     // PDFs & Exporte
     ['GET', '/tournament/{id}/aushang',           'pdf', 'aushang'],

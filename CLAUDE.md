@@ -3,7 +3,11 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Sprache
-Antworte immer auf Deutsch, unabhängig davon, in welcher Sprache ich schreibe.
+Antworte immer auf Deutsch, auch wenn ich auf Englisch schreibe.
+
+## Verhalten
+- Erkläre Codeänderungen kurz und verständlich
+- Frage nach, wenn etwas unklar ist
 
 ## Projekt
 
