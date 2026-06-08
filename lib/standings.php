@@ -1,6 +1,6 @@
 <?php
 
-function _apply_h2h_tiebreaker(array $standings, array $matches, string $p1_col, string $p2_col): array {
+function _apply_h2h_tiebreaker(array $standings, array $matches, string $p1_col, string $p2_col, string $seeding_order = 'desc'): array {
     $by_points = [];
     foreach ($standings as $row) {
         $by_points[$row['points']][] = $row;
@@ -34,7 +34,9 @@ function _apply_h2h_tiebreaker(array $standings, array $matches, string $p1_col,
             if ($mb['goals_for'] !== $ma['goals_for']) return $mb['goals_for'] - $ma['goals_for'];
             if ($b['goal_diff']  !== $a['goal_diff'])  return $b['goal_diff']  - $a['goal_diff'];
             if ($b['goals_for']  !== $a['goals_for'])  return $b['goals_for']  - $a['goals_for'];
-            return $b['skill'] <=> $a['skill'];
+            return $seeding_order === 'asc'
+                ? $a['skill'] <=> $b['skill']
+                : $b['skill'] <=> $a['skill'];
         });
 
         foreach ($group as $row) $final[] = $row;
@@ -42,7 +44,7 @@ function _apply_h2h_tiebreaker(array $standings, array $matches, string $p1_col,
     return $final;
 }
 
-function group_standings(int $group_id): array {
+function group_standings(int $group_id, string $seeding_order = 'desc'): array {
     $players = db_fetchall(
         "SELECT p.id, TRIM(CONCAT(p.name, IF(p.firstname != '', CONCAT(' ', p.firstname), ''))) as name,
          p.club, COALESCE(cp.skill, p.skill, 0) as skill
@@ -89,10 +91,10 @@ function group_standings(int $group_id): array {
         $r['goal_diff'] = $r['goals_for'] - $r['goals_against'];
     }
     usort($result, fn($a, $b) => $b['points'] - $a['points']);
-    return _apply_h2h_tiebreaker($result, $matches, 'player1_id', 'player2_id');
+    return _apply_h2h_tiebreaker($result, $matches, 'player1_id', 'player2_id', $seeding_order);
 }
 
-function double_standings(int $group_id): array {
+function double_standings(int $group_id, string $seeding_order = 'desc'): array {
     $doubles = db_fetchall(
         "SELECT d.id,
          TRIM(CONCAT(
@@ -146,5 +148,5 @@ function double_standings(int $group_id): array {
         $r['goal_diff'] = $r['goals_for'] - $r['goals_against'];
     }
     usort($result, fn($a, $b) => $b['points'] - $a['points']);
-    return _apply_h2h_tiebreaker($result, $matches, 'double1_id', 'double2_id');
+    return _apply_h2h_tiebreaker($result, $matches, 'double1_id', 'double2_id', $seeding_order);
 }

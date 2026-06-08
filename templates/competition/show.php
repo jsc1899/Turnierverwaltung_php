@@ -144,7 +144,7 @@ ob_start(); ?>
           <label class="form-check-label" for="third_place">Platz-3-Spiel</label>
         </div>
       </div>
-      <?php if (in_array($c['mode'], ['ko_only', 'double_ko'])): ?>
+      <?php if (in_array($c['mode'], ['ko_only', 'double_ko', 'groups_ko'])): ?>
       <div class="col-auto">
         <label class="form-label">Setzungsreihenfolge</label>
         <select name="seeding_order" class="form-select form-select-sm">

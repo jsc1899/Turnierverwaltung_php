@@ -123,7 +123,7 @@ function show(array $p): void {
         foreach ($grps as $g) {
             if ($is_doubles) {
                 require_once __DIR__ . '/../lib/standings.php';
-                $standings = double_standings($g['id']);
+                $standings = double_standings($g['id'], $c['seeding_order'] ?? 'desc');
                 $matches   = db_fetchall(
                     "SELECT m.*,
                      COALESCE(CONCAT(dp1a.name,' / ',dp1b.name),'') as p1name,
@@ -145,7 +145,7 @@ function show(array $p): void {
                     return $m;
                 }, $matches);
             } else {
-                $standings = group_standings($g['id']);
+                $standings = group_standings($g['id'], $c['seeding_order'] ?? 'desc');
                 $matches   = db_fetchall(
                     "SELECT m.*,
                      TRIM(CONCAT(p1.name, IF(COALESCE(p1.firstname,'') != '', CONCAT(' ', p1.firstname), ''))) as p1name,
@@ -482,11 +482,11 @@ function settings(array $p): void {
         db_execute("UPDATE competition SET third_place=?, registrations_open=?, max_players=?, show_seeding=?, seeding_order=? WHERE id=?",
             [$third_place, $registrations_open, $max_players, $show_seeding, $seeding_order, $cid]);
     } elseif ($c && $c['phase'] === 'setup') {
-        db_execute("UPDATE competition SET group_size=?, advance_count=?, third_place=?, registrations_open=?, max_players=? WHERE id=?",
-            [$group_size, $advance_count, $third_place, $registrations_open, $max_players, $cid]);
+        db_execute("UPDATE competition SET group_size=?, advance_count=?, third_place=?, registrations_open=?, max_players=?, seeding_order=? WHERE id=?",
+            [$group_size, $advance_count, $third_place, $registrations_open, $max_players, $seeding_order, $cid]);
     } else {
-        db_execute("UPDATE competition SET advance_count=?, third_place=?, registrations_open=?, max_players=? WHERE id=?",
-            [$advance_count, $third_place, $registrations_open, $max_players, $cid]);
+        db_execute("UPDATE competition SET advance_count=?, third_place=?, registrations_open=?, max_players=?, seeding_order=? WHERE id=?",
+            [$advance_count, $third_place, $registrations_open, $max_players, $seeding_order, $cid]);
     }
     flash('success', 'Einstellungen gespeichert.');
     redirect('competition/' . $cid);
@@ -659,16 +659,17 @@ function draw_groups(array $p): void {
     $c   = db_fetch("SELECT * FROM competition WHERE id=?", [$cid]);
     $is_doubles = !empty($c['is_doubles']);
 
+    $skill_order = ($c['seeding_order'] ?? 'desc') === 'asc' ? 'ASC' : 'DESC';
     if ($is_doubles) {
         $rows = db_fetchall(
             "SELECT cd.double_id as participant_id, COALESCE(cd.skill, 0) as skill
-             FROM competition_double cd WHERE cd.competition_id=? ORDER BY cd.skill DESC",
+             FROM competition_double cd WHERE cd.competition_id=? ORDER BY cd.skill $skill_order, cd.double_id",
             [$cid]
         );
     } else {
         $rows = db_fetchall(
             "SELECT cp.player_id as participant_id, COALESCE(cp.skill, 0) as skill
-             FROM competition_player cp WHERE cp.competition_id=? ORDER BY cp.skill DESC",
+             FROM competition_player cp WHERE cp.competition_id=? ORDER BY cp.skill $skill_order, cp.player_id",
             [$cid]
         );
     }
@@ -772,7 +773,7 @@ function draw_ko(array $p): void {
 
     $firsts = []; $seconds = [];
     foreach ($grps as $g) {
-        $st = $is_doubles ? double_standings($g['id']) : group_standings($g['id']);
+        $st = $is_doubles ? double_standings($g['id'], $c['seeding_order'] ?? 'desc') : group_standings($g['id'], $c['seeding_order'] ?? 'desc');
         if ($st) $firsts[] = ['gid' => $g['id'], 'pid' => $st[0]['id']];
         if ($advance_count >= 2 && count($st) >= 2)
             $seconds[] = ['gid' => $g['id'], 'pid' => $st[1]['id']];
