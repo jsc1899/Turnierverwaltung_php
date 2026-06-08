@@ -106,7 +106,6 @@ ob_start(); ?>
   </li>
 </ul>
 <div class="tab-content border border-top-0 rounded-bottom mb-4">
-<?php endif; ?>
 
   <!-- Tab: Einstellungen -->
   <div class="tab-pane fade<?= $settings_active ? ' show active' : '' ?> p-3" id="tab-settings" role="tabpanel">
