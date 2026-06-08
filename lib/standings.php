@@ -1,5 +1,46 @@
 <?php
 
+function _apply_h2h_tiebreaker(array $standings, array $matches, string $p1_col, string $p2_col): array {
+    $by_points = [];
+    foreach ($standings as $row) {
+        $by_points[$row['points']][] = $row;
+    }
+    krsort($by_points);
+
+    $final = [];
+    foreach ($by_points as $group) {
+        if (count($group) === 1) { $final[] = $group[0]; continue; }
+
+        $ids    = array_column($group, 'id');
+        $id_set = array_flip($ids);
+        $mini   = array_fill_keys($ids, ['points' => 0, 'goal_diff' => 0, 'goals_for' => 0]);
+
+        foreach ($matches as $m) {
+            $p1 = $m[$p1_col]; $p2 = $m[$p2_col];
+            if (!isset($id_set[$p1]) || !isset($id_set[$p2])) continue;
+            $s1 = (int)$m['score1']; $s2 = (int)$m['score2'];
+            $mini[$p1]['goals_for'] += $s1;  $mini[$p1]['goal_diff'] += $s1 - $s2;
+            $mini[$p2]['goals_for'] += $s2;  $mini[$p2]['goal_diff'] += $s2 - $s1;
+            if      ($s1 > $s2) { $mini[$p1]['points'] += 2; }
+            elseif  ($s2 > $s1) { $mini[$p2]['points'] += 2; }
+            else                { $mini[$p1]['points']++; $mini[$p2]['points']++; }
+        }
+
+        // h2h-Punkte → h2h-Tordiff → h2h-Tore → Gesamt-Tordiff → Gesamt-Tore
+        usort($group, function($a, $b) use ($mini) {
+            $ma = $mini[$a['id']]; $mb = $mini[$b['id']];
+            if ($mb['points']    !== $ma['points'])    return $mb['points']    - $ma['points'];
+            if ($mb['goal_diff'] !== $ma['goal_diff']) return $mb['goal_diff'] - $ma['goal_diff'];
+            if ($mb['goals_for'] !== $ma['goals_for']) return $mb['goals_for'] - $ma['goals_for'];
+            if ($b['goal_diff']  !== $a['goal_diff'])  return $b['goal_diff']  - $a['goal_diff'];
+            return $b['goals_for'] - $a['goals_for'];
+        });
+
+        foreach ($group as $row) $final[] = $row;
+    }
+    return $final;
+}
+
 function group_standings(int $group_id): array {
     $players = db_fetchall(
         "SELECT p.id, TRIM(CONCAT(p.name, IF(p.firstname != '', CONCAT(' ', p.firstname), ''))) as name,
@@ -46,12 +87,8 @@ function group_standings(int $group_id): array {
     foreach ($result as &$r) {
         $r['goal_diff'] = $r['goals_for'] - $r['goals_against'];
     }
-    usort($result, function($a, $b) {
-        if ($b['points']    !== $a['points'])    return $b['points']    - $a['points'];
-        if ($b['goal_diff'] !== $a['goal_diff']) return $b['goal_diff'] - $a['goal_diff'];
-        return $b['goals_for'] - $a['goals_for'];
-    });
-    return $result;
+    usort($result, fn($a, $b) => $b['points'] - $a['points']);
+    return _apply_h2h_tiebreaker($result, $matches, 'player1_id', 'player2_id');
 }
 
 function double_standings(int $group_id): array {
@@ -107,10 +144,6 @@ function double_standings(int $group_id): array {
     foreach ($result as &$r) {
         $r['goal_diff'] = $r['goals_for'] - $r['goals_against'];
     }
-    usort($result, function($a, $b) {
-        if ($b['points']    !== $a['points'])    return $b['points']    - $a['points'];
-        if ($b['goal_diff'] !== $a['goal_diff']) return $b['goal_diff'] - $a['goal_diff'];
-        return $b['goals_for'] - $a['goals_for'];
-    });
-    return $result;
+    usort($result, fn($a, $b) => $b['points'] - $a['points']);
+    return _apply_h2h_tiebreaker($result, $matches, 'double1_id', 'double2_id');
 }
