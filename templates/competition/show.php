@@ -83,18 +83,16 @@ ob_start(); ?>
 </div>
 <?php endif; ?>
 
-<?php $settings_active = true; ?>
-<?php if (can_edit()): ?>
-<!-- ═══ Registerkarten: Einstellungen + Spielerliste ════════════════════════ -->
+<!-- ═══ Registerkarten: Bewerb + Spieler [+ Einstellungen] ═════════════════ -->
 <ul class="nav nav-tabs mb-0" id="comp-tabs" role="tablist">
   <li class="nav-item" role="presentation">
-    <button class="nav-link<?= $settings_active ? ' active' : '' ?>" id="tab-settings-btn"
-            data-bs-toggle="tab" data-bs-target="#tab-settings" type="button" role="tab">
-      <i class="bi bi-gear me-1"></i>Einstellungen
+    <button class="nav-link active" id="tab-competition-btn"
+            data-bs-toggle="tab" data-bs-target="#tab-competition" type="button" role="tab">
+      <i class="bi bi-diagram-3 me-1"></i>Bewerb
     </button>
   </li>
   <li class="nav-item" role="presentation">
-    <button class="nav-link<?= !$settings_active ? ' active' : '' ?>" id="tab-players-btn"
+    <button class="nav-link" id="tab-players-btn"
             data-bs-toggle="tab" data-bs-target="#tab-players" type="button" role="tab">
       <?php if ($is_doubles): ?>
       <i class="bi bi-people-fill me-1"></i>Doppel (<?= count($assigned_doubles) ?>)
@@ -104,11 +102,20 @@ ob_start(); ?>
       <?php if ($c['max_players']): ?><span class="text-muted small">/ <?= (int)$c['max_players'] ?></span><?php endif; ?>
     </button>
   </li>
+  <?php if (can_edit()): ?>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tab-settings-btn"
+            data-bs-toggle="tab" data-bs-target="#tab-settings" type="button" role="tab">
+      <i class="bi bi-gear me-1"></i>Einstellungen
+    </button>
+  </li>
+  <?php endif; ?>
 </ul>
 <div class="tab-content border border-top-0 rounded-bottom mb-4">
 
+  <?php if (can_edit()): ?>
   <!-- Tab: Einstellungen -->
-  <div class="tab-pane fade<?= $settings_active ? ' show active' : '' ?> p-3" id="tab-settings" role="tabpanel">
+  <div class="tab-pane fade p-3" id="tab-settings" role="tabpanel">
     <form method="post" action="<?= url('competition/'.$c['id'].'/settings') ?>" class="row g-3 align-items-end">
       <?= csrf_field() ?>
       <div class="col-auto">
@@ -190,46 +197,11 @@ ob_start(); ?>
         <button class="btn btn-primary btn-sm">Speichern</button>
       </div>
     </form>
-    <?php if ($c['phase'] === 'setup'): ?>
-    <?php $draw_count = $is_doubles ? count($assigned_doubles) : count($assigned); ?>
-    <?php if (!in_array($c['mode'], ['ko_only','double_ko']) && $draw_count >= 3): ?>
-    <hr class="my-3">
-    <form method="post" action="<?= url('competition/'.$c['id'].'/draw/groups') ?>">
-      <?= csrf_field() ?>
-      <button class="btn btn-primary btn-sm"><i class="bi bi-shuffle me-1"></i>Gruppen auslosen</button>
-    </form>
-    <?php endif; ?>
-    <?php if ($c['mode'] === 'ko_only' && $draw_count >= 2): ?>
-    <hr class="my-3">
-    <form method="post" action="<?= url('competition/'.$c['id'].'/draw/ko-direct') ?>">
-      <?= csrf_field() ?>
-      <button class="btn btn-primary btn-sm"><i class="bi bi-shuffle me-1"></i>KO-Bracket auslosen</button>
-    </form>
-    <?php endif; ?>
-    <?php if ($c['mode'] === 'double_ko' && $draw_count >= 2): ?>
-    <hr class="my-3">
-    <form method="post" action="<?= url('competition/'.$c['id'].'/draw/ko-direct') ?>">
-      <?= csrf_field() ?>
-      <button class="btn btn-primary btn-sm"><i class="bi bi-shuffle me-1"></i>Doppel-KO auslosen</button>
-    </form>
-    <?php endif; ?>
-    <?php endif; ?>
-  </div>
+  </div><!-- /tab-settings -->
+  <?php endif; ?>
 
   <!-- Tab: Spielerliste / Doppelliste -->
-  <div class="tab-pane fade<?= !$settings_active ? ' show active' : '' ?> p-3" id="tab-players" role="tabpanel">
-<?php else: ?>
-<!-- ═══ Spielerliste (Ansicht) ══════════════════════════════════════════════ -->
-<div class="card shadow-sm mb-4">
-  <div class="card-header fw-semibold">
-    <?php if ($is_doubles): ?>
-    <i class="bi bi-people-fill me-1"></i>Doppel (<?= count($assigned_doubles) ?>)
-    <?php else: ?>
-    <i class="bi bi-people me-1"></i>Spielerliste (<?= count($assigned) ?>)
-    <?php endif; ?>
-  </div>
-  <div class="p-3">
-<?php endif; ?>
+  <div class="tab-pane fade p-3" id="tab-players" role="tabpanel">
     <?php if ($is_doubles): ?>
     <!-- ── Doppel-Verwaltung ── -->
     <?php if ($assigned_doubles): ?>
@@ -473,25 +445,51 @@ ob_start(); ?>
     </div>
     <?php endif; ?>
     <?php endif; /* end is_doubles/else */ ?>
-<?php if (can_edit()): ?>
   </div><!-- /tab-players -->
-</div><!-- /tab-content -->
-<?php else: ?>
-  </div><!-- /card body -->
-</div><!-- /card -->
-<?php endif; ?>
 
-<!-- KO-Phase auslosen (standalone, Gruppenphase abgeschlossen) -->
-<?php if (can_edit() && $c['phase'] === 'group' && $unplayed_group == 0 && (int)$c['advance_count'] > 0): ?>
-<div class="card shadow-sm mb-4 border-primary">
-  <div class="card-body">
-    <form method="post" action="<?= url('competition/'.$c['id'].'/draw/ko') ?>">
+  <!-- Tab: Bewerb (active, last in DOM) -->
+  <div class="tab-pane fade show active p-3" id="tab-competition" role="tabpanel">
+  <?php if (can_edit() && $c['phase'] === 'setup'): ?>
+  <?php $draw_count = $is_doubles ? count($assigned_doubles) : count($assigned); ?>
+  <?php if (!in_array($c['mode'], ['ko_only','double_ko']) && $draw_count >= 3): ?>
+  <div class="mb-3">
+    <form method="post" action="<?= url('competition/'.$c['id'].'/draw/groups') ?>">
       <?= csrf_field() ?>
-      <button class="btn btn-primary w-100"><i class="bi bi-trophy me-1"></i>KO-Phase auslosen</button>
+      <button class="btn btn-primary btn-sm"><i class="bi bi-shuffle me-1"></i>Gruppen auslosen</button>
     </form>
   </div>
-</div>
-<?php endif; ?>
+  <?php endif; ?>
+  <?php if ($c['mode'] === 'ko_only' && $draw_count >= 2): ?>
+  <div class="mb-3">
+    <form method="post" action="<?= url('competition/'.$c['id'].'/draw/ko-direct') ?>">
+      <?= csrf_field() ?>
+      <button class="btn btn-primary btn-sm"><i class="bi bi-shuffle me-1"></i>KO-Bracket auslosen</button>
+    </form>
+  </div>
+  <?php endif; ?>
+  <?php if ($c['mode'] === 'double_ko' && $draw_count >= 2): ?>
+  <div class="mb-3">
+    <form method="post" action="<?= url('competition/'.$c['id'].'/draw/ko-direct') ?>">
+      <?= csrf_field() ?>
+      <button class="btn btn-primary btn-sm"><i class="bi bi-shuffle me-1"></i>Doppel-KO auslosen</button>
+    </form>
+  </div>
+  <?php endif; ?>
+  <?php endif; ?>
+  <?php if (can_edit() && $c['phase'] === 'group' && $unplayed_group == 0 && (int)$c['advance_count'] > 0): ?>
+  <div class="mb-3">
+    <form method="post" action="<?= url('competition/'.$c['id'].'/draw/ko') ?>">
+      <?= csrf_field() ?>
+      <button class="btn btn-primary"><i class="bi bi-trophy me-1"></i>KO-Phase auslosen</button>
+    </form>
+  </div>
+  <?php endif; ?>
+
+  <?php if ($c['phase'] === 'setup' && $c['mode'] !== 'double_ko'): ?>
+  <div class="alert alert-secondary mb-0">
+    <i class="bi bi-hourglass me-1"></i>Dieser Bewerb wurde noch nicht gestartet.
+  </div>
+  <?php endif; ?>
 
 <!-- ═══ Gruppenphase / KO-Bracket (volle Breite) ════════════════════════════ -->
 <?php if ($groups): ?>
@@ -1053,19 +1051,22 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
 <!-- DKO: noch nicht ausgelost -->
 <div class="alert alert-info">
   <i class="bi bi-info-circle me-1"></i>
-  Doppel-KO-Bracket noch nicht ausgelost. Spieler hinzufügen und im Tab <strong>Einstellungen</strong> auslosen.
+  Doppel-KO-Bracket noch nicht ausgelost. Spieler hinzufügen und im Tab <strong>Bewerb</strong> auslosen.
 </div>
 <?php endif; ?>
+
+  </div><!-- /tab-competition -->
+</div><!-- /tab-content -->
 
 <?php
 $extra_js = <<<'JS'
 <script>
 // Aktiven Tab aus URL-Hash wiederherstellen
 (function() {
-  if (window.location.hash === '#spieler') {
-    var btn = document.getElementById('tab-players-btn');
-    if (btn) bootstrap.Tab.getOrCreateInstance(btn).show();
-  }
+  var hash = window.location.hash;
+  var map = { '#spieler': 'tab-players-btn', '#einstellungen': 'tab-settings-btn', '#bewerb': 'tab-competition-btn' };
+  var btnId = map[hash];
+  if (btnId) { var btn = document.getElementById(btnId); if (btn) bootstrap.Tab.getOrCreateInstance(btn).show(); }
 })();
 
 // ── Group Drag-and-Drop ──────────────────────────────────────────
