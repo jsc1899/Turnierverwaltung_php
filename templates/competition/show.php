@@ -576,7 +576,7 @@ ob_start(); ?>
 
     <?php if ($ko_rounds):
       $first_count = count($ko_rounds[0]['matches']);
-      $slot_h = 100;
+      $slot_h = 115;
       $bracket_h = $first_count * $slot_h;
       $bracket_w = count($ko_rounds) * 270;
     ?>
@@ -808,7 +808,7 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
 <?php if ($dko_wb):
   $dko_wb_arr  = array_values($dko_wb);
   $dko_first_n = count(reset($dko_wb_arr)['matches']);
-  $dko_slot_h  = 100;
+  $dko_slot_h  = 115;
   $dko_wb_h    = $dko_first_n * $dko_slot_h;
   $dko_wb_w    = count($dko_wb_arr) * 270;
   // Sequentielle Spielnummern für WB (Runde 1 top→bottom, Runde 2 top→bottom, ...)
@@ -886,7 +886,7 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
   $lb_match_num = $wb_n ?? 0;
   $lb_rd_arr   = array_values($dko_lb);
   $lb_r1_count = count(reset($lb_rd_arr)['matches']);
-  $lb_slot_h   = 100;
+  $lb_slot_h   = 115;
   $lb_total_h  = max(1, $lb_r1_count) * $lb_slot_h;
   $lb_col_w    = 220;
   $lb_total_w  = count($lb_rd_arr) * $lb_col_w;
