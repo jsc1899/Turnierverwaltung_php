@@ -106,6 +106,7 @@ ob_start(); ?>
   </li>
 </ul>
 <div class="tab-content border border-top-0 rounded-bottom mb-4">
+<?php endif; ?>
 
   <!-- Tab: Einstellungen -->
   <div class="tab-pane fade<?= $settings_active ? ' show active' : '' ?> p-3" id="tab-settings" role="tabpanel">
@@ -218,6 +219,18 @@ ob_start(); ?>
 
   <!-- Tab: Spielerliste / Doppelliste -->
   <div class="tab-pane fade<?= !$settings_active ? ' show active' : '' ?> p-3" id="tab-players" role="tabpanel">
+<?php else: ?>
+<!-- ═══ Spielerliste (Ansicht) ══════════════════════════════════════════════ -->
+<div class="card shadow-sm mb-4">
+  <div class="card-header fw-semibold">
+    <?php if ($is_doubles): ?>
+    <i class="bi bi-people-fill me-1"></i>Doppel (<?= count($assigned_doubles) ?>)
+    <?php else: ?>
+    <i class="bi bi-people me-1"></i>Spielerliste (<?= count($assigned) ?>)
+    <?php endif; ?>
+  </div>
+  <div class="p-3">
+<?php endif; ?>
     <?php if ($is_doubles): ?>
     <!-- ── Doppel-Verwaltung ── -->
     <?php if ($assigned_doubles): ?>
@@ -226,7 +239,7 @@ ob_start(); ?>
         <thead class="table-light">
           <tr>
             <th>Doppel</th><th>Spieler 1</th><th>Spieler 2</th><th class="text-center">Spielstärke</th><th>Angemeldet</th>
-            <?php if ($c['phase'] === 'setup'): ?><th class="no-sort"></th><?php endif; ?>
+            <?php if ($c['phase'] === 'setup' && can_edit()): ?><th class="no-sort"></th><?php endif; ?>
           </tr>
         </thead>
         <tbody>
@@ -276,7 +289,7 @@ ob_start(); ?>
             <?php endif; ?>
           </td>
           <td class="small text-muted" data-sort="<?= e($d['reg_date']) ?>"><?= e(fmtdate($d['reg_date'])) ?></td>
-          <?php if ($c['phase'] === 'setup'): ?>
+          <?php if ($c['phase'] === 'setup' && can_edit()): ?>
           <td>
             <form method="post" action="<?= url('competition/'.$c['id'].'/double/'.$d['id'].'/remove') ?>">
               <?= csrf_field() ?>
@@ -339,7 +352,7 @@ ob_start(); ?>
     </div>
     <?php endif; ?>
 
-    <?php if ($c['phase'] === 'setup'): ?>
+    <?php if ($c['phase'] === 'setup' && can_edit()): ?>
     <?php if ($unassigned_doubles): ?>
     <div class="mt-3 pt-3 border-top">
       <form method="post" action="<?= url('competition/'.$c['id'].'/double/add') ?>">
@@ -382,7 +395,7 @@ ob_start(); ?>
         <thead class="table-light">
           <tr>
             <th>Name</th><th>Verein</th><th>Angemeldet</th><th class="text-center">Spielstärke</th>
-            <?php if ($c['phase'] === 'setup'): ?><th class="no-sort"></th><?php endif; ?>
+            <?php if ($c['phase'] === 'setup' && can_edit()): ?><th class="no-sort"></th><?php endif; ?>
           </tr>
         </thead>
         <tbody>
@@ -436,7 +449,7 @@ ob_start(); ?>
             <?php endif; ?>
             <?php endif; ?>
           </td>
-          <?php if ($c['phase'] === 'setup'): ?>
+          <?php if ($c['phase'] === 'setup' && can_edit()): ?>
           <td>
             <form method="post" action="<?= url('competition/'.$c['id'].'/player/'.$pl['id'].'/remove') ?>">
               <?= csrf_field() ?>
@@ -449,7 +462,7 @@ ob_start(); ?>
         </tbody>
       </table>
     </div>
-    <?php if ($c['phase'] === 'setup' && $unassigned): ?>
+    <?php if ($c['phase'] === 'setup' && can_edit() && $unassigned): ?>
     <div class="mt-3 pt-3 border-top">
       <form method="post" action="<?= url('competition/'.$c['id'].'/player/add') ?>">
         <?= csrf_field() ?>
@@ -467,9 +480,12 @@ ob_start(); ?>
     </div>
     <?php endif; ?>
     <?php endif; /* end is_doubles/else */ ?>
-  </div>
-
-</div>
+<?php if (can_edit()): ?>
+  </div><!-- /tab-players -->
+</div><!-- /tab-content -->
+<?php else: ?>
+  </div><!-- /card body -->
+</div><!-- /card -->
 <?php endif; ?>
 
 <!-- KO-Phase auslosen (standalone, Gruppenphase abgeschlossen) -->
