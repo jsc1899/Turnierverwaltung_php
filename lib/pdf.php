@@ -156,7 +156,7 @@ function generate_groups_pdf(int $cid): void {
         $st    = group_standings($g['id']);
         $html .= '<table><tr><th>#</th><th>Spieler</th><th>Verein</th>'
                . '<th>Sp</th><th>S</th><th>U</th><th>N</th>'
-               . '<th>Tore</th><th>Diff</th><th>Pkt</th></tr>';
+               . '<th>Erg.</th><th>Diff</th><th>Pkt</th></tr>';
         foreach ($st as $i => $pl) {
             $odd = $i % 2 === 1 ? ' class="odd"' : '';
             $html .= "<tr$odd><td>" . ($i+1)
