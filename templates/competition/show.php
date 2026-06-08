@@ -225,7 +225,7 @@ ob_start(); ?>
       <table class="table table-sm table-hover align-middle mb-0" data-sortable>
         <thead class="table-light">
           <tr>
-            <th>Doppel</th><th>Spieler 1</th><th>Spieler 2</th><th class="text-center">St.</th><th>Angemeldet</th>
+            <th>Doppel</th><th>Spieler 1</th><th>Spieler 2</th><th class="text-center">Spielstärke</th><th>Angemeldet</th>
             <?php if ($c['phase'] === 'setup'): ?><th class="no-sort"></th><?php endif; ?>
           </tr>
         </thead>
@@ -356,7 +356,7 @@ ob_start(); ?>
       <table class="table table-sm table-hover align-middle mb-0" data-sortable>
         <thead class="table-light">
           <tr>
-            <th>Name</th><th>Verein</th><th>Angemeldet</th><th class="text-center">St.</th>
+            <th>Name</th><th>Verein</th><th>Angemeldet</th><th class="text-center">Spielstärke</th>
             <?php if ($c['phase'] === 'setup'): ?><th class="no-sort"></th><?php endif; ?>
           </tr>
         </thead>
