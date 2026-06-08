@@ -253,13 +253,13 @@ ob_start(); ?>
                 </button>
               </form>
               <?php if ($d_diff): ?>
-              <div class="d-flex align-items-center gap-1 text-warning small">
+              <div class="d-flex align-items-center gap-1 small" style="color:#fd7e14">
                 <i class="bi bi-exclamation-triangle-fill"></i>
                 <span>Aktuell: <?= (int)$d_reg ?></span>
                 <form method="post" action="<?= url('competition/'.$c['id'].'/double/'.$d['id'].'/skill') ?>">
                   <?= csrf_field() ?>
                   <input type="hidden" name="skill" value="<?= (int)$d_reg ?>">
-                  <button type="submit" class="btn btn-link btn-sm p-0 text-warning lh-1" title="Auf aktuellen Wert vom Spielerregister setzen">
+                  <button type="submit" class="btn btn-link btn-sm p-0 lh-1" style="color:#fd7e14" title="Auf aktuellen Wert vom Spielerregister setzen">
                     <i class="bi bi-arrow-clockwise"></i>
                   </button>
                 </form>
@@ -414,13 +414,13 @@ ob_start(); ?>
                 </button>
               </form>
               <?php if ($skill_diff): ?>
-              <div class="d-flex align-items-center gap-1 text-warning small">
+              <div class="d-flex align-items-center gap-1 small" style="color:#fd7e14">
                 <i class="bi bi-exclamation-triangle-fill"></i>
                 <span>Aktuell: <?= $is_tennis ? number_format($reg_skill, 1) : (int)$reg_skill ?></span>
                 <form method="post" action="<?= url('competition/'.$c['id'].'/player/'.$pl['id'].'/skill') ?>">
                   <?= csrf_field() ?>
                   <input type="hidden" name="skill" value="<?= $is_tennis ? number_format($reg_skill, 1, '.', '') : (int)$reg_skill ?>">
-                  <button type="submit" class="btn btn-link btn-sm p-0 text-warning lh-1" title="Auf aktuellen Wert vom Spielerregister setzen">
+                  <button type="submit" class="btn btn-link btn-sm p-0 lh-1" style="color:#fd7e14" title="Auf aktuellen Wert vom Spielerregister setzen">
                     <i class="bi bi-arrow-clockwise"></i>
                   </button>
                 </form>
