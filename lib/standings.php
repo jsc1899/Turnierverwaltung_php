@@ -33,7 +33,8 @@ function _apply_h2h_tiebreaker(array $standings, array $matches, string $p1_col,
             if ($mb['goal_diff'] !== $ma['goal_diff']) return $mb['goal_diff'] - $ma['goal_diff'];
             if ($mb['goals_for'] !== $ma['goals_for']) return $mb['goals_for'] - $ma['goals_for'];
             if ($b['goal_diff']  !== $a['goal_diff'])  return $b['goal_diff']  - $a['goal_diff'];
-            return $b['goals_for'] - $a['goals_for'];
+            if ($b['goals_for']  !== $a['goals_for'])  return $b['goals_for']  - $a['goals_for'];
+            return $b['skill'] <=> $a['skill'];
         });
 
         foreach ($group as $row) $final[] = $row;
