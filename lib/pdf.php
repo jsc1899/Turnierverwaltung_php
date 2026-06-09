@@ -821,25 +821,53 @@ function generate_players_registry_csv(): void {
 
 // ── Doppelregister PDF ───────────────────────────────────────────────────────
 
-function generate_doubles_registry_pdf(): void {
+function _doubles_with_sport_skills(): array {
     $doubles = db_fetchall(
-        "SELECT d.id, d.name as dname, d.skill,
+        "SELECT d.id, d.name as dname,
          TRIM(CONCAT(p1.name, IF(COALESCE(p1.firstname,'')!='', CONCAT(' ', p1.firstname), ''))) as p1full,
-         p1.club as p1club,
+         p1.id as p1id, p1.name as p1name, p1.firstname as p1firstname, p1.club as p1club,
          TRIM(CONCAT(p2.name, IF(COALESCE(p2.firstname,'')!='', CONCAT(' ', p2.firstname), ''))) as p2full,
-         p2.club as p2club
+         p2.id as p2id, p2.name as p2name, p2.firstname as p2firstname, p2.club as p2club
          FROM `double` d
          JOIN player p1 ON p1.id = d.player1_id
          JOIN player p2 ON p2.id = d.player2_id
          ORDER BY p1.name, p1.firstname",
         []
     );
+    if (!$doubles) return [];
+
+    $pids = array_unique(array_merge(array_column($doubles, 'p1id'), array_column($doubles, 'p2id')));
+    $ph   = implode(',', array_fill(0, count($pids), '?'));
+    $ps   = [];
+    foreach (db_fetchall("SELECT player_id, sport, skill FROM player_skill WHERE player_id IN ($ph)", $pids) as $r) {
+        $ps[$r['player_id']][$r['sport']] = (float)$r['skill'];
+    }
+
+    $sports = ['tischtennis', 'tennis', 'fussball', 'cornhole'];
+    foreach ($doubles as &$d) {
+        $s1 = $ps[$d['p1id']] ?? [];
+        $s2 = $ps[$d['p2id']] ?? [];
+        $d['skills'] = [];
+        foreach ($sports as $sport) {
+            $v1 = isset($s1[$sport]) ? (float)$s1[$sport] : ($sport === 'tennis' ? 10.0 : 0.0);
+            $v2 = isset($s2[$sport]) ? (float)$s2[$sport] : ($sport === 'tennis' ? 10.0 : 0.0);
+            $d['skills'][$sport] = round($v1 + $v2, 1);
+        }
+    }
+    unset($d);
+    return $doubles;
+}
+
+function generate_doubles_registry_pdf(): void {
+    $doubles      = _doubles_with_sport_skills();
+    $sport_labels = ['tischtennis'=>'TT', 'tennis'=>'Ten', 'fussball'=>'Fuß', 'cornhole'=>'CH'];
 
     $html  = pdf_css();
     $html .= '<h2 style="margin-top:0">Doppelregister</h2>';
     $html .= '<div class="meta">' . count($doubles) . ' Doppel</div>';
-    $html .= '<table><tr><th>#</th><th>Name</th><th>Spieler 1</th><th>Spieler 2</th>'
-           . '<th>Verein</th><th style="text-align:right">Stärke</th></tr>';
+    $html .= '<table><tr><th>#</th><th>Name</th><th>Spieler 1</th><th>Spieler 2</th><th>Verein</th>';
+    foreach ($sport_labels as $sl) $html .= "<th style=\"text-align:right\">$sl</th>";
+    $html .= '</tr>';
     foreach ($doubles as $i => $d) {
         $odd   = $i % 2 === 1 ? ' class="odd"' : '';
         $clubs = implode(' / ', array_unique(array_filter([$d['p1club'], $d['p2club']])));
@@ -848,13 +876,16 @@ function generate_doubles_registry_pdf(): void {
             . '<td>' . e($d['dname']) . '</td>'
             . '<td>' . e($d['p1full']) . '</td>'
             . '<td>' . e($d['p2full']) . '</td>'
-            . '<td>' . e($clubs) . '</td>'
-            . '<td style="text-align:right">' . ($d['skill'] ?: '') . '</td>'
-            . '</tr>';
+            . '<td>' . e($clubs) . '</td>';
+        foreach (array_keys($sport_labels) as $sport) {
+            $v = $d['skills'][$sport] ?? 0;
+            $html .= '<td style="text-align:right">' . ($v > 0 ? ($v == (int)$v ? (int)$v : $v) : '') . '</td>';
+        }
+        $html .= '</tr>';
     }
     $html .= '</table>';
 
-    $pdf = mpdf();
+    $pdf = mpdf(['format' => 'A4-L']);
     $pdf->SetTitle('Doppelregister');
     $pdf->WriteHTML($html);
     $pdf->Output('Doppelregister.pdf', \Mpdf\Output\Destination::INLINE);
@@ -864,29 +895,27 @@ function generate_doubles_registry_pdf(): void {
 // ── Doppelregister CSV ───────────────────────────────────────────────────────
 
 function generate_doubles_registry_csv(): void {
-    $doubles = db_fetchall(
-        "SELECT d.skill,
-         p1.name as p1name, p1.firstname as p1firstname, p1.club as p1club,
-         p2.name as p2name, p2.firstname as p2firstname, p2.club as p2club
-         FROM `double` d
-         JOIN player p1 ON p1.id = d.player1_id
-         JOIN player p2 ON p2.id = d.player2_id
-         ORDER BY p1.name, p1.firstname",
-        []
-    );
+    $doubles = _doubles_with_sport_skills();
 
     header('Content-Type: text/csv; charset=UTF-8');
     header('Content-Disposition: attachment; filename="Doppelregister.csv"');
     $out = fopen('php://output', 'w');
     fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
-    fputcsv($out, ['Spieler 1 Nachname','Spieler 1 Vorname','Spieler 1 Verein',
-                   'Spieler 2 Nachname','Spieler 2 Vorname','Spieler 2 Verein','Spielstärke'], ';');
+    fputcsv($out, ['Name', 'Spieler 1 Nachname', 'Spieler 1 Vorname', 'Spieler 1 Verein',
+                   'Spieler 2 Nachname', 'Spieler 2 Vorname', 'Spieler 2 Verein',
+                   'Stärke TT', 'Stärke Tennis', 'Stärke Fußball', 'Stärke Cornhole'], ';');
+    $sports = ['tischtennis', 'tennis', 'fussball', 'cornhole'];
     foreach ($doubles as $d) {
-        fputcsv($out, [
+        $row = [
+            $d['dname'],
             $d['p1name'], $d['p1firstname'] ?? '', $d['p1club'] ?? '',
             $d['p2name'], $d['p2firstname'] ?? '', $d['p2club'] ?? '',
-            $d['skill'] ?? '',
-        ], ';');
+        ];
+        foreach ($sports as $sport) {
+            $v = $d['skills'][$sport] ?? 0;
+            $row[] = $v > 0 ? $v : '';
+        }
+        fputcsv($out, $row, ';');
     }
     fclose($out);
     exit;
