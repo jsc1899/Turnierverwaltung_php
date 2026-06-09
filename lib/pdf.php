@@ -968,39 +968,109 @@ function generate_registrations_csv(int $tid): void {
 function generate_competition_players_pdf(int $cid): void {
     $c = db_fetch("SELECT * FROM competition WHERE id=?", [$cid]);
     if (!$c) { http_response_code(404); exit; }
-    $t = db_fetch("SELECT name FROM tournament WHERE id=?", [$c['tournament_id']]);
-
-    $players = db_fetchall(
-        "SELECT p.name, p.firstname, p.club, p.gender, p.pass_nr, cp.skill
-         FROM competition_player cp
-         JOIN player p ON p.id = cp.player_id
-         WHERE cp.competition_id = ?
-         ORDER BY p.name, p.firstname",
-        [$cid]
-    );
-
-    $html  = pdf_css();
-    $html .= '<h2 style="margin-top:0">' . e($c['name']) . ' — Spielerliste</h2>';
-    if ($t) $html .= '<div class="meta">' . e($t['name']) . ' &nbsp;|&nbsp; ' . count($players) . ' Spieler</div>';
-
-    $html .= '<table><tr><th>#</th><th>Nachname</th><th>Vorname</th><th>G</th>'
-           . '<th>Verein</th><th>Pass-Nr.</th><th style="text-align:right">Stärke</th></tr>';
-    foreach ($players as $i => $pl) {
-        $odd  = $i % 2 === 1 ? ' class="odd"' : '';
-        $html .= "<tr$odd>"
-            . '<td style="text-align:right;color:#6b7280">' . ($i + 1) . '</td>'
-            . '<td>' . e($pl['name']) . '</td>'
-            . '<td>' . e($pl['firstname'] ?? '') . '</td>'
-            . '<td style="text-align:center">' . e($pl['gender'] ?? '') . '</td>'
-            . '<td>' . e($pl['club'] ?? '') . '</td>'
-            . '<td>' . e($pl['pass_nr'] ?? '') . '</td>'
-            . '<td style="text-align:right">' . ($pl['skill'] ?: '') . '</td>'
-            . '</tr>';
-    }
-    $html .= '</table>';
-
-    $pdf  = mpdf();
+    $t    = db_fetch("SELECT name FROM tournament WHERE id=?", [$c['tournament_id']]);
+    $html = pdf_css();
     $safe = preg_replace('/[^\w\-]/', '_', $c['name'] ?: 'Bewerb');
+
+    if (!empty($c['is_team'])) {
+        $rows = db_fetchall(
+            "SELECT ct.skill as team_skill, t.id as tid, t.name as tname,
+             p.name as pname, p.firstname, p.club
+             FROM competition_team ct
+             JOIN `team` t ON t.id = ct.team_id
+             LEFT JOIN team_player tp ON tp.team_id = t.id
+             LEFT JOIN player p ON p.id = tp.player_id
+             WHERE ct.competition_id = ?
+             ORDER BY t.name, p.name, p.firstname",
+            [$cid]
+        );
+        $teams = [];
+        foreach ($rows as $row) {
+            $tid = $row['tid'];
+            if (!isset($teams[$tid])) {
+                $teams[$tid] = ['name' => $row['tname'], 'skill' => $row['team_skill'], 'players' => []];
+            }
+            if ($row['pname'] !== null) {
+                $label = trim(($row['pname'] ?? '') . ' ' . ($row['firstname'] ?? ''));
+                if ($row['club']) $label .= ' (' . $row['club'] . ')';
+                $teams[$tid]['players'][] = $label;
+            }
+        }
+        $html .= '<h2 style="margin-top:0">' . e($c['name']) . ' — Teamliste</h2>';
+        if ($t) $html .= '<div class="meta">' . e($t['name']) . ' &nbsp;|&nbsp; ' . count($teams) . ' Teams</div>';
+        $html .= '<table><tr><th>#</th><th>Team</th><th>Spieler</th><th style="text-align:right">Stärke</th></tr>';
+        $i = 0;
+        foreach ($teams as $team) {
+            $odd  = $i % 2 === 1 ? ' class="odd"' : '';
+            $html .= "<tr$odd>"
+                . '<td style="text-align:right;color:#6b7280">' . ($i + 1) . '</td>'
+                . '<td style="white-space:nowrap">' . e($team['name']) . '</td>'
+                . '<td>' . implode('<br>', array_map('e', $team['players'])) . '</td>'
+                . '<td style="text-align:right;white-space:nowrap">' . ($team['skill'] ?: '') . '</td>'
+                . '</tr>';
+            $i++;
+        }
+        $html .= '</table>';
+
+    } elseif (!empty($c['is_doubles'])) {
+        $doubles = db_fetchall(
+            "SELECT cd.skill,
+             TRIM(CONCAT(p1.name, IF(COALESCE(p1.firstname,'')!='', CONCAT(' ', p1.firstname), ''))) as p1full,
+             TRIM(CONCAT(p2.name, IF(COALESCE(p2.firstname,'')!='', CONCAT(' ', p2.firstname), ''))) as p2full,
+             p1.club as p1club, p2.club as p2club
+             FROM competition_double cd
+             JOIN `double` d ON d.id = cd.double_id
+             JOIN player p1 ON p1.id = d.player1_id
+             JOIN player p2 ON p2.id = d.player2_id
+             WHERE cd.competition_id = ?
+             ORDER BY p1.name, p1.firstname",
+            [$cid]
+        );
+        $html .= '<h2 style="margin-top:0">' . e($c['name']) . ' — Doppelliste</h2>';
+        if ($t) $html .= '<div class="meta">' . e($t['name']) . ' &nbsp;|&nbsp; ' . count($doubles) . ' Doppel</div>';
+        $html .= '<table><tr><th>#</th><th>Spieler 1</th><th>Spieler 2</th><th>Verein</th><th style="text-align:right">Stärke</th></tr>';
+        foreach ($doubles as $i => $d) {
+            $odd   = $i % 2 === 1 ? ' class="odd"' : '';
+            $clubs = implode(' / ', array_unique(array_filter([$d['p1club'], $d['p2club']])));
+            $html .= "<tr$odd>"
+                . '<td style="text-align:right;color:#6b7280">' . ($i + 1) . '</td>'
+                . '<td>' . e($d['p1full']) . '</td>'
+                . '<td>' . e($d['p2full']) . '</td>'
+                . '<td>' . e($clubs) . '</td>'
+                . '<td style="text-align:right;white-space:nowrap">' . ($d['skill'] ?: '') . '</td>'
+                . '</tr>';
+        }
+        $html .= '</table>';
+
+    } else {
+        $players = db_fetchall(
+            "SELECT p.name, p.firstname, p.club, p.gender, p.pass_nr, cp.skill
+             FROM competition_player cp
+             JOIN player p ON p.id = cp.player_id
+             WHERE cp.competition_id = ?
+             ORDER BY p.name, p.firstname",
+            [$cid]
+        );
+        $html .= '<h2 style="margin-top:0">' . e($c['name']) . ' — Spielerliste</h2>';
+        if ($t) $html .= '<div class="meta">' . e($t['name']) . ' &nbsp;|&nbsp; ' . count($players) . ' Spieler</div>';
+        $html .= '<table><tr><th>#</th><th>Nachname</th><th>Vorname</th><th>G</th>'
+               . '<th>Verein</th><th>Pass-Nr.</th><th style="text-align:right">Stärke</th></tr>';
+        foreach ($players as $i => $pl) {
+            $odd  = $i % 2 === 1 ? ' class="odd"' : '';
+            $html .= "<tr$odd>"
+                . '<td style="text-align:right;color:#6b7280">' . ($i + 1) . '</td>'
+                . '<td>' . e($pl['name']) . '</td>'
+                . '<td>' . e($pl['firstname'] ?? '') . '</td>'
+                . '<td style="text-align:center">' . e($pl['gender'] ?? '') . '</td>'
+                . '<td>' . e($pl['club'] ?? '') . '</td>'
+                . '<td>' . e($pl['pass_nr'] ?? '') . '</td>'
+                . '<td style="text-align:right">' . ($pl['skill'] ?: '') . '</td>'
+                . '</tr>';
+        }
+        $html .= '</table>';
+    }
+
+    $pdf = mpdf();
     $pdf->SetTitle('Spielerliste: ' . $c['name']);
     $pdf->WriteHTML($html);
     $pdf->Output('Spieler_' . $safe . '.pdf', \Mpdf\Output\Destination::INLINE);
@@ -1010,31 +1080,77 @@ function generate_competition_players_pdf(int $cid): void {
 // ── Bewerbsspieler-CSV ────────────────────────────────────────────────────────
 
 function generate_competition_players_csv(int $cid): void {
-    $c = db_fetch("SELECT name FROM competition WHERE id=?", [$cid]);
+    $c = db_fetch("SELECT * FROM competition WHERE id=?", [$cid]);
     if (!$c) { http_response_code(404); exit; }
-
-    $players = db_fetchall(
-        "SELECT p.name, p.firstname, p.club, p.gender, p.pass_nr, p.email, cp.skill
-         FROM competition_player cp
-         JOIN player p ON p.id = cp.player_id
-         WHERE cp.competition_id = ?
-         ORDER BY p.name, p.firstname",
-        [$cid]
-    );
 
     $safe = preg_replace('/[^\w\-]/', '_', $c['name'] ?: 'Bewerb');
     header('Content-Type: text/csv; charset=UTF-8');
     header('Content-Disposition: attachment; filename="Spieler_' . $safe . '.csv"');
     $out = fopen('php://output', 'w');
     fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
-    fputcsv($out, ['Nachname','Vorname','Geschlecht','Verein','Pass-Nr.','E-Mail','Spielstärke'], ';');
-    foreach ($players as $pl) {
-        fputcsv($out, [
-            $pl['name'], $pl['firstname'] ?? '', $pl['gender'] ?? '',
-            $pl['club'] ?? '', $pl['pass_nr'] ?? '', $pl['email'] ?? '',
-            $pl['skill'] ?? '',
-        ], ';');
+
+    if (!empty($c['is_team'])) {
+        $rows = db_fetchall(
+            "SELECT ct.skill as team_skill, t.name as tname,
+             p.name as pname, p.firstname, p.club
+             FROM competition_team ct
+             JOIN `team` t ON t.id = ct.team_id
+             LEFT JOIN team_player tp ON tp.team_id = t.id
+             LEFT JOIN player p ON p.id = tp.player_id
+             WHERE ct.competition_id = ?
+             ORDER BY t.name, p.name, p.firstname",
+            [$cid]
+        );
+        fputcsv($out, ['Team', 'Spielstärke Team', 'Nachname', 'Vorname', 'Verein'], ';');
+        foreach ($rows as $row) {
+            fputcsv($out, [
+                $row['tname'], $row['team_skill'] ?? '',
+                $row['pname'] ?? '', $row['firstname'] ?? '', $row['club'] ?? '',
+            ], ';');
+        }
+
+    } elseif (!empty($c['is_doubles'])) {
+        $doubles = db_fetchall(
+            "SELECT cd.skill,
+             p1.name as p1name, p1.firstname as p1firstname, p1.club as p1club,
+             p2.name as p2name, p2.firstname as p2firstname, p2.club as p2club
+             FROM competition_double cd
+             JOIN `double` d ON d.id = cd.double_id
+             JOIN player p1 ON p1.id = d.player1_id
+             JOIN player p2 ON p2.id = d.player2_id
+             WHERE cd.competition_id = ?
+             ORDER BY p1.name, p1.firstname",
+            [$cid]
+        );
+        fputcsv($out, ['Spieler 1 Nachname','Spieler 1 Vorname','Spieler 1 Verein',
+                       'Spieler 2 Nachname','Spieler 2 Vorname','Spieler 2 Verein','Spielstärke'], ';');
+        foreach ($doubles as $d) {
+            fputcsv($out, [
+                $d['p1name'], $d['p1firstname'] ?? '', $d['p1club'] ?? '',
+                $d['p2name'], $d['p2firstname'] ?? '', $d['p2club'] ?? '',
+                $d['skill'] ?? '',
+            ], ';');
+        }
+
+    } else {
+        $players = db_fetchall(
+            "SELECT p.name, p.firstname, p.club, p.gender, p.pass_nr, p.email, cp.skill
+             FROM competition_player cp
+             JOIN player p ON p.id = cp.player_id
+             WHERE cp.competition_id = ?
+             ORDER BY p.name, p.firstname",
+            [$cid]
+        );
+        fputcsv($out, ['Nachname','Vorname','Geschlecht','Verein','Pass-Nr.','E-Mail','Spielstärke'], ';');
+        foreach ($players as $pl) {
+            fputcsv($out, [
+                $pl['name'], $pl['firstname'] ?? '', $pl['gender'] ?? '',
+                $pl['club'] ?? '', $pl['pass_nr'] ?? '', $pl['email'] ?? '',
+                $pl['skill'] ?? '',
+            ], ';');
+        }
     }
+
     fclose($out);
     exit;
 }
