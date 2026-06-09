@@ -767,24 +767,42 @@ function sync_external_skill(array $p): void {
 
 
 function _fetch_ratingscentral_rating(string $id): array {
-    $url = 'https://www.ratingscentral.com/Player.php?PlayerID=' . urlencode($id);
-    $ch  = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_TIMEOUT        => 15,
-        CURLOPT_SSL_VERIFYPEER => true,
-        CURLOPT_USERAGENT      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        CURLOPT_HTTPHEADER     => ['Accept: text/html,application/xhtml+xml', 'Accept-Language: de,en;q=0.9'],
-    ]);
-    $html = curl_exec($ch);
-    $err  = curl_error($ch);
-    curl_close($ch);
+    $url  = 'https://www.ratingscentral.com/Player.php?PlayerID=' . urlencode($id);
+    $ua   = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+    $html = false;
 
-    if (!$html || $err) return ['error' => 'Verbindungsfehler — bitte ID prüfen'];
+    // cURL bevorzugen (dogado hat allow_url_fopen deaktiviert)
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_USERAGENT      => $ua,
+            CURLOPT_HTTPHEADER     => ['Accept: text/html,application/xhtml+xml', 'Accept-Language: de,en;q=0.9'],
+        ]);
+        $res = curl_exec($ch);
+        $err = curl_error($ch);
+        curl_close($ch);
+        if ($res && !$err) $html = $res;
+    }
 
-    // <span class="Subheader">1937​±73</span> — Zahl vor dem ±-Zeichen
-    if (preg_match('/<span[^>]*class="Subheader"[^>]*>\s*(\d+)\s*(?:&#8203;)?±/u', $html, $m)) {
+    // Fallback: file_get_contents (lokal, allow_url_fopen aktiv)
+    if (!$html && ini_get('allow_url_fopen')) {
+        $ctx  = stream_context_create(['http' => [
+            'user_agent'    => $ua,
+            'timeout'       => 15,
+            'ignore_errors' => true,
+        ]]);
+        $res = @file_get_contents($url, false, $ctx);
+        if ($res) $html = $res;
+    }
+
+    if (!$html) return ['error' => 'Verbindungsfehler — bitte ID prüfen'];
+
+    // Erste Zahl nach <span class="Subheader"> — unabhängig von ±-Kodierung
+    if (preg_match('/<span[^>]*class="Subheader"[^>]*>\s*(\d+)/u', $html, $m)) {
         return ['rating' => (float)$m[1]];
     }
     return ['error' => 'Rating nicht gefunden — bitte ID prüfen'];
