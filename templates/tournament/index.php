@@ -37,7 +37,12 @@ ob_start(); ?>
 
     <?php if ($tournaments): ?>
     <?php if (can_edit()): ?>
-    <span id="sort-saved" class="d-none badge bg-success mb-2"><i class="bi bi-check2 me-1"></i>Reihenfolge gespeichert</span>
+    <div class="d-flex align-items-center gap-2 mb-2">
+      <button id="sort-toggle" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrows-move me-1"></i>Umstellen
+      </button>
+      <span id="sort-saved" class="d-none badge bg-success"><i class="bi bi-check2 me-1"></i>Reihenfolge gespeichert</span>
+    </div>
     <?php endif; ?>
     <div class="row g-3" id="tournament-list" data-reorder-url="<?= url('tournaments/reorder') ?>">
       <?php foreach ($tournaments as $t):
@@ -245,7 +250,7 @@ $extra_js = <<<'JS'
       var okSport  = activeSport  === 'all' || item.dataset.sport  === activeSport;
       item.style.display = (okStatus && okSport) ? '' : 'none';
     });
-    if (sortable) sortable.option('disabled', isFiltered());
+    if (sortable) sortable.option('disabled', !sortReorderActive || isFiltered());
   }
   document.querySelectorAll('#status-filter button').forEach(function(btn) {
     btn.addEventListener('click', function() {
@@ -266,13 +271,17 @@ $extra_js = <<<'JS'
 })();
 
 var sortable = null;
+var sortReorderActive = false;
 (function() {
   var list = document.getElementById('tournament-list');
   if (!list || !list.querySelector('.drag-handle')) return;
+  var toggleBtn = document.getElementById('sort-toggle');
+  list.querySelectorAll('.drag-handle').forEach(function(h) { h.classList.add('d-none'); });
   sortable = Sortable.create(list, {
     handle: '.drag-handle',
     animation: 150,
     ghostClass: 'sortable-ghost',
+    disabled: true,
     onEnd: function() {
       var ids = Array.from(list.querySelectorAll('.tournament-item'))
                      .map(function(el) { return el.dataset.id; });
@@ -284,6 +293,20 @@ var sortable = null;
         .then(function(d) { if (d.ok) showSaved(); });
     }
   });
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', function() {
+      sortReorderActive = !sortReorderActive;
+      sortable.option('disabled', !sortReorderActive);
+      list.querySelectorAll('.drag-handle').forEach(function(h) {
+        h.classList.toggle('d-none', !sortReorderActive);
+      });
+      toggleBtn.innerHTML = sortReorderActive
+        ? '<i class="bi bi-check2 me-1"></i>Fertig'
+        : '<i class="bi bi-arrows-move me-1"></i>Umstellen';
+      toggleBtn.classList.toggle('btn-outline-secondary', !sortReorderActive);
+      toggleBtn.classList.toggle('btn-outline-success', sortReorderActive);
+    });
+  }
   function showSaved() {
     var el = document.getElementById('sort-saved');
     if (!el) return;

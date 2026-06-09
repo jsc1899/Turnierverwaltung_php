@@ -127,7 +127,12 @@ $nennung_badge = $pending_count + $change_count;
     </div>
     <?php if ($comp_info): ?>
     <?php if (can_edit()): ?>
-    <span id="comp-sort-saved" class="d-none badge bg-success mb-2"><i class="bi bi-check2 me-1"></i>Reihenfolge gespeichert</span>
+    <div class="d-flex align-items-center gap-2 mb-2">
+      <button id="comp-sort-toggle" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrows-move me-1"></i>Umstellen
+      </button>
+      <span id="comp-sort-saved" class="d-none badge bg-success"><i class="bi bi-check2 me-1"></i>Reihenfolge gespeichert</span>
+    </div>
     <?php endif; ?>
     <div class="row g-3" id="comp-list" data-reorder-url="<?= url('tournament/'.$t['id'].'/competitions/reorder') ?>">
       <?php foreach ($comp_info as $ci): $c = $ci['comp']; ?>
@@ -432,10 +437,14 @@ $extra_js = <<<'JS'
 (function() {
   var list = document.getElementById('comp-list');
   if (!list || !list.querySelector('.drag-handle')) return;
-  Sortable.create(list, {
+  var toggleBtn = document.getElementById('comp-sort-toggle');
+  var active = false;
+  list.querySelectorAll('.drag-handle').forEach(function(h) { h.classList.add('d-none'); });
+  var sortable = Sortable.create(list, {
     handle: '.drag-handle',
     animation: 150,
     ghostClass: 'sortable-ghost',
+    disabled: true,
     onEnd: function() {
       var ids = Array.from(list.querySelectorAll('[data-id]'))
                      .map(function(el) { return el.dataset.id; });
@@ -452,6 +461,20 @@ $extra_js = <<<'JS'
         });
     }
   });
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', function() {
+      active = !active;
+      sortable.option('disabled', !active);
+      list.querySelectorAll('.drag-handle').forEach(function(h) {
+        h.classList.toggle('d-none', !active);
+      });
+      toggleBtn.innerHTML = active
+        ? '<i class="bi bi-check2 me-1"></i>Fertig'
+        : '<i class="bi bi-arrows-move me-1"></i>Umstellen';
+      toggleBtn.classList.toggle('btn-outline-secondary', !active);
+      toggleBtn.classList.toggle('btn-outline-success', active);
+    });
+  }
 })();
 function openImageModal(src) {
   document.getElementById('imageModalImg').src = src;
