@@ -195,8 +195,21 @@ ob_start(); ?>
         <li><strong>Bewerbe</strong> — Übersicht aller Bewerbe als Einzelspieler, Doppel-Zuordnungen und Teams, jeweils mit Turniername, Bewerbsname und aktuellem Status</li>
       </ul>
 
-      <h5 class="mt-3">Import per CSV</h5>
-      <p>Über <strong>Spieler importieren</strong> können Spieler per CSV-Datei massenweise angelegt werden. Die Vorlage ist über den gleichnamigen Button herunterladbar. Spalten: Name, Vorname, Verein, Geschlecht, Lizenznummer, E-Mail, Spielstärke.</p>
+      <h5 class="mt-3">Sportart-Spielstärken</h5>
+      <p>Pro Spieler können mehrere sportartspezifische Spielstärken hinterlegt werden (Tischtennis, Tennis, Fußball, Cornhole). Die Übersichtstabelle zeigt für jede Sportart eine eigene Spalte mit dem Symbol der Sportart in der Titelzeile.</p>
+
+      <h5 class="mt-3">RatingsCentral-Abgleich (Tischtennis)</h5>
+      <p>Spieler können mit ihrem Profil auf <strong>RatingsCentral</strong> verknüpft werden, um die Tischtennis-Spielstärke automatisch zu aktualisieren:</p>
+      <ol>
+        <li>Im Spielerprofil-Modal die <strong>RatingsCentral-ID</strong> eintragen (die Zahl aus der Profil-URL, z.B. <code>5728</code>) und speichern</li>
+        <li>Über den <i class="bi bi-box-arrow-up-right"></i>-Button das externe Profil zur Kontrolle öffnen</li>
+        <li>Mit dem <i class="bi bi-arrow-clockwise"></i>-Button neben dem Feld die aktuelle Spielstärke direkt abrufen — der Wert wird in <em>Spielstärke Tischtennis</em> eingetragen und gespeichert</li>
+      </ol>
+      <p>In der Spielerübersicht erscheint bei Spielern mit hinterlegter RatingsCentral-ID ein <i class="bi bi-arrow-clockwise"></i>-Symbol neben der TT-Spielstärke — ein Klick darauf aktualisiert den Wert direkt in der Tabelle.</p>
+      <p>Über den Button <strong>TT RC Abgleich</strong> (rechts in der Toolbar) werden alle Spieler mit hinterlegter RatingsCentral-ID nacheinander abgeglichen. Fortschritt und Ergebnis werden direkt angezeigt.</p>
+
+      <h5 class="mt-3">Import per CSV/XLSX</h5>
+      <p>Über <strong>Spieler importieren</strong> können Spieler per Datei massenweise angelegt werden. Die Vorlage ist über den gleichnamigen Button herunterladbar. Spalten: Name, Vorname, Verein, Geschlecht, Lizenznummer, E-Mail, Spielstärke, Spielstärke Tischtennis, Spielstärke Tennis, Spielstärke Fußball, RatingsCentral-ID.</p>
 
       <h5 class="mt-3">Spielstärke und Setzung</h5>
       <p>Bei der Auslosung werden Spieler nach Spielstärke gereiht:</p>
