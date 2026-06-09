@@ -180,7 +180,7 @@ $nennung_badge = $pending_count + $change_count;
               </a>
               <?php if (can_edit()): ?>
               <form method="post" action="<?= url('competition/' . $c['id'] . '/delete') ?>"
-                    onsubmit="return confirm('Bewerb wirklich löschen?')">
+                    data-confirm="Bewerb wirklich löschen?">
                 <?= csrf_field() ?>
                 <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button>
               </form>
@@ -300,7 +300,7 @@ $nennung_badge = $pending_count + $change_count;
       <h6 class="text-danger mb-2"><i class="bi bi-exclamation-triangle me-1"></i>Turnier löschen</h6>
       <p class="text-muted small mb-2">Das Turnier und alle zugehörigen Bewerbe, Spieler und Ergebnisse werden unwiderruflich gelöscht.</p>
       <form method="post" action="<?= url('tournament/' . $t['id'] . '/delete') ?>"
-            onsubmit="return confirm('Turnier wirklich löschen?')">
+            data-confirm="Turnier wirklich löschen?">
         <?= csrf_field() ?>
         <button class="btn btn-outline-danger btn-sm">
           <i class="bi bi-trash me-1"></i>Turnier löschen

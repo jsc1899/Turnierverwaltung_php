@@ -298,6 +298,7 @@ function init_db(): void {
         "ALTER TABLE competition ADD COLUMN team_size INT DEFAULT 0",
         "ALTER TABLE tournament ADD COLUMN sort_order INT NOT NULL DEFAULT 0",
         "ALTER TABLE competition ADD COLUMN sort_order INT NOT NULL DEFAULT 0",
+        "ALTER TABLE `match` ADD COLUMN tiebreak_winner TINYINT NOT NULL DEFAULT 0",
     ];
     foreach ($migrations as $sql) {
         try { $pdo->exec($sql); } catch (\PDOException $e) { /* Spalte/Typ bereits korrekt */ }

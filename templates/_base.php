@@ -79,6 +79,8 @@
   // Bei jedem Form-Submit den aktiven Tab als _tab-Parameter mitschicken.
   // redirect() in helpers.php liest ihn aus und hängt ihn als Fragment ans Redirect-Ziel.
   document.addEventListener('submit', function(e) {
+    var msg = e.target.dataset.confirm;
+    if (msg && !confirm(msg)) { e.preventDefault(); return; }
     var hash = location.hash;
     if (!hash || !hash.startsWith('#tab-')) return;
     var form = e.target;

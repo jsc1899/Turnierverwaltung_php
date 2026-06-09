@@ -701,6 +701,17 @@ function remove_player(array $p): void {
     redirect('competition/' . $p['id'] . '#tab-players');
 }
 
+function remove_all_players(array $p): void {
+    require_edit();
+    csrf_verify();
+    $cid = (int)$p['id'];
+    $c = db_fetch("SELECT phase FROM competition WHERE id=?", [$cid]);
+    if (!$c || $c['phase'] !== 'setup') { redirect('competition/' . $cid); return; }
+    db_execute("DELETE FROM competition_player WHERE competition_id=?", [$cid]);
+    flash('success', 'Alle Spieler wurden vom Bewerb entfernt.');
+    redirect('competition/' . $cid . '#tab-players');
+}
+
 function add_double(array $p): void {
     require_edit();
     csrf_verify();
@@ -810,6 +821,17 @@ function remove_double(array $p): void {
     db_execute("DELETE FROM competition_double WHERE competition_id=? AND double_id=?",
         [(int)$p['id'], (int)$p['did']]);
     redirect('competition/' . $p['id'] . '#tab-players');
+}
+
+function remove_all_doubles(array $p): void {
+    require_edit();
+    csrf_verify();
+    $cid = (int)$p['id'];
+    $c = db_fetch("SELECT phase FROM competition WHERE id=?", [$cid]);
+    if (!$c || $c['phase'] !== 'setup') { redirect('competition/' . $cid); return; }
+    db_execute("DELETE FROM competition_double WHERE competition_id=?", [$cid]);
+    flash('success', 'Alle Doppel wurden vom Bewerb entfernt.');
+    redirect('competition/' . $cid . '#tab-players');
 }
 
 function update_player_skill(array $p): void {
@@ -1418,6 +1440,17 @@ function remove_team(array $p): void {
     db_execute("DELETE FROM competition_team WHERE competition_id=? AND team_id=?",
         [(int)$p['id'], (int)$p['tid']]);
     redirect('competition/' . $p['id'] . '#tab-players');
+}
+
+function remove_all_teams(array $p): void {
+    require_edit();
+    csrf_verify();
+    $cid = (int)$p['id'];
+    $c = db_fetch("SELECT phase FROM competition WHERE id=?", [$cid]);
+    if (!$c || $c['phase'] !== 'setup') { redirect('competition/' . $cid); return; }
+    db_execute("DELETE FROM competition_team WHERE competition_id=?", [$cid]);
+    flash('success', 'Alle Teams wurden vom Bewerb entfernt.');
+    redirect('competition/' . $cid . '#tab-players');
 }
 
 function update_team_skill(array $p): void {

@@ -46,7 +46,7 @@ ob_start(); ?>
           </td>
           <td>
             <form method="post" action="<?= url('tournament/'.$t['id'].'/doppel/'.$d['id'].'/loeschen') ?>"
-                  onsubmit="return confirm('Doppel „<?= e($d['name']) ?>" wirklich löschen?')">
+                  data-confirm="Doppel &bdquo;<?= e($d['name']) ?>&ldquo; wirklich löschen?">
               <?= csrf_field() ?>
               <button class="btn btn-outline-danger btn-sm py-0 px-1" title="Löschen">
                 <i class="bi bi-trash"></i>

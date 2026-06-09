@@ -47,17 +47,25 @@ function seeded_match_order(int $num_matches): array {
 }
 
 function advance_ko_winner(array $match): void {
-    if ($match['score1'] === $match['score2']) return;
+    $score1    = (int)$match['score1'];
+    $score2    = (int)$match['score2'];
+    $tiebreak  = (int)($match['tiebreak_winner'] ?? 0);
+    if ($score1 === $score2 && !$tiebreak) return;
     $is_team    = !empty($match['team1_id'])   || !empty($match['team2_id']);
     $is_doubles = !$is_team && (!empty($match['double1_id']) || !empty($match['double2_id']));
+    if ($tiebreak) {
+        $winner_side = $tiebreak; // 1 or 2
+    } else {
+        $winner_side = $score1 > $score2 ? 1 : 2;
+    }
     if ($is_team) {
-        $winner_id = $match['score1'] > $match['score2'] ? $match['team1_id'] : $match['team2_id'];
+        $winner_id = $winner_side === 1 ? $match['team1_id'] : $match['team2_id'];
         $p1col = 'team1_id'; $p2col = 'team2_id';
     } elseif ($is_doubles) {
-        $winner_id = $match['score1'] > $match['score2'] ? $match['double1_id'] : $match['double2_id'];
+        $winner_id = $winner_side === 1 ? $match['double1_id'] : $match['double2_id'];
         $p1col = 'double1_id'; $p2col = 'double2_id';
     } else {
-        $winner_id = $match['score1'] > $match['score2'] ? $match['player1_id'] : $match['player2_id'];
+        $winner_id = $winner_side === 1 ? $match['player1_id'] : $match['player2_id'];
         $p1col = 'player1_id'; $p2col = 'player2_id';
     }
     $next_round = (int)($match['ko_round'] / 2);

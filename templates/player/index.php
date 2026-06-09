@@ -102,7 +102,7 @@ ob_start(); ?>
               <?php if (can_edit()): ?>
               <form method="post" action="<?= url('player/' . $p['id'] . '/delete') ?>"
                     class="d-inline ms-1"
-                    onsubmit="return confirm('Spieler <?= e($p['firstname'].' '.$p['name']) ?> wirklich löschen?')">
+                    data-confirm="Spieler <?= e($p['firstname'].' '.$p['name']) ?> wirklich löschen?">
                 <?= csrf_field() ?>
                 <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button>
               </form>
@@ -163,7 +163,7 @@ ob_start(); ?>
             </button>
             <form method="post" action="<?= url('players/double/'.$d['id'].'/delete') ?>"
                   class="d-inline"
-                  onsubmit="return confirm('Doppel „<?= e($d['name']) ?>" wirklich löschen?')">
+                  data-confirm="Doppel &bdquo;<?= e($d['name']) ?>&ldquo; wirklich löschen?">
               <?= csrf_field() ?>
               <button class="btn btn-outline-danger btn-sm py-0 px-1" title="Löschen">
                 <i class="bi bi-trash"></i>
@@ -257,7 +257,7 @@ ob_start(); ?>
             </button>
             <form method="post" action="<?= url('players/team/'.$team['id'].'/delete') ?>"
                   class="d-inline"
-                  onsubmit="return confirm('Team „<?= e($team['name']) ?>" wirklich löschen?')">
+                  data-confirm="Team &bdquo;<?= e($team['name']) ?>&ldquo; wirklich löschen?">
               <?= csrf_field() ?>
               <button class="btn btn-outline-danger btn-sm py-0 px-1" title="Löschen">
                 <i class="bi bi-trash"></i>
@@ -363,7 +363,7 @@ ob_start(); ?>
                   <?php if ($member['club']): ?><span class="text-muted">(<?= e($member['club']) ?>)</span><?php endif; ?>
                 </span>
                 <form method="post" action="<?= url('players/team/'.$team['id'].'/player/'.$member['id'].'/remove') ?>"
-                      class="d-inline">
+                      class="d-inline" data-confirm="Spieler aus dem Team entfernen?">
                   <?= csrf_field() ?>
                   <button class="btn btn-outline-danger btn-sm py-0 px-1" title="Entfernen">
                     <i class="bi bi-x"></i>

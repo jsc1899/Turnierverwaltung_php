@@ -52,7 +52,7 @@
 
           <form method="post"
                 action="<?= url('nennung/verwalten/' . urlencode($token) . '/withdraw/' . $r['id']) ?>"
-                onsubmit="return confirm('Nennung wirklich zurückziehen?')">
+                data-confirm="Nennung wirklich zurückziehen?">
             <?= csrf_field() ?>
             <button class="btn btn-outline-danger btn-sm">
               <i class="bi bi-x-circle me-1"></i>Zurückziehen

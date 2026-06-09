@@ -46,20 +46,20 @@ ob_start(); ?>
     <?php endif; ?>
     <?php if ($c['phase'] === 'group'): ?>
     <form method="post" action="<?= url('competition/'.$c['id'].'/reset/groups') ?>"
-          onsubmit="return confirm('Alle Gruppenspiel-Ergebnisse löschen?')">
+          data-confirm="Alle Gruppenspiel-Ergebnisse löschen?">
       <?= csrf_field() ?>
       <button class="btn btn-outline-warning btn-sm"><i class="bi bi-arrow-counterclockwise me-1"></i>Gruppe zurücksetzen</button>
     </form>
     <?php endif; ?>
     <?php if ($c['phase'] === 'ko'): ?>
     <form method="post" action="<?= url('competition/'.$c['id'].'/reset/ko') ?>"
-          onsubmit="return confirm('KO-Phase zurücksetzen?')">
+          data-confirm="KO-Phase zurücksetzen?">
       <?= csrf_field() ?>
       <button class="btn btn-outline-warning btn-sm"><i class="bi bi-arrow-counterclockwise me-1"></i>KO zurücksetzen</button>
     </form>
     <?php endif; ?>
     <form method="post" action="<?= url('competition/'.$c['id'].'/delete') ?>"
-          onsubmit="return confirm('Bewerb wirklich löschen?')">
+          data-confirm="Bewerb wirklich löschen?">
       <?= csrf_field() ?>
       <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash me-1"></i>Löschen</button>
     </form>
@@ -237,9 +237,18 @@ ob_start(); ?>
     <?php if ($is_doubles): ?>
     <!-- ── Doppel-Verwaltung ── -->
     <?php if ($assigned_doubles): ?>
-    <div class="mb-2">
+    <div class="mb-2 d-flex align-items-center gap-2">
       <input type="search" class="form-control form-control-sm table-filter" style="max-width:220px"
              placeholder="Filtern…" data-target="tbl-comp-doubles" aria-label="Doppel filtern">
+      <?php if ($c['phase'] === 'setup' && can_edit()): ?>
+      <form method="post" action="<?= url('competition/'.$c['id'].'/doubles/remove-all') ?>"
+            data-confirm="Alle Doppel aus dem Bewerb entfernen?">
+        <?= csrf_field() ?>
+        <button class="btn btn-outline-danger btn-sm text-nowrap">
+          <i class="bi bi-x-circle me-1"></i>Alle entfernen
+        </button>
+      </form>
+      <?php endif; ?>
     </div>
     <div class="table-responsive">
       <table class="table table-sm table-hover align-middle mb-0" data-sortable id="tbl-comp-doubles">
@@ -295,7 +304,8 @@ ob_start(); ?>
           <td class="small text-muted" data-sort="<?= e($d['reg_date']) ?>"><?= e(fmtdate($d['reg_date'])) ?></td>
           <?php if ($c['phase'] === 'setup' && can_edit()): ?>
           <td>
-            <form method="post" action="<?= url('competition/'.$c['id'].'/double/'.$d['id'].'/remove') ?>">
+            <form method="post" action="<?= url('competition/'.$c['id'].'/double/'.$d['id'].'/remove') ?>"
+                  data-confirm="Doppel aus dem Bewerb entfernen?">
               <?= csrf_field() ?>
               <button class="btn btn-outline-danger btn-sm py-0 px-1"><i class="bi bi-x"></i></button>
             </form>
@@ -385,9 +395,18 @@ ob_start(); ?>
     <?php elseif ($is_team): ?>
     <!-- ── Team-Verwaltung ── -->
     <?php if ($assigned_teams): ?>
-    <div class="mb-2">
+    <div class="mb-2 d-flex align-items-center gap-2">
       <input type="search" class="form-control form-control-sm table-filter" style="max-width:220px"
              placeholder="Filtern…" data-target="tbl-comp-teams" aria-label="Teams filtern">
+      <?php if ($c['phase'] === 'setup' && can_edit()): ?>
+      <form method="post" action="<?= url('competition/'.$c['id'].'/teams/remove-all') ?>"
+            data-confirm="Alle Teams aus dem Bewerb entfernen?">
+        <?= csrf_field() ?>
+        <button class="btn btn-outline-danger btn-sm text-nowrap">
+          <i class="bi bi-x-circle me-1"></i>Alle entfernen
+        </button>
+      </form>
+      <?php endif; ?>
     </div>
     <div class="table-responsive">
       <table class="table table-sm table-hover align-middle mb-0" data-sortable id="tbl-comp-teams">
@@ -426,7 +445,8 @@ ob_start(); ?>
           </td>
           <?php if ($c['phase'] === 'setup' && can_edit()): ?>
           <td>
-            <form method="post" action="<?= url('competition/'.$c['id'].'/team/'.$team['id'].'/remove') ?>">
+            <form method="post" action="<?= url('competition/'.$c['id'].'/team/'.$team['id'].'/remove') ?>"
+                  data-confirm="Team aus dem Bewerb entfernen?">
               <?= csrf_field() ?>
               <button class="btn btn-outline-danger btn-sm py-0 px-1"><i class="bi bi-x"></i></button>
             </form>
@@ -479,9 +499,18 @@ ob_start(); ?>
       </a>
     </div>
     <?php endif; ?>
-    <div class="mb-2">
+    <div class="mb-2 d-flex align-items-center gap-2">
       <input type="search" class="form-control form-control-sm table-filter" style="max-width:220px"
              placeholder="Filtern…" data-target="tbl-comp-players" aria-label="Spieler filtern">
+      <?php if ($c['phase'] === 'setup' && can_edit() && $assigned): ?>
+      <form method="post" action="<?= url('competition/'.$c['id'].'/players/remove-all') ?>"
+            data-confirm="Alle Spieler aus dem Bewerb entfernen?">
+        <?= csrf_field() ?>
+        <button class="btn btn-outline-danger btn-sm text-nowrap">
+          <i class="bi bi-x-circle me-1"></i>Alle entfernen
+        </button>
+      </form>
+      <?php endif; ?>
     </div>
     <div class="table-responsive">
       <table class="table table-sm table-hover align-middle mb-0" data-sortable id="tbl-comp-players">
@@ -541,7 +570,8 @@ ob_start(); ?>
           </td>
           <?php if ($c['phase'] === 'setup' && can_edit()): ?>
           <td>
-            <form method="post" action="<?= url('competition/'.$c['id'].'/player/'.$pl['id'].'/remove') ?>">
+            <form method="post" action="<?= url('competition/'.$c['id'].'/player/'.$pl['id'].'/remove') ?>"
+                  data-confirm="Spieler aus dem Bewerb entfernen?">
               <?= csrf_field() ?>
               <button class="btn btn-outline-danger btn-sm py-0 px-1"><i class="bi bi-x"></i></button>
             </form>
@@ -717,7 +747,8 @@ ob_start(); ?>
               </span>
               <span class="text-truncate fw-semibold" style="min-width:0;flex:1"><?= e($m['p2name']) ?></span>
               <?php if ($m['played'] && can_edit()): ?>
-              <form method="post" action="<?= url('match/'.$m['id'].'/result/clear') ?>" class="flex-shrink-0 ms-1">
+              <form method="post" action="<?= url('match/'.$m['id'].'/result/clear') ?>" class="flex-shrink-0 ms-1"
+                    data-confirm="Ergebnis wirklich löschen?">
                 <?= csrf_field() ?>
                 <button class="btn btn-sm btn-outline-danger p-0" style="width:26px;height:26px" title="Ergebnis löschen">
                   <i class="bi bi-x-circle"></i>
@@ -799,7 +830,8 @@ ob_start(); ?>
                    value="<?= $m['played'] ? $m['score2'] : '' ?>">
             <span class="small text-truncate"><?= e($m['p2name']) ?></span>
             <?php if ($m['played']): ?>
-            <form method="post" action="<?= url('match/'.$m['id'].'/result/clear') ?>">
+            <form method="post" action="<?= url('match/'.$m['id'].'/result/clear') ?>"
+                  data-confirm="Ergebnis wirklich löschen?">
               <?= csrf_field() ?>
               <button class="btn btn-sm btn-outline-danger p-0" style="width:30px;height:30px" title="Ergebnis löschen">
                 <i class="bi bi-x-circle"></i>
@@ -1019,12 +1051,37 @@ ob_start(); ?>
                   </div>
                 </form>
                 <?php if ($m['played']): ?>
-                <form method="post" action="<?= url('match/'.$m['id'].'/result/clear') ?>" style="display:inline">
+                <form method="post" action="<?= url('match/'.$m['id'].'/result/clear') ?>" style="display:inline"
+                      data-confirm="Ergebnis wirklich löschen?">
                   <?= csrf_field() ?>
                   <button class="btn btn-link text-danger p-0" style="font-size:.7rem;line-height:1.4" title="Ergebnis löschen">
                     <i class="bi bi-x-circle"></i>
                   </button>
                 </form>
+                <?php endif; ?>
+                <?php if ($m['played'] && (int)$m['score1'] === (int)$m['score2']): ?>
+                <?php $ko_tb = (int)($m['tiebreak_winner'] ?? 0); ?>
+                <div class="mt-1 pt-1" style="border-top:1px dashed #dee2e6;font-size:.72rem">
+                  <?php if ($ko_tb === 0): ?>
+                  <div class="d-flex align-items-center gap-1 flex-wrap">
+                    <span class="text-warning-emphasis fw-semibold"><i class="bi bi-trophy me-1"></i>Tiebreak:</span>
+                    <form method="post" action="<?= url('match/'.$m['id'].'/advance/1') ?>" style="display:inline">
+                      <?= csrf_field() ?>
+                      <button class="btn btn-outline-primary btn-sm py-0 px-1" style="font-size:.7rem">
+                        <i class="bi bi-arrow-right-circle me-1"></i><?= e($m['p1name'] ?? 'Team 1') ?>
+                      </button>
+                    </form>
+                    <form method="post" action="<?= url('match/'.$m['id'].'/advance/2') ?>" style="display:inline">
+                      <?= csrf_field() ?>
+                      <button class="btn btn-outline-primary btn-sm py-0 px-1" style="font-size:.7rem">
+                        <i class="bi bi-arrow-right-circle me-1"></i><?= e($m['p2name'] ?? 'Team 2') ?>
+                      </button>
+                    </form>
+                  </div>
+                  <?php else: ?>
+                  <span class="text-success fw-semibold"><i class="bi bi-check-circle me-1"></i>Tiebreak: <?= e($ko_tb === 1 ? ($m['p1name'] ?? 'Team 1') : ($m['p2name'] ?? 'Team 2')) ?> vorgerückt</span>
+                  <?php endif; ?>
+                </div>
                 <?php endif; ?>
                 <?php elseif (!empty($ko_duel_rows)): ?>
                 <table class="table table-sm align-middle mb-0 mt-1" style="font-size:.72rem;table-layout:fixed">
@@ -1044,7 +1101,8 @@ ob_start(); ?>
             </div>
             <?php elseif (can_edit() && $m['played'] && $m['player1_id'] && $m['player2_id']): ?>
             <div style="border-top:1px solid #f0f0f0;padding:0 4px 1px;text-align:right">
-              <form method="post" action="<?= url('match/'.$m['id'].'/result/clear') ?>" style="display:inline">
+              <form method="post" action="<?= url('match/'.$m['id'].'/result/clear') ?>" style="display:inline"
+                    data-confirm="Ergebnis wirklich löschen?">
                 <?= csrf_field() ?>
                 <button class="btn btn-link text-danger p-0" style="font-size:.7rem;line-height:1.4" title="Ergebnis löschen">
                   <i class="bi bi-x-circle"></i>
@@ -1103,7 +1161,8 @@ ob_start(); ?>
             </div>
             <?php if (can_edit() && $m['played'] && $m['player1_id'] && $m['player2_id']): ?>
             <div style="border-top:1px solid #f0f0f0;padding:0 4px 1px;text-align:right">
-              <form method="post" action="<?= url('match/'.$m['id'].'/result/clear') ?>" style="display:inline">
+              <form method="post" action="<?= url('match/'.$m['id'].'/result/clear') ?>" style="display:inline"
+                    data-confirm="Ergebnis wirklich löschen?">
                 <?= csrf_field() ?>
                 <button class="btn btn-link text-danger p-0" style="font-size:.7rem;line-height:1.4" title="Ergebnis löschen">
                   <i class="bi bi-x-circle"></i>
@@ -1180,7 +1239,7 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
     }
     if ($editable && $m['played'] && $has_both) {
         $o .= '<div style="border-top:1px solid #f0f0f0;padding:0 4px 1px;text-align:right">'
-            . '<form method="post" action="' . url('match/' . $m['id'] . '/result/clear') . '" style="display:inline">'
+            . '<form method="post" action="' . url('match/' . $m['id'] . '/result/clear') . '" style="display:inline" data-confirm="Ergebnis wirklich löschen?">'
             . csrf_field()
             . '<button class="btn btn-link text-danger p-0" style="font-size:.7rem" title="Ergebnis löschen"><i class="bi bi-x-circle"></i></button>'
             . '</form></div>';

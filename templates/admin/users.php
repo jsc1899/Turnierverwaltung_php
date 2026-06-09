@@ -30,7 +30,7 @@ ob_start(); ?>
         <td>
           <?php if ($u['email'] !== ADMIN_EMAIL): ?>
           <form method="post" action="<?= url('admin/user/' . $u['id'] . '/delete') ?>"
-                onsubmit="return confirm('Benutzer wirklich löschen?')">
+                data-confirm="Benutzer wirklich löschen?">
             <?= csrf_field() ?>
             <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button>
           </form>

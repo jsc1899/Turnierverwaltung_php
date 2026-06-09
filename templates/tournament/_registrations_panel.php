@@ -47,7 +47,7 @@
             <button class="btn btn-success btn-sm" title="Alle bestätigen"><i class="bi bi-check-all"></i> Alle</button>
           </form>
           <form method="post" action="<?= url('registration/' . $r['id'] . '/reject') ?>"
-                onsubmit="return confirm('Alle Nennungen von <?= e($r['lastname']) ?> <?= e($r['firstname']) ?> ablehnen?')">
+                data-confirm="Alle Nennungen von <?= e($r['lastname']) ?> <?= e($r['firstname']) ?> ablehnen?">
             <?= csrf_field() ?>
             <button class="btn btn-outline-danger btn-sm"><i class="bi bi-x-lg"></i> Alle</button>
           </form>
@@ -111,7 +111,7 @@
             <button class="btn btn-success btn-sm"><i class="bi bi-check-all"></i><?= $cr['request_type'] === 'modify' ? ' Alle' : '' ?></button>
           </form>
           <form method="post" action="<?= url('reg-change/' . $cr['id'] . '/reject') ?>"
-                onsubmit="return confirm('Antrag ablehnen?')">
+                data-confirm="Antrag ablehnen?">
             <?= csrf_field() ?>
             <button class="btn btn-outline-danger btn-sm"><i class="bi bi-x-lg"></i><?= $cr['request_type'] === 'modify' ? ' Alle' : '' ?></button>
           </form>

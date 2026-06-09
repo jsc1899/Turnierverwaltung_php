@@ -91,7 +91,7 @@ function clear_result(array $p): void {
     $mid = (int)$p['id'];
     $m   = db_fetch("SELECT * FROM `match` WHERE id=?", [$mid]);
     if (!$m) { redirect(''); return; }
-    db_execute("UPDATE `match` SET score1=NULL, score2=NULL, played=0 WHERE id=?", [$mid]);
+    db_execute("UPDATE `match` SET score1=NULL, score2=NULL, played=0, tiebreak_winner=0 WHERE id=?", [$mid]);
     $comp = db_fetch("SELECT team_size FROM competition WHERE id=?", [(int)$m['competition_id']]);
     if (!empty($comp['team_size'])) {
         db_execute("DELETE FROM team_match_duel WHERE match_id=?", [$mid]);
@@ -99,6 +99,23 @@ function clear_result(array $p): void {
     if ($m['group_id'] === null) {
         _propagate_result((int)$m['competition_id'], $m);
     }
+    redirect('competition/' . $m['competition_id']);
+}
+
+function force_advance_ko(array $p): void {
+    require_edit();
+    csrf_verify();
+    $mid  = (int)$p['id'];
+    $slot = (int)$p['slot'];
+    if ($slot !== 1 && $slot !== 2) { redirect(''); return; }
+    $m = db_fetch("SELECT * FROM `match` WHERE id=?", [$mid]);
+    if (!$m || !$m['played'] || (int)$m['score1'] !== (int)$m['score2']) {
+        redirect('competition/' . ($m['competition_id'] ?? '')); return;
+    }
+    db_execute("UPDATE `match` SET tiebreak_winner=? WHERE id=?", [$slot, $mid]);
+    require_once __DIR__ . '/../lib/ko_bracket.php';
+    $m['tiebreak_winner'] = $slot;
+    advance_ko_winner($m);
     redirect('competition/' . $m['competition_id']);
 }
 
