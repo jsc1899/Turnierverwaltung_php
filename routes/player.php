@@ -768,16 +768,23 @@ function sync_external_skill(array $p): void {
 
 function _fetch_ratingscentral_rating(string $id): array {
     $url = 'https://www.ratingscentral.com/Player.php?PlayerID=' . urlencode($id);
-    $ctx = stream_context_create(['http' => [
-        'user_agent'    => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'timeout'       => 10,
-        'ignore_errors' => true,
-    ]]);
-    $html = @file_get_contents($url, false, $ctx);
-    if (!$html) return ['error' => 'Verbindungsfehler — bitte ID prüfen'];
+    $ch  = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_TIMEOUT        => 15,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_USERAGENT      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        CURLOPT_HTTPHEADER     => ['Accept: text/html,application/xhtml+xml', 'Accept-Language: de,en;q=0.9'],
+    ]);
+    $html = curl_exec($ch);
+    $err  = curl_error($ch);
+    curl_close($ch);
+
+    if (!$html || $err) return ['error' => 'Verbindungsfehler — bitte ID prüfen'];
 
     // <span class="Subheader">1937​±73</span> — Zahl vor dem ±-Zeichen
-    if (preg_match('/<span[^>]*class="Subheader"[^>]*>\s*(\d+)\s*(?:​)?±/u', $html, $m)) {
+    if (preg_match('/<span[^>]*class="Subheader"[^>]*>\s*(\d+)\s*(?:&#8203;)?±/u', $html, $m)) {
         return ['rating' => (float)$m[1]];
     }
     return ['error' => 'Rating nicht gefunden — bitte ID prüfen'];
