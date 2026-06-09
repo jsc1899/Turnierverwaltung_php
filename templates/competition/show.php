@@ -144,13 +144,12 @@ ob_start(); ?>
         <?php endif; ?>
       </div>
       <div class="col-auto" id="field-team-size"<?= $comp_type !== 'team' ? ' style="display:none"' : '' ?>>
-        <label class="form-label">Spieler pro Team</label>
+        <label class="form-label">Spieler pro Team <span class="text-muted small">(0 = direkte Eingabe)</span></label>
         <input type="number" name="team_size" class="form-control form-control-sm" style="width:90px"
                min="0" max="20" value="<?= (int)($c['team_size'] ?? 0) ?>"<?= $c['phase'] !== 'setup' ? ' disabled' : '' ?>>
         <?php if ($c['phase'] !== 'setup'): ?>
         <input type="hidden" name="team_size" value="<?= (int)($c['team_size'] ?? 0) ?>">
         <?php endif; ?>
-        <div class="form-text">0 = direkte Eingabe</div>
       </div>
       <div class="col-auto">
         <label class="form-label">Spielmodus</label>

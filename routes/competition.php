@@ -25,6 +25,7 @@ function new_competition(array $p): void {
     $registrations_open = post('registrations_open') ? 1 : 0;
     $max_players        = max(0, (int)post('max_players', 0));
     $seeding_order      = post('seeding_order') === 'asc' ? 'asc' : 'desc';
+    $team_size          = $is_team ? max(0, min(20, (int)post('team_size', 0))) : 0;
 
     if (!$name) {
         flash('danger', 'Name erforderlich.');
@@ -34,10 +35,10 @@ function new_competition(array $p): void {
     db_insert(
         "INSERT INTO competition
          (tournament_id, name, group_size, advance_count, mode, is_doubles, is_team,
-          third_place, show_seeding, show_skill, registrations_open, max_players, seeding_order)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+          third_place, show_seeding, show_skill, registrations_open, max_players, seeding_order, team_size)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         [$p['tid'], $name, $group_size, $advance_count, $mode, $is_doubles, $is_team,
-         $third_place, $show_seeding, $show_skill, $registrations_open, $max_players, $seeding_order]
+         $third_place, $show_seeding, $show_skill, $registrations_open, $max_players, $seeding_order, $team_size]
     );
     redirect('tournament/' . $p['tid']);
 }

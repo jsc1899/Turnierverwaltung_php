@@ -336,11 +336,15 @@ $nennung_badge = $pending_count + $change_count;
             </div>
             <div class="col-sm-6">
               <label class="form-label">Bewerbstyp</label>
-              <select name="comp_type" class="form-select">
+              <select name="comp_type" class="form-select" id="new-comp-type-select" onchange="toggleTeamSize()">
                 <option value="single" selected>Einzelbewerb</option>
                 <option value="doubles">Doppelbewerb</option>
                 <option value="team">Teambewerb</option>
               </select>
+            </div>
+            <div class="col-sm-6" id="new-team-size-wrap" style="display:none">
+              <label class="form-label">Spieler pro Team <span class="text-muted small">(0 = direkte Eingabe)</span></label>
+              <input type="number" name="team_size" class="form-control" value="0" min="0" max="20">
             </div>
             <div class="col-sm-6">
               <label class="form-label">Spielmodus</label>
@@ -479,6 +483,11 @@ $extra_js = <<<'JS'
 function openImageModal(src) {
   document.getElementById('imageModalImg').src = src;
   new bootstrap.Modal(document.getElementById('imageModal')).show();
+}
+function toggleTeamSize() {
+  var sel  = document.getElementById('new-comp-type-select');
+  var wrap = document.getElementById('new-team-size-wrap');
+  if (wrap) wrap.style.display = (sel && sel.value === 'team') ? '' : 'none';
 }
 function toggleGroupSettings() {
   var sel  = document.getElementById('comp-mode-select');
