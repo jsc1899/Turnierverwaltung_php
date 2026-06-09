@@ -226,6 +226,53 @@ function init_db(): void {
             FOREIGN KEY (group_id)  REFERENCES grp(id)     ON DELETE CASCADE,
             FOREIGN KEY (double_id) REFERENCES `double`(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+        CREATE TABLE IF NOT EXISTS `team` (
+            id         INT AUTO_INCREMENT PRIMARY KEY,
+            name       VARCHAR(500) NOT NULL DEFAULT '',
+            skill      DECIMAL(8,1) DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+        CREATE TABLE IF NOT EXISTS `team_player` (
+            team_id   INT NOT NULL,
+            player_id INT NOT NULL,
+            PRIMARY KEY (team_id, player_id),
+            FOREIGN KEY (team_id)   REFERENCES `team`(id)  ON DELETE CASCADE,
+            FOREIGN KEY (player_id) REFERENCES player(id)  ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+        CREATE TABLE IF NOT EXISTS `competition_team` (
+            competition_id INT NOT NULL,
+            team_id        INT NOT NULL,
+            skill          DECIMAL(8,1) DEFAULT 0,
+            created_at     VARCHAR(50) DEFAULT '',
+            PRIMARY KEY (competition_id, team_id),
+            FOREIGN KEY (competition_id) REFERENCES competition(id) ON DELETE CASCADE,
+            FOREIGN KEY (team_id)        REFERENCES `team`(id)      ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+        CREATE TABLE IF NOT EXISTS `group_team` (
+            group_id INT NOT NULL,
+            team_id  INT NOT NULL,
+            PRIMARY KEY (group_id, team_id),
+            FOREIGN KEY (group_id) REFERENCES grp(id)    ON DELETE CASCADE,
+            FOREIGN KEY (team_id)  REFERENCES `team`(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+        CREATE TABLE IF NOT EXISTS `team_match_duel` (
+            id          INT AUTO_INCREMENT PRIMARY KEY,
+            match_id    INT NOT NULL,
+            duel_order  INT NOT NULL DEFAULT 0,
+            player1_id  INT NULL DEFAULT NULL,
+            player2_id  INT NULL DEFAULT NULL,
+            score1      INT NULL DEFAULT NULL,
+            score2      INT NULL DEFAULT NULL,
+            played      TINYINT(1) DEFAULT 0,
+            FOREIGN KEY (match_id)   REFERENCES `match`(id)  ON DELETE CASCADE,
+            FOREIGN KEY (player1_id) REFERENCES player(id)   ON DELETE SET NULL,
+            FOREIGN KEY (player2_id) REFERENCES player(id)   ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ");
 
     // Migrations für bestehende Datenbanken (try-catch: Spalte existiert ggf. schon)
@@ -244,6 +291,11 @@ function init_db(): void {
         "ALTER TABLE `double` MODIFY COLUMN tournament_id INT NULL DEFAULT NULL",
         "ALTER TABLE registration_competition ADD COLUMN partner_name VARCHAR(255) DEFAULT ''",
         "ALTER TABLE registration_change_competition ADD COLUMN partner_name VARCHAR(255) DEFAULT ''",
+        "ALTER TABLE `match` ADD COLUMN team1_id INT NULL DEFAULT NULL",
+        "ALTER TABLE `match` ADD COLUMN team2_id INT NULL DEFAULT NULL",
+        "ALTER TABLE competition ADD COLUMN is_team TINYINT(1) DEFAULT 0",
+        "ALTER TABLE competition ADD COLUMN show_skill TINYINT(1) DEFAULT 0",
+        "ALTER TABLE competition ADD COLUMN team_size INT DEFAULT 0",
     ];
     foreach ($migrations as $sql) {
         try { $pdo->exec($sql); } catch (\PDOException $e) { /* Spalte/Typ bereits korrekt */ }

@@ -133,7 +133,9 @@ $nennung_badge = $pending_count + $change_count;
           <div class="card-body d-flex flex-column">
             <h6 class="card-title mb-1"><?= e($c['name']) ?></h6>
             <div class="text-muted small mb-2">
-              <i class="bi bi-<?= $c['is_doubles'] ? 'people-fill' : 'people' ?> me-1"></i><?= $ci['player_count'] ?><?= $c['max_players'] ? '/' . (int)$c['max_players'] : '' ?> <?= $c['is_doubles'] ? 'Doppel' : 'Spieler' ?>
+              <?php $picon = !empty($c['is_team']) ? 'shield-fill' : (!empty($c['is_doubles']) ? 'people-fill' : 'people'); ?>
+              <?php $plabel = !empty($c['is_team']) ? 'Teams' : (!empty($c['is_doubles']) ? 'Doppel' : 'Spieler'); ?>
+              <i class="bi bi-<?= $picon ?> me-1"></i><?= $ci['player_count'] ?><?= $c['max_players'] ? '/' . (int)$c['max_players'] : '' ?> <?= $plabel ?>
               &nbsp;·&nbsp;
               <?php if ($c['mode'] === 'ko_only'): ?>
               KO-Runde
@@ -277,11 +279,6 @@ $nennung_badge = $pending_count + $change_count;
         </select>
       </div>
       <div class="col-12">
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" name="show_skill" id="show_skill" value="1"
-                 <?= ($t['show_skill'] ?? 0) ? 'checked' : '' ?>>
-          <label class="form-check-label" for="show_skill">Spielstärke in Tabellen anzeigen</label>
-        </div>
       </div>
       <div class="col-12">
         <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-check me-1"></i>Speichern</button>
@@ -309,7 +306,7 @@ $nennung_badge = $pending_count + $change_count;
 <?php if (can_edit()): ?>
 <!-- Neuer Bewerb Modal -->
 <div class="modal fade" id="newCompetitionModal" tabindex="-1">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title"><i class="bi bi-plus-circle me-1"></i>Neuer Bewerb</h5>
@@ -318,48 +315,84 @@ $nennung_badge = $pending_count + $change_count;
       <div class="modal-body">
         <form method="post" action="<?= url('tournament/' . $t['id'] . '/competition/new') ?>">
           <?= csrf_field() ?>
-          <div class="mb-3">
-            <label class="form-label">Name</label>
-            <input type="text" name="name" class="form-control" placeholder="z.B. Herren A" required>
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Modus</label>
-            <select name="mode" class="form-select" id="comp-mode-select" onchange="toggleGroupSettings()">
-              <option value="groups_ko" selected>Gruppenphase + KO</option>
-              <option value="ko_only">KO-Runde</option>
-              <option value="double_ko">Doppel-KO (mit Loser-Bracket)</option>
-            </select>
-          </div>
-          <div id="group-settings">
-            <div class="mb-3">
-              <label class="form-label">Gruppengröße</label>
-              <select name="group_size" class="form-select">
-                <option value="3">3 Spieler</option>
-                <option value="4" selected>4 Spieler</option>
-                <option value="5">5 Spieler</option>
-                <option value="6">6 Spieler</option>
-                <option value="7">7 Spieler</option>
-                <option value="8">8 Spieler</option>
+          <div class="row g-3">
+            <div class="col-sm-6">
+              <label class="form-label">Bewerbsname <span class="text-danger">*</span></label>
+              <input type="text" name="name" class="form-control" placeholder="z.B. Herren A" required>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">Bewerbstyp</label>
+              <select name="comp_type" class="form-select">
+                <option value="single" selected>Einzelbewerb</option>
+                <option value="doubles">Doppelbewerb</option>
+                <option value="team">Teambewerb</option>
               </select>
             </div>
-            <div class="mb-3">
+            <div class="col-sm-6">
+              <label class="form-label">Spielmodus</label>
+              <select name="mode" class="form-select" id="comp-mode-select" onchange="toggleGroupSettings()">
+                <option value="groups_ko" selected>Gruppenphase + KO</option>
+                <option value="ko_only">Nur KO</option>
+                <option value="double_ko">Doppel-KO (mit Loser-Bracket)</option>
+              </select>
+            </div>
+            <div class="col-sm-3" id="new-group-size-wrap">
+              <label class="form-label">Gruppengröße</label>
+              <select name="group_size" class="form-select">
+                <option value="3">3 Teilnehmer</option>
+                <option value="4" selected>4 Teilnehmer</option>
+                <option value="5">5 Teilnehmer</option>
+                <option value="6">6 Teilnehmer</option>
+                <option value="7">7 Teilnehmer</option>
+                <option value="8">8 Teilnehmer</option>
+              </select>
+            </div>
+            <div class="col-sm-3" id="new-advance-wrap">
               <label class="form-label">KO-Aufstieg</label>
-              <select name="advance_count" class="form-select">
+              <select name="advance_count" id="new-advance-count" class="form-select"
+                      onchange="newToggleThirdPlace()">
                 <option value="0">Nur Gruppenphase</option>
                 <option value="1">Gruppenerste → KO</option>
                 <option value="2" selected>Erste &amp; Zweite → KO</option>
               </select>
             </div>
-          </div>
-          <div class="mb-3">
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" name="is_doubles" id="new_is_doubles" value="1">
-              <label class="form-check-label" for="new_is_doubles">
-                <i class="bi bi-people-fill me-1"></i>Doppelbewerb
-              </label>
+            <div class="col-sm-6 d-flex align-items-end pb-1" id="new-third-place-wrap">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="third_place" id="new_third_place">
+                <label class="form-check-label" for="new_third_place">Platz-3-Spiel</label>
+              </div>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">Setzungsreihenfolge</label>
+              <select name="seeding_order" class="form-select">
+                <option value="desc" selected>Höhere Stärke = stärker</option>
+                <option value="asc">Niedrigere Stärke = stärker (Tennis)</option>
+              </select>
+            </div>
+            <div class="col-sm-3 d-flex align-items-end pb-1">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="show_skill" id="new_show_skill">
+                <label class="form-check-label" for="new_show_skill">Spielstärke anzeigen (Gruppe)</label>
+              </div>
+            </div>
+            <div class="col-sm-3 d-flex align-items-end pb-1">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="show_seeding" id="new_show_seeding" checked>
+                <label class="form-check-label" for="new_show_seeding">Setzungen anzeigen (KO)</label>
+              </div>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">Max. Teilnehmer <span class="text-muted small">(0 = unbegrenzt)</span></label>
+              <input type="number" name="max_players" class="form-control" value="0" min="0">
+            </div>
+            <div class="col-sm-6 d-flex align-items-end pb-1">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="registrations_open" id="new_regs_open" checked>
+                <label class="form-check-label" for="new_regs_open">Nennung offen</label>
+              </div>
             </div>
           </div>
-          <div class="d-flex gap-2 justify-content-end">
+          <div class="d-flex gap-2 justify-content-end mt-3">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
             <button type="submit" class="btn btn-primary">
               <i class="bi bi-plus me-1"></i>Erstellen
@@ -391,9 +424,24 @@ function openImageModal(src) {
   new bootstrap.Modal(document.getElementById('imageModal')).show();
 }
 function toggleGroupSettings() {
-  var sel = document.getElementById('comp-mode-select');
-  var grp = document.getElementById('group-settings');
-  if (grp) grp.style.display = (sel && (sel.value === 'ko_only' || sel.value === 'double_ko')) ? 'none' : '';
+  var sel  = document.getElementById('comp-mode-select');
+  var mode = sel ? sel.value : 'groups_ko';
+  var isKo = (mode === 'ko_only' || mode === 'double_ko');
+  var gsWrap  = document.getElementById('new-group-size-wrap');
+  var advWrap = document.getElementById('new-advance-wrap');
+  if (gsWrap)  gsWrap.style.display  = isKo ? 'none' : '';
+  if (advWrap) advWrap.style.display = isKo ? 'none' : '';
+  newToggleThirdPlace();
+}
+function newToggleThirdPlace() {
+  var sel    = document.getElementById('comp-mode-select');
+  var adv    = document.getElementById('new-advance-count');
+  var wrap   = document.getElementById('new-third-place-wrap');
+  if (!wrap) return;
+  var mode   = sel  ? sel.value  : 'groups_ko';
+  var advVal = adv  ? adv.value  : '2';
+  var show   = (mode === 'ko_only' || mode === 'double_ko') || advVal !== '0';
+  wrap.style.display = show ? '' : 'none';
 }
 function setSport(btn) {
   var picker = btn.closest('.sport-picker');

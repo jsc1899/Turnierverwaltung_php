@@ -115,6 +115,9 @@ $routes = [
     ['POST',     '/competition/{id}/double/pair',            'competition', 'pair_double_from_reg'],
     ['POST',     '/competition/{id}/double/{did}/remove',    'competition', 'remove_double'],
     ['POST',     '/competition/{id}/double/{did}/skill',     'competition', 'update_double_skill'],
+    ['POST',     '/competition/{id}/team/add',               'competition', 'add_team'],
+    ['POST',     '/competition/{id}/team/{tid}/remove',      'competition', 'remove_team'],
+    ['POST',     '/competition/{id}/team/{tid}/skill',       'competition', 'update_team_skill'],
     ['POST',     '/competition/{id}/draw/groups',            'competition', 'draw_groups'],
     ['POST',     '/competition/{id}/draw/ko',                'competition', 'draw_ko'],
     ['POST',     '/competition/{id}/draw/ko-direct',         'competition', 'draw_ko_direct'],
@@ -127,6 +130,7 @@ $routes = [
     // Match results
     ['POST',     '/match/{id}/result',               'match_result', 'save'],
     ['POST',     '/match/{id}/result/clear',          'match_result', 'clear_result'],
+    ['POST',     '/match/{id}/duels',                'match_result', 'save_duels'],
     ['POST',     '/ko-match/{id}/result',             'match_result', 'save_ko'],
     ['POST',     '/competition/{id}/results/bulk',    'match_result', 'save_bulk'],
 
@@ -141,6 +145,11 @@ $routes = [
     ['POST',     '/players/double/new',             'player', 'create_double_global'],
     ['POST',     '/players/double/{did}/edit',      'player', 'edit_double_global'],
     ['POST',     '/players/double/{did}/delete',    'player', 'delete_double_global'],
+    ['POST',     '/players/team/new',                             'player', 'create_team_global'],
+    ['POST',     '/players/team/{tid}/edit',                      'player', 'edit_team_global'],
+    ['POST',     '/players/team/{tid}/delete',                    'player', 'delete_team_global'],
+    ['POST',     '/players/team/{tid}/player/add',                'player', 'add_team_player'],
+    ['POST',     '/players/team/{tid}/player/{pid}/remove',       'player', 'remove_team_player'],
 
     // PDFs & Exporte
     ['GET', '/tournament/{id}/aushang',           'pdf', 'aushang'],

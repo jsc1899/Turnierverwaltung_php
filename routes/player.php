@@ -49,6 +49,38 @@ function index(array $p): void {
         }
         $double_sport_skills[$d['id']] = $sums;
     }
+    $double_competitions = [];
+    foreach ($all_doubles as $d) {
+        $double_competitions[$d['id']] = db_fetchall(
+            "SELECT c.id, c.name, t.name as tournament_name FROM competition c
+             JOIN competition_double cd ON cd.competition_id = c.id
+             JOIN tournament t ON t.id = c.tournament_id
+             WHERE cd.double_id = ? ORDER BY t.name, c.name",
+            [$d['id']]
+        );
+    }
+    $all_teams = db_fetchall(
+        "SELECT t.*, COUNT(tp.player_id) as member_count
+         FROM `team` t LEFT JOIN `team_player` tp ON tp.team_id = t.id
+         GROUP BY t.id ORDER BY t.name",
+        []
+    );
+    foreach ($all_teams as &$team) {
+        $team['members'] = db_fetchall(
+            "SELECT p.id, TRIM(CONCAT(COALESCE(p.firstname,''), IF(COALESCE(p.firstname,'')!='', ' ',''), p.name)) as fullname, p.club
+             FROM player p JOIN `team_player` tp ON tp.player_id = p.id
+             WHERE tp.team_id = ? ORDER BY p.name",
+            [$team['id']]
+        );
+        $team['competitions'] = db_fetchall(
+            "SELECT c.id, c.name, t.name as tournament_name FROM competition c
+             JOIN competition_team ct ON ct.competition_id = c.id
+             JOIN tournament t ON t.id = c.tournament_id
+             WHERE ct.team_id = ? ORDER BY t.name, c.name",
+            [$team['id']]
+        );
+    }
+    unset($team);
     render('player/index', [
         'page_title'          => 'Spielerregister',
         'players'             => $all_players,
@@ -57,6 +89,8 @@ function index(array $p): void {
         'sports_list'         => SPORTS_LIST,
         'all_doubles'         => $all_doubles,
         'double_sport_skills' => $double_sport_skills,
+        'double_competitions' => $double_competitions,
+        'all_teams'           => $all_teams,
     ]);
 }
 
@@ -148,6 +182,114 @@ function delete_double_global(array $p): void {
     db_execute("DELETE FROM `double` WHERE id=?", [$did]);
     flash('info', 'Doppel „' . $d['name'] . '" gelöscht.');
     redirect('players#tab-doppel');
+}
+
+function create_team_global(array $p): void {
+    require_edit();
+    csrf_verify();
+    $name = trim(post('name'));
+    if (!$name) {
+        flash('danger', 'Name erforderlich.');
+        redirect('players#tab-teams');
+        return;
+    }
+    $skill = (float)post('skill', 0);
+    $tid = (int)db_insert("INSERT INTO `team` (name, skill) VALUES (?,?)", [$name, $skill]);
+    foreach ((array)($_POST['player_ids'] ?? []) as $pid_str) {
+        $pid = (int)$pid_str;
+        if ($pid) db_execute("INSERT IGNORE INTO `team_player` (team_id, player_id) VALUES (?,?)", [$tid, $pid]);
+    }
+    flash('success', 'Team „' . $name . '" erstellt.');
+    redirect('players#tab-teams');
+}
+
+function edit_team_global(array $p): void {
+    require_edit();
+    csrf_verify();
+    $tid  = (int)$p['tid'];
+    $name = trim(post('name'));
+    if (!$name) {
+        flash('danger', 'Name darf nicht leer sein.');
+        redirect('players#tab-teams');
+        return;
+    }
+    $skill = (float)post('skill', 0);
+    db_execute("UPDATE `team` SET name=?, skill=? WHERE id=?", [$name, $skill, $tid]);
+    flash('success', 'Team gespeichert.');
+    redirect('players#tab-teams');
+}
+
+function delete_team_global(array $p): void {
+    require_edit();
+    csrf_verify();
+    $tid    = (int)$p['tid'];
+    $active = db_fetch(
+        "SELECT c.id FROM competition c
+         JOIN competition_team ct ON ct.competition_id = c.id
+         WHERE ct.team_id = ? AND c.phase != 'setup'",
+        [$tid]
+    );
+    if ($active) {
+        flash('danger', 'Team kann nicht gelöscht werden: Bewerb läuft bereits.');
+        redirect('players#tab-teams');
+        return;
+    }
+    $t = db_fetch("SELECT name FROM `team` WHERE id=?", [$tid]);
+    if (!$t) { redirect('players#tab-teams'); return; }
+    db_execute("DELETE FROM `team` WHERE id=?", [$tid]);
+    flash('info', 'Team „' . $t['name'] . '" gelöscht.');
+    redirect('players#tab-teams');
+}
+
+function add_team_player(array $p): void {
+    require_edit();
+    csrf_verify();
+    $tid = (int)$p['tid'];
+    $pid = (int)post('player_id');
+    if ($pid) {
+        db_execute("INSERT IGNORE INTO `team_player` (team_id, player_id) VALUES (?,?)", [$tid, $pid]);
+    }
+    redirect('players#tab-teams');
+}
+
+function remove_team_player(array $p): void {
+    require_edit();
+    csrf_verify();
+    $tid = (int)$p['tid'];
+    $pid = (int)$p['pid'];
+    $blocked = db_fetchall(
+        "SELECT c.name, c.team_size FROM competition c
+         JOIN competition_team ct ON ct.competition_id = c.id
+         WHERE ct.team_id = ? AND c.team_size > 0",
+        [$tid]
+    );
+    if ($blocked) {
+        $current = (int)(db_fetch(
+            "SELECT COUNT(*) as n FROM team_player WHERE team_id=?", [$tid]
+        )['n'] ?? 0);
+        foreach ($blocked as $bc) {
+            if (($current - 1) < (int)$bc['team_size']) {
+                flash('danger', "Spieler kann nicht entfernt werden: Bewerb \u{201E}{$bc['name']}\u{201C} erfordert mind. {$bc['team_size']} Mitglieder.");
+                redirect('players#tab-teams');
+                return;
+            }
+        }
+    }
+    $duel_used = db_fetch(
+        "SELECT d.id FROM team_match_duel d
+         JOIN `match` m ON m.id = d.match_id
+         JOIN competition_team ct ON ct.competition_id = m.competition_id AND ct.team_id = ?
+         WHERE (d.player1_id = ? OR d.player2_id = ?)
+         LIMIT 1",
+        [$tid, $pid, $pid]
+    );
+    if ($duel_used) {
+        flash('danger', 'Spieler kann nicht entfernt werden: Er ist in einem gespeicherten Spielergebnis eingetragen.');
+        redirect('players#tab-teams');
+        return;
+    }
+    db_execute("DELETE FROM `team_player` WHERE team_id=? AND player_id=?", [$tid, $pid]);
+    redirect('players#tab-teams');
 }
 
 function new_player(array $p): void {
@@ -287,8 +429,27 @@ function player_profile_json(array $p): void {
     }
     unset($dbl);
 
+    $teams_raw = db_fetchall(
+        "SELECT tm.id, tm.name FROM `team` tm
+         JOIN team_player tp ON tp.team_id = tm.id
+         WHERE tp.player_id = ? ORDER BY tm.name",
+        [$pid]
+    );
+    $teams = [];
+    foreach ($teams_raw as $tm) {
+        $tm['competitions'] = db_fetchall(
+            "SELECT t.id as tid, t.name as tname, c.id as cid, c.name as cname, c.phase
+             FROM competition_team ct
+             JOIN competition c ON c.id = ct.competition_id
+             JOIN tournament t ON t.id = c.tournament_id
+             WHERE ct.team_id = ? ORDER BY t.name, c.name",
+            [$tm['id']]
+        );
+        $teams[] = $tm;
+    }
+
     header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['player' => $player, 'skills' => $skills, 'comps' => $comps, 'doubles' => $doubles]);
+    echo json_encode(['player' => $player, 'skills' => $skills, 'comps' => $comps, 'doubles' => $doubles, 'teams' => $teams]);
     exit;
 }
 

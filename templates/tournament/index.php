@@ -190,12 +190,6 @@ ob_start(); ?>
             </div>
           </div>
           <div class="mb-3">
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" name="show_skill" id="new_show_skill" value="1">
-              <label class="form-check-label" for="new_show_skill">Spielstärke in Tabellen anzeigen</label>
-            </div>
-          </div>
-          <div class="mb-3">
             <label class="form-label">Ausschreibung (PDF)</label>
             <input type="file" name="ausschreibung_file" class="form-control" accept=".pdf">
           </div>

@@ -16,7 +16,15 @@ function new_competition(array $p): void {
     $group_size    = max(3, min(8, (int)post('group_size', 4)));
     $advance_count = max(0, min(2, (int)post('advance_count', 1)));
     $mode          = in_array(post('mode'), ['groups_ko', 'ko_only', 'double_ko']) ? post('mode') : 'groups_ko';
-    $is_doubles    = post('is_doubles') ? 1 : 0;
+    $comp_type          = post('comp_type', 'single');
+    $is_team            = $comp_type === 'team'    ? 1 : 0;
+    $is_doubles         = $comp_type === 'doubles' ? 1 : 0;
+    $third_place        = post('third_place')        ? 1 : 0;
+    $show_seeding       = post('show_seeding')       ? 1 : 0;
+    $show_skill         = post('show_skill')         ? 1 : 0;
+    $registrations_open = post('registrations_open') ? 1 : 0;
+    $max_players        = max(0, (int)post('max_players', 0));
+    $seeding_order      = post('seeding_order') === 'asc' ? 'asc' : 'desc';
 
     if (!$name) {
         flash('danger', 'Name erforderlich.');
@@ -24,8 +32,12 @@ function new_competition(array $p): void {
         return;
     }
     db_insert(
-        "INSERT INTO competition (tournament_id, name, group_size, advance_count, mode, is_doubles) VALUES (?,?,?,?,?,?)",
-        [$p['tid'], $name, $group_size, $advance_count, $mode, $is_doubles]
+        "INSERT INTO competition
+         (tournament_id, name, group_size, advance_count, mode, is_doubles, is_team,
+          third_place, show_seeding, show_skill, registrations_open, max_players, seeding_order)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        [$p['tid'], $name, $group_size, $advance_count, $mode, $is_doubles, $is_team,
+         $third_place, $show_seeding, $show_skill, $registrations_open, $max_players, $seeding_order]
     );
     redirect('tournament/' . $p['tid']);
 }
@@ -36,12 +48,62 @@ function show(array $p): void {
     if (!$c) { redirect(''); return; }
     $t = db_fetch("SELECT * FROM tournament WHERE id = ?", [$c['tournament_id']]);
     $is_doubles = !empty($c['is_doubles']);
+    $is_team    = !empty($c['is_team']);
 
-    // Teilnehmer laden (Spieler oder Doppel je nach Bewerb-Typ)
+    // Teilnehmer laden (Spieler oder Doppel oder Teams je nach Bewerb-Typ)
     $assigned = $assigned_doubles = $unassigned = $unassigned_doubles = [];
+    $assigned_teams = $unassigned_teams = [];
     $unassigned_skills = [];
 
-    if ($is_doubles) {
+    if ($is_team) {
+        $assigned_teams = db_fetchall(
+            "SELECT t.id, t.name, ct.skill, ct.created_at as reg_date
+             FROM `team` t JOIN competition_team ct ON ct.team_id = t.id
+             WHERE ct.competition_id = ? ORDER BY t.name",
+            [$cid]
+        );
+        foreach ($assigned_teams as &$team) {
+            $team['members'] = db_fetchall(
+                "SELECT TRIM(CONCAT(COALESCE(p.firstname,''), IF(COALESCE(p.firstname,'')!='', ' ',''), p.name)) as fullname, p.club
+                 FROM player p JOIN `team_player` tp ON tp.player_id = p.id WHERE tp.team_id = ? ORDER BY p.name",
+                [$team['id']]
+            );
+        }
+        unset($team);
+        $unassigned_teams = db_fetchall(
+            "SELECT t.id, t.name, t.skill FROM `team` t
+             WHERE t.id NOT IN (SELECT team_id FROM competition_team WHERE competition_id=?)
+             ORDER BY t.name",
+            [$cid]
+        );
+        // Team-Mitglieder und bestehende Duelle für Duel-Modals (nur wenn team_size > 0)
+        $team_members   = [];
+        $existing_duels = [];
+        if ((int)($c['team_size'] ?? 0) > 0) {
+            foreach ($assigned_teams as $tm) {
+                $team_members[$tm['id']] = db_fetchall(
+                    "SELECT p.id,
+                     TRIM(CONCAT(p.name, IF(COALESCE(p.firstname,'')!='',CONCAT(' ',p.firstname),''))) as fullname
+                     FROM player p JOIN `team_player` tp ON tp.player_id=p.id
+                     WHERE tp.team_id=? ORDER BY p.name",
+                    [$tm['id']]
+                );
+            }
+            foreach (db_fetchall(
+                "SELECT d.*,
+                 TRIM(CONCAT(COALESCE(p1.firstname,''), IF(COALESCE(p1.firstname,'')!='',' ',''), p1.name)) as player1_name,
+                 TRIM(CONCAT(COALESCE(p2.firstname,''), IF(COALESCE(p2.firstname,'')!='',' ',''), p2.name)) as player2_name
+                 FROM team_match_duel d
+                 JOIN `match` m ON m.id=d.match_id
+                 LEFT JOIN player p1 ON p1.id=d.player1_id
+                 LEFT JOIN player p2 ON p2.id=d.player2_id
+                 WHERE m.competition_id=? ORDER BY d.match_id, d.duel_order",
+                [$cid]
+            ) as $duel) {
+                $existing_duels[$duel['match_id']][] = $duel;
+            }
+        }
+    } elseif ($is_doubles) {
         $assigned_doubles = db_fetchall(
             "SELECT d.id, d.name, d.player1_id, d.player2_id,
              TRIM(CONCAT(COALESCE(p1.firstname,''), IF(COALESCE(p1.firstname,'')!='', ' ',''), p1.name)) as p1name,
@@ -136,7 +198,23 @@ function show(array $p): void {
     if (in_array($c['phase'], ['group', 'ko', 'done'], true)) {
         $grps = db_fetchall("SELECT * FROM grp WHERE competition_id = ? ORDER BY name", [$cid]);
         foreach ($grps as $g) {
-            if ($is_doubles) {
+            if ($is_team) {
+                require_once __DIR__ . '/../lib/standings.php';
+                $standings = team_standings($g['id'], $c['seeding_order'] ?? 'desc');
+                $matches   = db_fetchall(
+                    "SELECT m.*, COALESCE(t1.name,'') as p1name, COALESCE(t2.name,'') as p2name
+                     FROM `match` m
+                     LEFT JOIN `team` t1 ON t1.id = m.team1_id
+                     LEFT JOIN `team` t2 ON t2.id = m.team2_id
+                     WHERE m.group_id = ? ORDER BY m.match_order, m.id",
+                    [$g['id']]
+                );
+                $matches = array_map(function($m) {
+                    $m['player1_id'] = $m['team1_id'];
+                    $m['player2_id'] = $m['team2_id'];
+                    return $m;
+                }, $matches);
+            } elseif ($is_doubles) {
                 require_once __DIR__ . '/../lib/standings.php';
                 $standings = double_standings($g['id'], $c['seeding_order'] ?? 'desc');
                 $matches   = db_fetchall(
@@ -206,7 +284,15 @@ function show(array $p): void {
                 $lb_names[$r] = $r === $lb_total ? 'LB Finale'
                     : ($r === $lb_total - 1 ? 'LB Halbfinale' : 'LB Runde ' . $r);
             }
-            if ($is_doubles) {
+            if ($is_team) {
+                $sql = "SELECT m.*, COALESCE(t1.name,'') as p1name, COALESCE(t2.name,'') as p2name,
+                        '' as p1club, '' as p2club
+                        FROM `match` m
+                        LEFT JOIN `team` t1 ON t1.id=m.team1_id
+                        LEFT JOIN `team` t2 ON t2.id=m.team2_id
+                        WHERE m.competition_id=? AND m.group_id IS NULL
+                        ORDER BY bracket, ko_round, ko_position";
+            } elseif ($is_doubles) {
                 $sql = "SELECT m.*,
                         COALESCE(CONCAT(dp1a.name,' / ',dp1b.name),'') as p1name,
                         COALESCE(CONCAT(dp2a.name,' / ',dp2b.name),'') as p2name,
@@ -232,7 +318,10 @@ function show(array $p): void {
                         ORDER BY bracket, ko_round, ko_position";
             }
             foreach (db_fetchall($sql, [$cid]) as $m) {
-                if ($is_doubles) {
+                if ($is_team) {
+                    $m['player1_id'] = $m['team1_id'];
+                    $m['player2_id'] = $m['team2_id'];
+                } elseif ($is_doubles) {
                     $m['player1_id'] = $m['double1_id'];
                     $m['player2_id'] = $m['double2_id'];
                 }
@@ -265,7 +354,23 @@ function show(array $p): void {
                 }
             }
         } else {
-            if ($is_doubles) {
+            if ($is_team) {
+                $ko_matches = db_fetchall(
+                    "SELECT m.*, COALESCE(t1.name,'') as p1name, COALESCE(t2.name,'') as p2name,
+                     '' as p1club, '' as p2club
+                     FROM `match` m
+                     LEFT JOIN `team` t1 ON t1.id = m.team1_id
+                     LEFT JOIN `team` t2 ON t2.id = m.team2_id
+                     WHERE m.competition_id = ? AND m.group_id IS NULL
+                     ORDER BY m.ko_round DESC, m.ko_position",
+                    [$cid]
+                );
+                $ko_matches = array_map(function($m) {
+                    $m['player1_id'] = $m['team1_id'];
+                    $m['player2_id'] = $m['team2_id'];
+                    return $m;
+                }, $ko_matches);
+            } elseif ($is_doubles) {
                 $ko_matches = db_fetchall(
                     "SELECT m.*,
                      COALESCE(CONCAT(dp1a.name,' / ',dp1b.name),'') as p1name,
@@ -376,7 +481,17 @@ function show(array $p): void {
         : "COALESCE(skill,0) DESC";
     $ko_seedings = [];
     if (in_array($c['mode'], ['ko_only', 'double_ko']) && in_array($c['phase'], ['ko', 'done']) && !empty($c['show_seeding'])) {
-        if ($is_doubles) {
+        if ($is_team) {
+            $seed_rows = db_fetchall(
+                "SELECT team_id FROM competition_team WHERE competition_id=? ORDER BY $seed_order_sql, team_id",
+                [$cid]
+            );
+            foreach ($seed_rows as $i => $sr) {
+                $rank = $i + 1;
+                $lbl  = $rank <= 2 ? (string)$rank : ((($hi = 1 << (int)ceil(log($rank, 2))) >> 1) + 1) . '-' . $hi;
+                $ko_seedings[(int)$sr['team_id']] = $lbl;
+            }
+        } elseif ($is_doubles) {
             $seed_rows = db_fetchall(
                 "SELECT double_id FROM competition_double WHERE competition_id=? ORDER BY $seed_order_sql, double_id",
                 [$cid]
@@ -409,7 +524,13 @@ function show(array $p): void {
     }
     $ko_no_results = false;
     if ($c['phase'] === 'ko') {
-        if ($is_doubles) {
+        if ($is_team) {
+            $played_ko = db_fetch(
+                "SELECT COUNT(*) as n FROM `match` WHERE competition_id=? AND group_id IS NULL AND ko_round != 3
+                 AND team1_id IS NOT NULL AND team2_id IS NOT NULL AND played=1",
+                [$cid]
+            )['n'];
+        } elseif ($is_doubles) {
             $played_ko = db_fetch(
                 "SELECT COUNT(*) as n FROM `match` WHERE competition_id=? AND group_id IS NULL AND ko_round != 3
                  AND double1_id IS NOT NULL AND double2_id IS NOT NULL AND played=1",
@@ -428,11 +549,15 @@ function show(array $p): void {
     render('competition/show', [
         'page_title' => $c['name'],
         'c' => $c, 't' => $t,
-        'is_doubles' => $is_doubles,
+        'is_doubles' => $is_doubles, 'is_team' => $is_team,
         'assigned' => $assigned, 'unassigned' => $unassigned,
         'unassigned_skills' => $unassigned_skills,
         'assigned_doubles' => $assigned_doubles,
         'unassigned_doubles' => $unassigned_doubles,
+        'assigned_teams' => $assigned_teams,
+        'unassigned_teams' => $unassigned_teams,
+        'team_members' => $team_members ?? [],
+        'existing_duels' => $existing_duels ?? [],
         'confirmed_regs' => $confirmed_regs ?? [],
         'groups' => $groups, 'ko_rounds' => $ko_rounds,
         'third_place_match' => $third_place_match,
@@ -477,9 +602,11 @@ function settings(array $p): void {
     $registrations_open = post('registrations_open') ? 1 : 0;
     $max_players       = max(0, (int)post('max_players', 0));
     $show_seeding      = post('show_seeding') ? 1 : 0;
+    $show_skill        = post('show_skill')   ? 1 : 0;
     $seeding_order     = post('seeding_order') === 'asc' ? 'asc' : 'desc';
+    $team_size         = max(0, (int)post('team_size', 0));
 
-    $c = db_fetch("SELECT phase, mode, is_doubles FROM competition WHERE id=?", [$cid]);
+    $c = db_fetch("SELECT phase, mode, is_doubles, is_team FROM competition WHERE id=?", [$cid]);
     if (!$c) { redirect('competition/' . $cid); return; }
     if ($name) db_execute("UPDATE competition SET name=? WHERE id=?", [$name, $cid]);
 
@@ -492,25 +619,34 @@ function settings(array $p): void {
         }
     }
 
-    // is_doubles nur ändern solange noch keine Teilnehmer eingetragen
-    $has_participants = $c['is_doubles']
-        ? (int)db_fetch("SELECT COUNT(*) as n FROM competition_double WHERE competition_id=?", [$cid])['n']
-        : (int)db_fetch("SELECT COUNT(*) as n FROM competition_player WHERE competition_id=?", [$cid])['n'];
+    // is_doubles / is_team nur ändern solange noch keine Teilnehmer eingetragen
+    $cur_is_doubles = !empty($c['is_doubles']);
+    $cur_is_team    = !empty($c['is_team']);
+    if ($cur_is_team) {
+        $has_participants = (int)db_fetch("SELECT COUNT(*) as n FROM competition_team WHERE competition_id=?", [$cid])['n'];
+    } elseif ($cur_is_doubles) {
+        $has_participants = (int)db_fetch("SELECT COUNT(*) as n FROM competition_double WHERE competition_id=?", [$cid])['n'];
+    } else {
+        $has_participants = (int)db_fetch("SELECT COUNT(*) as n FROM competition_player WHERE competition_id=?", [$cid])['n'];
+    }
     if ($c['phase'] === 'setup' && $has_participants === 0) {
-        $is_doubles = post('is_doubles') ? 1 : 0;
-        db_execute("UPDATE competition SET is_doubles=? WHERE id=?", [$is_doubles, $cid]);
+        $comp_type  = post('comp_type', 'single');
+        $is_team    = $comp_type === 'team'    ? 1 : 0;
+        $is_doubles = $comp_type === 'doubles' ? 1 : 0;
+        db_execute("UPDATE competition SET is_doubles=?, is_team=? WHERE id=?", [$is_doubles, $is_team, $cid]);
         $c['is_doubles'] = $is_doubles;
+        $c['is_team']    = $is_team;
     }
 
     if (in_array($c['mode'], ['ko_only', 'double_ko'], true)) {
-        db_execute("UPDATE competition SET third_place=?, registrations_open=?, max_players=?, show_seeding=?, seeding_order=? WHERE id=?",
-            [$third_place, $registrations_open, $max_players, $show_seeding, $seeding_order, $cid]);
+        db_execute("UPDATE competition SET third_place=?, registrations_open=?, max_players=?, show_seeding=?, show_skill=?, seeding_order=?, team_size=? WHERE id=?",
+            [$third_place, $registrations_open, $max_players, $show_seeding, $show_skill, $seeding_order, $team_size, $cid]);
     } elseif ($c && $c['phase'] === 'setup') {
-        db_execute("UPDATE competition SET group_size=?, advance_count=?, third_place=?, registrations_open=?, max_players=?, seeding_order=? WHERE id=?",
-            [$group_size, $advance_count, $third_place, $registrations_open, $max_players, $seeding_order, $cid]);
+        db_execute("UPDATE competition SET group_size=?, advance_count=?, third_place=?, registrations_open=?, max_players=?, show_skill=?, seeding_order=?, team_size=? WHERE id=?",
+            [$group_size, $advance_count, $third_place, $registrations_open, $max_players, $show_skill, $seeding_order, $team_size, $cid]);
     } else {
-        db_execute("UPDATE competition SET advance_count=?, third_place=?, registrations_open=?, max_players=?, seeding_order=? WHERE id=?",
-            [$advance_count, $third_place, $registrations_open, $max_players, $seeding_order, $cid]);
+        db_execute("UPDATE competition SET advance_count=?, third_place=?, registrations_open=?, max_players=?, show_skill=?, seeding_order=?, team_size=? WHERE id=?",
+            [$advance_count, $third_place, $registrations_open, $max_players, $show_skill, $seeding_order, $team_size, $cid]);
     }
     flash('success', 'Einstellungen gespeichert.');
     redirect('competition/' . $cid);
@@ -707,10 +843,17 @@ function draw_groups(array $p): void {
     csrf_verify();
     $cid = (int)$p['id'];
     $c   = db_fetch("SELECT * FROM competition WHERE id=?", [$cid]);
-    $is_doubles = !empty($c['is_doubles']);
+    $is_team    = !empty($c['is_team']);
+    $is_doubles = !$is_team && !empty($c['is_doubles']);
 
     $skill_order = ($c['seeding_order'] ?? 'desc') === 'asc' ? 'ASC' : 'DESC';
-    if ($is_doubles) {
+    if ($is_team) {
+        $rows = db_fetchall(
+            "SELECT ct.team_id as participant_id, COALESCE(ct.skill, 0) as skill
+             FROM competition_team ct WHERE ct.competition_id=? ORDER BY ct.skill $skill_order, ct.team_id",
+            [$cid]
+        );
+    } elseif ($is_doubles) {
         $rows = db_fetchall(
             "SELECT cd.double_id as participant_id, COALESCE(cd.skill, 0) as skill
              FROM competition_double cd WHERE cd.competition_id=? ORDER BY cd.skill $skill_order, cd.double_id",
@@ -724,7 +867,8 @@ function draw_groups(array $p): void {
         );
     }
     $n = count($rows);
-    if ($n < 3) { flash('danger', 'Mindestens 3 ' . ($is_doubles ? 'Doppel' : 'Spieler') . ' erforderlich.'); redirect('competition/'.$cid); return; }
+    $kind = $is_team ? 'Teams' : ($is_doubles ? 'Doppel' : 'Spieler');
+    if ($n < 3) { flash('danger', "Mindestens 3 $kind erforderlich."); redirect('competition/'.$cid); return; }
     if ($n > 64) { flash('danger', 'Maximal 64 erlaubt.'); redirect('competition/'.$cid); return; }
 
     $group_size = (int)$c['group_size'];
@@ -752,7 +896,10 @@ function draw_groups(array $p): void {
             shuffle($bucket);
             foreach ($bucket as $j => $pid) {
                 if (isset($group_ids[$j])) {
-                    if ($is_doubles) {
+                    if ($is_team) {
+                        db_execute("INSERT INTO group_team (group_id, team_id) VALUES (?,?)",
+                            [$group_ids[$j], $pid]);
+                    } elseif ($is_doubles) {
                         db_execute("INSERT INTO group_double (group_id, double_id) VALUES (?,?)",
                             [$group_ids[$j], $pid]);
                     } else {
@@ -764,7 +911,19 @@ function draw_groups(array $p): void {
         }
 
         foreach ($group_ids as $gid) {
-            if ($is_doubles) {
+            if ($is_team) {
+                $pids = array_column(
+                    db_fetchall("SELECT team_id FROM group_team WHERE group_id=?", [$gid]),
+                    'team_id'
+                );
+                $pairs = round_robin_schedule($pids);
+                foreach ($pairs as $order => [$t1, $t2]) {
+                    db_execute(
+                        "INSERT INTO `match` (competition_id, group_id, team1_id, team2_id, match_order) VALUES (?,?,?,?,?)",
+                        [$cid, $gid, $t1, $t2, $order + 1]
+                    );
+                }
+            } elseif ($is_doubles) {
                 $pids = array_column(
                     db_fetchall("SELECT double_id FROM group_double WHERE group_id=?", [$gid]),
                     'double_id'
@@ -806,7 +965,8 @@ function draw_ko(array $p): void {
     csrf_verify();
     $cid = (int)$p['id'];
     $c   = db_fetch("SELECT * FROM competition WHERE id=?", [$cid]);
-    $is_doubles = !empty($c['is_doubles']);
+    $is_team    = !empty($c['is_team']);
+    $is_doubles = !$is_team && !empty($c['is_doubles']);
 
     $unplayed = db_fetch(
         "SELECT COUNT(*) as n FROM `match` WHERE competition_id=? AND group_id IS NOT NULL AND played=0",
@@ -823,7 +983,9 @@ function draw_ko(array $p): void {
 
     $firsts = []; $seconds = [];
     foreach ($grps as $g) {
-        $st = $is_doubles ? double_standings($g['id'], $c['seeding_order'] ?? 'desc') : group_standings($g['id'], $c['seeding_order'] ?? 'desc');
+        $st = $is_team
+            ? team_standings($g['id'], $c['seeding_order'] ?? 'desc')
+            : ($is_doubles ? double_standings($g['id'], $c['seeding_order'] ?? 'desc') : group_standings($g['id'], $c['seeding_order'] ?? 'desc'));
         if ($st) $firsts[] = ['gid' => $g['id'], 'pid' => $st[0]['id']];
         if ($advance_count >= 2 && count($st) >= 2)
             $seconds[] = ['gid' => $g['id'], 'pid' => $st[1]['id']];
@@ -836,8 +998,9 @@ function draw_ko(array $p): void {
     $gids     = array_merge(array_column($firsts, 'gid'), array_column($seconds, 'gid'));
     $n        = count($seedings);
 
+    $kind = $is_team ? 'Teams' : ($is_doubles ? 'Doppel' : 'Spieler');
     if ($n < 2) {
-        flash('danger', 'Nicht genug ' . ($is_doubles ? 'Doppel' : 'Spieler') . ' für KO-Phase.');
+        flash('danger', "Nicht genug $kind für KO-Phase.");
         redirect('competition/' . $cid);
         return;
     }
@@ -874,7 +1037,7 @@ function draw_ko(array $p): void {
         $lo++; $hi--;
     }
 
-    _build_ko_bracket($cid, $bracket, (bool)$c['third_place'], $is_doubles);
+    _build_ko_bracket($cid, $bracket, (bool)$c['third_place'], $is_doubles, $is_team);
     flash('success', 'KO-Bracket wurde ausgelost!');
     redirect('competition/' . $cid);
 }
@@ -884,7 +1047,8 @@ function draw_ko_direct(array $p): void {
     csrf_verify();
     $cid = (int)$p['id'];
     $c   = db_fetch("SELECT * FROM competition WHERE id=?", [$cid]);
-    $is_doubles = !empty($c['is_doubles']);
+    $is_team    = !empty($c['is_team']);
+    $is_doubles = !$is_team && !empty($c['is_doubles']);
 
     if ($c['phase'] !== 'setup') {
         flash('warning', 'Auslosung nur in der Einrichtungsphase möglich.');
@@ -892,7 +1056,16 @@ function draw_ko_direct(array $p): void {
         return;
     }
     $draw_order_asc = ($c['seeding_order'] ?? 'desc') === 'asc';
-    if ($is_doubles) {
+    if ($is_team) {
+        $draw_order_sql = $draw_order_asc
+            ? "CASE WHEN COALESCE(ct.skill,0)=0 THEN 1 ELSE 0 END, COALESCE(ct.skill,0) ASC, ct.team_id"
+            : "COALESCE(ct.skill,0) DESC, ct.team_id";
+        $rows = db_fetchall(
+            "SELECT ct.team_id FROM competition_team ct WHERE ct.competition_id=? ORDER BY $draw_order_sql",
+            [$cid]
+        );
+        $participants = array_column($rows, 'team_id');
+    } elseif ($is_doubles) {
         $draw_order_sql = $draw_order_asc
             ? "CASE WHEN COALESCE(cd.skill,0)=0 THEN 1 ELSE 0 END, COALESCE(cd.skill,0) ASC, cd.double_id"
             : "COALESCE(cd.skill,0) DESC, cd.double_id";
@@ -912,12 +1085,13 @@ function draw_ko_direct(array $p): void {
         $participants = array_column($rows, 'player_id');
     }
     $n = count($participants);
-    if ($n < 2) { flash('danger', 'Mindestens 2 ' . ($is_doubles ? 'Doppel' : 'Spieler') . ' erforderlich.'); redirect('competition/'.$cid); return; }
+    $kind = $is_team ? 'Teams' : ($is_doubles ? 'Doppel' : 'Spieler');
+    if ($n < 2) { flash('danger', "Mindestens 2 $kind erforderlich."); redirect('competition/'.$cid); return; }
     if ($n > 64) { flash('danger', 'Maximal 64 erlaubt.'); redirect('competition/'.$cid); return; }
 
     if ($c['mode'] === 'double_ko') {
         require_once __DIR__ . '/../lib/double_ko_bracket.php';
-        draw_double_ko($cid, $participants, $is_doubles);
+        draw_double_ko($cid, $participants, $is_doubles, $is_team);
         flash('success', 'Doppel-KO-Bracket wurde ausgelost!');
         redirect('competition/' . $cid);
         return;
@@ -938,7 +1112,7 @@ function draw_ko_direct(array $p): void {
         $bracket[$seeded_pos[$num_byes + $j] ^ 1] = $opp;
     }
 
-    _build_ko_bracket($cid, $bracket, (bool)$c['third_place'], $is_doubles);
+    _build_ko_bracket($cid, $bracket, (bool)$c['third_place'], $is_doubles, $is_team);
     flash('success', 'KO-Bracket wurde ausgelost!');
     redirect('competition/' . $cid);
 }
@@ -970,8 +1144,9 @@ function groups_reorder(array $p): void {
     require_edit();
     csrf_verify();
     $cid = (int)$p['id'];
-    $c   = db_fetch("SELECT is_doubles FROM competition WHERE id=?", [$cid]);
-    $is_doubles = $c && !empty($c['is_doubles']);
+    $c   = db_fetch("SELECT is_doubles, is_team FROM competition WHERE id=?", [$cid]);
+    $is_team    = $c && !empty($c['is_team']);
+    $is_doubles = $c && !$is_team && !empty($c['is_doubles']);
 
     $played = db_fetch(
         "SELECT COUNT(*) as n FROM `match` WHERE competition_id=? AND group_id IS NOT NULL AND played=1",
@@ -984,7 +1159,12 @@ function groups_reorder(array $p): void {
     }
 
     $valid_gids = array_column(db_fetchall("SELECT id FROM grp WHERE competition_id=?", [$cid]), 'id');
-    if ($is_doubles) {
+    if ($is_team) {
+        $valid_ids = array_column(
+            db_fetchall("SELECT team_id FROM competition_team WHERE competition_id=?", [$cid]),
+            'team_id'
+        );
+    } elseif ($is_doubles) {
         $valid_ids = array_column(
             db_fetchall("SELECT double_id FROM competition_double WHERE competition_id=?", [$cid]),
             'double_id'
@@ -1003,7 +1183,9 @@ function groups_reorder(array $p): void {
         db_execute("DELETE FROM `match` WHERE competition_id=? AND group_id IS NOT NULL", [$cid]);
         if ($valid_gids) {
             $ph = implode(',', array_fill(0, count($valid_gids), '?'));
-            if ($is_doubles) {
+            if ($is_team) {
+                db_execute("DELETE FROM group_team WHERE group_id IN ($ph)", $valid_gids);
+            } elseif ($is_doubles) {
                 db_execute("DELETE FROM group_double WHERE group_id IN ($ph)", $valid_gids);
             } else {
                 db_execute("DELETE FROM group_player WHERE group_id IN ($ph)", $valid_gids);
@@ -1015,13 +1197,27 @@ function groups_reorder(array $p): void {
             foreach ((array)$pids as $pid) {
                 $pid = (int)$pid;
                 if (!in_array($pid, $valid_ids)) continue;
-                if ($is_doubles) {
+                if ($is_team) {
+                    db_execute("INSERT IGNORE INTO group_team (group_id, team_id) VALUES (?,?)", [$gid, $pid]);
+                } elseif ($is_doubles) {
                     db_execute("INSERT IGNORE INTO group_double (group_id, double_id) VALUES (?,?)", [$gid, $pid]);
                 } else {
                     db_execute("INSERT IGNORE INTO group_player (group_id, player_id) VALUES (?,?)", [$gid, $pid]);
                 }
             }
-            if ($is_doubles) {
+            if ($is_team) {
+                $ids_arr = array_column(
+                    db_fetchall("SELECT team_id FROM group_team WHERE group_id=?", [$gid]),
+                    'team_id'
+                );
+                $pairs = round_robin_schedule($ids_arr);
+                foreach ($pairs as $order => [$t1, $t2]) {
+                    db_execute(
+                        "INSERT INTO `match` (competition_id, group_id, team1_id, team2_id, match_order) VALUES (?,?,?,?,?)",
+                        [$cid, $gid, $t1, $t2, $order + 1]
+                    );
+                }
+            } elseif ($is_doubles) {
                 $ids_arr = array_column(
                     db_fetchall("SELECT double_id FROM group_double WHERE group_id=?", [$gid]),
                     'double_id'
@@ -1061,8 +1257,9 @@ function ko_reorder(array $p): void {
     require_edit();
     csrf_verify();
     $cid = (int)$p['id'];
-    $c   = db_fetch("SELECT third_place, is_doubles FROM competition WHERE id=?", [$cid]);
-    $is_doubles = $c && !empty($c['is_doubles']);
+    $c   = db_fetch("SELECT third_place, is_doubles, is_team FROM competition WHERE id=?", [$cid]);
+    $is_team    = $c && !empty($c['is_team']);
+    $is_doubles = $c && !$is_team && !empty($c['is_doubles']);
 
     $played = db_fetch(
         "SELECT COUNT(*) as n FROM `match` WHERE competition_id=? AND group_id IS NULL AND ko_round != 3
@@ -1075,7 +1272,12 @@ function ko_reorder(array $p): void {
         return;
     }
 
-    if ($is_doubles) {
+    if ($is_team) {
+        $valid_ids = array_column(
+            db_fetchall("SELECT team_id FROM competition_team WHERE competition_id=?", [$cid]),
+            'team_id'
+        );
+    } elseif ($is_doubles) {
         $valid_ids = array_column(
             db_fetchall("SELECT double_id FROM competition_double WHERE competition_id=?", [$cid]),
             'double_id'
@@ -1096,7 +1298,7 @@ function ko_reorder(array $p): void {
         return;
     }
 
-    _build_ko_bracket($cid, $bracket, (bool)($c['third_place'] ?? false), $is_doubles);
+    _build_ko_bracket($cid, $bracket, (bool)($c['third_place'] ?? false), $is_doubles, $is_team);
     flash('success', 'KO-Bracket aktualisiert.');
     redirect('competition/' . $cid);
 }
@@ -1105,12 +1307,18 @@ function seedings_save(array $p): void {
     require_edit();
     csrf_verify();
     $cid   = (int)$p['id'];
-    $c     = db_fetch("SELECT third_place, is_doubles FROM competition WHERE id=?", [$cid]);
-    $is_doubles = $c && !empty($c['is_doubles']);
+    $c     = db_fetch("SELECT third_place, is_doubles, is_team FROM competition WHERE id=?", [$cid]);
+    $is_team    = $c && !empty($c['is_team']);
+    $is_doubles = $c && !$is_team && !empty($c['is_doubles']);
     $order = post('player_order', '');
     $pids  = array_filter(array_map('intval', explode(',', $order)));
 
-    if ($is_doubles) {
+    if ($is_team) {
+        $valid_ids = array_column(
+            db_fetchall("SELECT team_id FROM competition_team WHERE competition_id=?", [$cid]),
+            'team_id'
+        );
+    } elseif ($is_doubles) {
         $valid_ids = array_column(
             db_fetchall("SELECT double_id FROM competition_double WHERE competition_id=?", [$cid]),
             'double_id'
@@ -1159,21 +1367,82 @@ function seedings_save(array $p): void {
         $bracket[$pos * 2 + 1] = $remaining[$hi--] ?? null;
     }
 
-    _build_ko_bracket($cid, $bracket, (bool)($c['third_place'] ?? false), $is_doubles);
+    _build_ko_bracket($cid, $bracket, (bool)($c['third_place'] ?? false), $is_doubles, $is_team);
     flash('success', 'Setzung gespeichert.');
     redirect('competition/' . $cid);
 }
 
 // ── Internal helpers ───────────────────────────────────────────────────────────
 
-function _build_ko_bracket(int $cid, array $bracket, bool $third_place, bool $is_doubles = false): void {
+function add_team(array $p): void {
+    require_edit();
+    csrf_verify();
+    $cid  = (int)$p['id'];
+    $tids = $_POST['team_ids'] ?? [];
+    $c    = db_fetch("SELECT max_players, is_team, team_size FROM competition WHERE id=?", [$cid]);
+    if (!$c || !$c['is_team']) { redirect('competition/' . $cid); return; }
+    $max     = (int)($c['max_players'] ?? 0);
+    $ts      = (int)($c['team_size'] ?? 0);
+    $skipped = 0;
+    foreach ((array)$tids as $tid_str) {
+        $tid = (int)$tid_str;
+        if (!$tid) continue;
+        if ($max > 0) {
+            $count = (int)db_fetch("SELECT COUNT(*) as n FROM competition_team WHERE competition_id=?", [$cid])['n'];
+            if ($count >= $max) { $skipped++; continue; }
+        }
+        if ($ts > 0) {
+            $member_count = (int)(db_fetch(
+                "SELECT COUNT(*) as n FROM team_player WHERE team_id=?", [$tid]
+            )['n'] ?? 0);
+            if ($member_count < $ts) {
+                $skipped++;
+                flash('warning', "Team hat nur $member_count Mitglieder — Bewerb erfordert mindestens $ts.");
+                continue;
+            }
+        }
+        $t = db_fetch("SELECT skill FROM `team` WHERE id=?", [$tid]);
+        if (!$t) continue;
+        db_execute(
+            "INSERT IGNORE INTO competition_team (competition_id, team_id, created_at, skill) VALUES (?,?,NOW(),?)",
+            [$cid, $tid, $t['skill']]
+        );
+    }
+    if ($skipped > 0) flash('warning', "Maximale Anzahl ($max) erreicht — $skipped Teams nicht hinzugefügt.");
+    redirect('competition/' . $cid . '#tab-players');
+}
+
+function remove_team(array $p): void {
+    require_edit();
+    csrf_verify();
+    db_execute("DELETE FROM competition_team WHERE competition_id=? AND team_id=?",
+        [(int)$p['id'], (int)$p['tid']]);
+    redirect('competition/' . $p['id'] . '#tab-players');
+}
+
+function update_team_skill(array $p): void {
+    require_edit();
+    csrf_verify();
+    $cid   = (int)$p['id'];
+    $tid   = (int)$p['tid'];
+    $skill = max(0, (float)post('skill', 0));
+    db_execute(
+        "UPDATE competition_team SET skill=? WHERE competition_id=? AND team_id=?",
+        [$skill, $cid, $tid]
+    );
+    redirect('competition/' . $cid . '#tab-players');
+}
+
+// ── Internal helpers ───────────────────────────────────────────────────────────
+
+function _build_ko_bracket(int $cid, array $bracket, bool $third_place, bool $is_doubles = false, bool $is_team = false): void {
     db_execute("DELETE FROM `match` WHERE competition_id=? AND group_id IS NULL", [$cid]);
     $bracket_total = count($bracket);
     if ($bracket_total < 2) return;
 
     $num_matches = $bracket_total / 2;
-    $p1col = $is_doubles ? 'double1_id' : 'player1_id';
-    $p2col = $is_doubles ? 'double2_id' : 'player2_id';
+    $p1col = $is_team ? 'team1_id' : ($is_doubles ? 'double1_id' : 'player1_id');
+    $p2col = $is_team ? 'team2_id' : ($is_doubles ? 'double2_id' : 'player2_id');
 
     for ($pos = 0; $pos < $num_matches; $pos++) {
         $p1 = $bracket[$pos * 2]     ?? null;
@@ -1203,8 +1472,8 @@ function _build_ko_bracket(int $cid, array $bracket, bool $third_place, bool $is
             [$cid, $bracket_total, $pos]
         );
         if ($m) {
-            $has_p1 = $is_doubles ? $m['double1_id'] : $m['player1_id'];
-            $has_p2 = $is_doubles ? $m['double2_id'] : $m['player2_id'];
+            $has_p1 = $m[$p1col];
+            $has_p2 = $m[$p2col];
             if ($has_p1 && !$has_p2) {
                 db_execute("UPDATE `match` SET played=1, score1=1, score2=0 WHERE id=?", [$m['id']]);
                 advance_ko_winner(array_merge($m, ['score1'=>1,'score2'=>0]));

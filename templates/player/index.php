@@ -29,14 +29,22 @@ ob_start(); ?>
       <i class="bi bi-people-fill me-1"></i>Doppel (<?= count($all_doubles) ?>)
     </button>
   </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tab-teams-btn"
+            data-bs-toggle="tab" data-bs-target="#tab-teams" type="button" role="tab">
+      <i class="bi bi-shield-fill me-1"></i>Teams (<?= count($all_teams) ?>)
+    </button>
+  </li>
 </ul>
 <div class="tab-content border border-top-0 rounded-bottom mb-4">
 
   <!-- ── Tab: Spieler ── -->
   <div class="tab-pane fade show active p-3" id="tab-spieler" role="tabpanel">
     <?php if ($players): ?>
-    <div class="d-flex align-items-center mb-2">
+    <div class="d-flex align-items-center mb-2 gap-2">
       <span class="text-muted small"><?= count($players) ?> Einträge</span>
+      <input type="search" class="form-control form-control-sm table-filter" style="max-width:220px"
+             placeholder="Filtern…" data-target="tbl-spieler" aria-label="Spieler filtern">
       <div class="btn-group btn-group-sm ms-auto">
         <a href="<?= url('players/pdf') ?>" class="btn btn-outline-danger" target="_blank">
           <i class="bi bi-file-earmark-pdf me-1"></i>PDF
@@ -47,7 +55,7 @@ ob_start(); ?>
       </div>
     </div>
     <div class="table-responsive">
-      <table class="table table-hover align-middle" data-sortable>
+      <table class="table table-hover align-middle" data-sortable id="tbl-spieler">
         <thead class="table-light">
           <tr>
             <th>Nachname</th><th>Vorname</th><th class="text-center">G</th>
@@ -114,8 +122,12 @@ ob_start(); ?>
   <div class="tab-pane fade p-3" id="tab-doppel" role="tabpanel">
     <?php $sport_labels = ['tischtennis'=>'Tischtennis','tennis'=>'Tennis','fussball'=>'Fußball','cornhole'=>'Cornhole']; ?>
     <?php if ($all_doubles): ?>
+    <div class="mb-2">
+      <input type="search" class="form-control form-control-sm table-filter" style="max-width:220px"
+             placeholder="Filtern…" data-target="tbl-doppel" aria-label="Doppel filtern">
+    </div>
     <div class="table-responsive mb-3">
-      <table class="table table-sm table-hover align-middle mb-0" data-sortable>
+      <table class="table table-sm table-hover align-middle mb-0" data-sortable id="tbl-doppel">
         <thead class="table-light">
           <tr>
             <th>Name</th><th>Spieler 1</th><th>Spieler 2</th><th>Spielstärke</th>
@@ -208,9 +220,205 @@ ob_start(); ?>
     <?php endif; ?>
   </div>
 
+
+  <!-- ── Tab: Teams ── -->
+  <div class="tab-pane fade p-3" id="tab-teams" role="tabpanel">
+    <?php if ($all_teams): ?>
+    <div class="mb-2">
+      <input type="search" class="form-control form-control-sm table-filter" style="max-width:220px"
+             placeholder="Filtern…" data-target="tbl-teams" aria-label="Teams filtern">
+    </div>
+    <div class="table-responsive mb-3">
+      <table class="table table-sm table-hover align-middle mb-0" data-sortable id="tbl-teams">
+        <thead class="table-light">
+          <tr>
+            <th>Teamname</th><th>Mitglieder</th><th>Spielstärke</th>
+            <?php if (can_edit()): ?><th class="no-sort"></th><?php endif; ?>
+          </tr>
+        </thead>
+        <tbody>
+        <?php foreach ($all_teams as $team): ?>
+        <tr>
+          <td class="fw-semibold"><?= e($team['name']) ?></td>
+          <td class="small">
+            <?php if ($team['members']): ?>
+              <?= e(implode(', ', array_column($team['members'], 'fullname'))) ?>
+              <span class="text-muted">(<?= count($team['members']) ?>)</span>
+            <?php else: ?>
+              <span class="text-muted">—</span>
+            <?php endif; ?>
+          </td>
+          <td><?= $team['skill'] > 0 ? (int)$team['skill'] : '—' ?></td>
+          <?php if (can_edit()): ?>
+          <td class="text-end text-nowrap">
+            <button class="btn btn-outline-secondary btn-sm py-0 px-1 me-1"
+                    data-bs-toggle="modal" data-bs-target="#editTeamModal<?= $team['id'] ?>" title="Bearbeiten">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <form method="post" action="<?= url('players/team/'.$team['id'].'/delete') ?>"
+                  class="d-inline"
+                  onsubmit="return confirm('Team „<?= e($team['name']) ?>" wirklich löschen?')">
+              <?= csrf_field() ?>
+              <button class="btn btn-outline-danger btn-sm py-0 px-1" title="Löschen">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+          </td>
+          <?php endif; ?>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+    <?php else: ?>
+    <p class="text-muted small">Noch keine Teams erstellt.</p>
+    <?php endif; ?>
+
+    <?php if (can_edit()): ?>
+    <div class="border-top pt-3">
+      <h6 class="mb-3"><i class="bi bi-plus-circle me-1"></i>Neues Team erstellen</h6>
+      <form method="post" action="<?= url('players/team/new') ?>" class="row g-2 align-items-end">
+        <?= csrf_field() ?>
+        <div class="col-sm-4">
+          <label class="form-label small">Teamname <span class="text-danger">*</span></label>
+          <input type="text" name="name" class="form-control form-control-sm" required placeholder="z.B. Team Alpha">
+        </div>
+        <div class="col-sm-4">
+          <label class="form-label small">Spielstärke</label>
+          <input type="number" name="skill" step="1" min="0" class="form-control form-control-sm" value="0">
+        </div>
+        <div class="col-sm-4">
+          <button class="btn btn-primary btn-sm w-100"><i class="bi bi-plus me-1"></i>Erstellen</button>
+        </div>
+        <?php if ($players): ?>
+        <div class="col-12">
+          <label class="form-label small">Spieler hinzufügen <span class="text-muted">(optional, Mehrfachauswahl)</span></label>
+          <select name="player_ids[]" multiple class="form-select form-select-sm" style="height:120px">
+            <?php foreach ($players as $pl): ?>
+            <option value="<?= $pl['id'] ?>">
+              <?= e(trim(($pl['firstname'] ? $pl['firstname'].' ' : '').$pl['name'])) ?>
+              <?php if ($pl['club']): ?>(<?= e($pl['club']) ?>)<?php endif; ?>
+            </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <?php endif; ?>
+      </form>
+    </div>
+    <?php endif; ?>
+  </div>
+
 </div><!-- tab-content -->
 
 <?php if (can_edit()): ?>
+<!-- Edit-Modals für jedes Team -->
+<?php foreach ($all_teams as $team): ?>
+<div class="modal fade" id="editTeamModal<?= $team['id'] ?>" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-shield me-1"></i>Team bearbeiten: <?= e($team['name']) ?></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form method="post" action="<?= url('players/team/'.$team['id'].'/edit') ?>" class="mb-3">
+          <?= csrf_field() ?>
+          <div class="row g-2 align-items-end">
+            <div class="col-sm-6">
+              <label class="form-label small">Teamname <span class="text-danger">*</span></label>
+              <input type="text" name="name" class="form-control form-control-sm" value="<?= e($team['name']) ?>" required>
+            </div>
+            <div class="col-sm-3">
+              <label class="form-label small">Spielstärke</label>
+              <input type="number" name="skill" step="1" min="0" class="form-control form-control-sm"
+                     value="<?= (int)$team['skill'] ?>">
+            </div>
+            <div class="col-sm-3">
+              <button class="btn btn-primary btn-sm w-100"><i class="bi bi-check me-1"></i>Speichern</button>
+            </div>
+          </div>
+        </form>
+        <ul class="nav nav-tabs mb-3" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" data-bs-toggle="tab"
+                    data-bs-target="#teamTabMember<?= $team['id'] ?>" type="button" role="tab">
+              <i class="bi bi-people me-1"></i>Mitglieder
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" data-bs-toggle="tab"
+                    data-bs-target="#teamTabComp<?= $team['id'] ?>" type="button" role="tab">
+              <i class="bi bi-trophy me-1"></i>Bewerbe
+            </button>
+          </li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane fade show active" id="teamTabMember<?= $team['id'] ?>" role="tabpanel">
+            <?php if ($team['members']): ?>
+            <ul class="list-group list-group-flush mb-3">
+              <?php foreach ($team['members'] as $member): ?>
+              <li class="list-group-item d-flex align-items-center justify-content-between py-1 px-0">
+                <span class="small">
+                  <?= e($member['fullname']) ?>
+                  <?php if ($member['club']): ?><span class="text-muted">(<?= e($member['club']) ?>)</span><?php endif; ?>
+                </span>
+                <form method="post" action="<?= url('players/team/'.$team['id'].'/player/'.$member['id'].'/remove') ?>"
+                      class="d-inline">
+                  <?= csrf_field() ?>
+                  <button class="btn btn-outline-danger btn-sm py-0 px-1" title="Entfernen">
+                    <i class="bi bi-x"></i>
+                  </button>
+                </form>
+              </li>
+              <?php endforeach; ?>
+            </ul>
+            <?php else: ?>
+            <p class="text-muted small mb-3">Noch keine Mitglieder.</p>
+            <?php endif; ?>
+            <form method="post" action="<?= url('players/team/'.$team['id'].'/player/add') ?>" class="row g-2 align-items-end">
+              <?= csrf_field() ?>
+              <?php $assigned_ids = array_column($team['members'], 'id'); ?>
+              <div class="col-sm-9">
+                <label class="form-label small">Spieler hinzufügen</label>
+                <select name="player_id" class="form-select form-select-sm" required>
+                  <option value="">— auswählen —</option>
+                  <?php foreach ($players as $pl): if (in_array($pl['id'], $assigned_ids)) continue; ?>
+                  <option value="<?= $pl['id'] ?>">
+                    <?= e(trim(($pl['firstname'] ? $pl['firstname'].' ' : '').$pl['name'])) ?>
+                    <?php if ($pl['club']): ?>(<?= e($pl['club']) ?>)<?php endif; ?>
+                  </option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+              <div class="col-sm-3">
+                <button class="btn btn-secondary btn-sm w-100"><i class="bi bi-plus me-1"></i>Hinzufügen</button>
+              </div>
+            </form>
+          </div>
+          <div class="tab-pane fade" id="teamTabComp<?= $team['id'] ?>" role="tabpanel">
+            <?php if ($team['competitions']): ?>
+            <ul class="list-group list-group-flush">
+              <?php foreach ($team['competitions'] as $comp): ?>
+              <li class="list-group-item py-1 px-0 small">
+                <i class="bi bi-trophy text-secondary me-2"></i>
+                <span class="text-muted"><?= e($comp['tournament_name']) ?> —</span> <?= e($comp['name']) ?>
+              </li>
+              <?php endforeach; ?>
+            </ul>
+            <?php else: ?>
+            <p class="text-muted small mb-0">Keinem Bewerb zugeteilt.</p>
+            <?php endif; ?>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schließen</button>
+      </div>
+    </div>
+  </div>
+</div>
+<?php endforeach; ?>
+
 <!-- Neuer Spieler Modal -->
 <div class="modal fade" id="newPlayerModal" tabindex="-1">
   <div class="modal-dialog">
@@ -275,46 +483,69 @@ ob_start(); ?>
 <!-- Edit-Modals für jedes Doppel -->
 <?php foreach ($all_doubles as $d): ?>
 <?php $dsums = $double_sport_skills[$d['id']] ?? []; ?>
+<?php $dcomps = $double_competitions[$d['id']] ?? []; ?>
 <div class="modal fade" id="editDoubleModal<?= $d['id'] ?>" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
-      <form method="post" action="<?= url('players/double/'.$d['id'].'/edit') ?>">
-        <?= csrf_field() ?>
-        <div class="modal-header">
-          <h5 class="modal-title"><i class="bi bi-pencil me-1"></i>Doppel bearbeiten</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div class="mb-3">
-            <label class="form-label">Name</label>
-            <input type="text" name="name" class="form-control" value="<?= e($d['name']) ?>" required>
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-pencil me-1"></i>Doppel bearbeiten</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form method="post" action="<?= url('players/double/'.$d['id'].'/edit') ?>" class="mb-3" id="doubleEditForm<?= $d['id'] ?>">
+          <?= csrf_field() ?>
+          <div class="row g-2 align-items-end">
+            <div class="col-sm-9">
+              <label class="form-label small">Name <span class="text-danger">*</span></label>
+              <input type="text" name="name" class="form-control form-control-sm" value="<?= e($d['name']) ?>" required>
+            </div>
+            <div class="col-sm-3">
+              <button class="btn btn-primary btn-sm w-100"><i class="bi bi-check me-1"></i>Speichern</button>
+            </div>
           </div>
-          <?php if ($dsums): ?>
-          <div class="mb-3">
-            <label class="form-label">Spielstärke <span class="text-muted small">(automatisch)</span></label>
-            <div class="d-flex flex-wrap gap-2">
-              <?php foreach ($dsums as $sport => $sum): if ($sum <= 0) continue; ?>
-              <span class="badge bg-secondary fs-6">
-                <?= e($sport_icons[$sport] ?? $sport) ?>
-                <?= e($sport_labels[$sport] ?? $sport) ?>:
-                <?= $sum == (int)$sum ? (int)$sum : $sum ?>
-              </span>
+        </form>
+        <?php if ($dsums): ?>
+        <div class="mb-3">
+          <div class="form-text mb-1">Spielstärke (automatisch):</div>
+          <div class="d-flex flex-wrap gap-2">
+            <?php foreach ($dsums as $sport => $sum): if ($sum <= 0) continue; ?>
+            <span class="badge bg-secondary">
+              <?= e($sport_icons[$sport] ?? $sport) ?>
+              <?= e($sport_labels[$sport] ?? $sport) ?>:
+              <?= $sum == (int)$sum ? (int)$sum : $sum ?>
+            </span>
+            <?php endforeach; ?>
+          </div>
+        </div>
+        <?php endif; ?>
+        <ul class="nav nav-tabs mb-3" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" data-bs-toggle="tab"
+                    data-bs-target="#doubleTabComp<?= $d['id'] ?>" type="button" role="tab">
+              <i class="bi bi-trophy me-1"></i>Bewerbe
+            </button>
+          </li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane fade show active" id="doubleTabComp<?= $d['id'] ?>" role="tabpanel">
+            <?php if ($dcomps): ?>
+            <ul class="list-group list-group-flush">
+              <?php foreach ($dcomps as $comp): ?>
+              <li class="list-group-item py-1 px-0 small">
+                <i class="bi bi-trophy text-secondary me-2"></i>
+                <span class="text-muted"><?= e($comp['tournament_name']) ?> —</span> <?= e($comp['name']) ?>
+              </li>
               <?php endforeach; ?>
-            </div>
-            <div class="form-text">
-              <?= e($d['p1name']) ?>: <?php foreach ($player_skills[$d['player1_id']] ?? [] as $sp => $sk): if ($sk <= 0) continue; ?>
-              <?= e($sport_labels[$sp] ?? $sp) ?> <?= $sk == (int)$sk ? (int)$sk : $sk ?><?php endforeach; ?> &nbsp;|&nbsp;
-              <?= e($d['p2name']) ?>: <?php foreach ($player_skills[$d['player2_id']] ?? [] as $sp => $sk): if ($sk <= 0) continue; ?>
-              <?= e($sport_labels[$sp] ?? $sp) ?> <?= $sk == (int)$sk ? (int)$sk : $sk ?><?php endforeach; ?>
-            </div>
+            </ul>
+            <?php else: ?>
+            <p class="text-muted small mb-0">Keinem Bewerb zugeteilt.</p>
+            <?php endif; ?>
           </div>
-          <?php endif; ?>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
-          <button type="submit" class="btn btn-primary">Speichern</button>
-        </div>
-      </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schließen</button>
+      </div>
     </div>
   </div>
 </div>
@@ -350,7 +581,7 @@ ob_start(); ?>
             <li class="nav-item" role="presentation">
               <button class="nav-link" id="profileTabCompsBtn"
                       data-bs-toggle="tab" data-bs-target="#profileTabComps" type="button">
-                <i class="bi bi-trophy me-1"></i>Bewerbe &amp; Doppel
+                <i class="bi bi-trophy me-1"></i>Bewerbe
               </button>
             </li>
           </ul>
@@ -522,7 +753,7 @@ function fillProfileModal(data, pid) {
     if (inp) inp.value = data.skills[sk] || '';
   });
 
-  // Bewerbe & Doppel Tab
+  // Bewerbe Tab
   document.getElementById('profileCompsContent').innerHTML = buildCompsHtml(data);
 
   // Anzeigen
@@ -563,7 +794,7 @@ function buildCompsHtml(data) {
   }
 
   // Doppel
-  html += '<h6 class="mb-2"><i class="bi bi-people-fill me-1 text-secondary"></i>Doppelpaarungen</h6>';
+  html += '<h6 class="mb-2 mt-3"><i class="bi bi-people-fill me-1 text-secondary"></i>Doppelpaarungen</h6>';
   if (data.doubles && data.doubles.length > 0) {
     html += '<div class="list-group list-group-flush mb-2">';
     data.doubles.forEach(function(d) {
@@ -589,6 +820,34 @@ function buildCompsHtml(data) {
     html += '</div>';
   } else {
     html += '<p class="text-muted small">Keine Doppelpaarungen.</p>';
+  }
+
+  // Teams
+  html += '<h6 class="mb-2 mt-3"><i class="bi bi-shield me-1 text-secondary"></i>Teams</h6>';
+  if (data.teams && data.teams.length > 0) {
+    html += '<div class="list-group list-group-flush mb-2">';
+    data.teams.forEach(function(tm) {
+      html += '<div class="list-group-item px-0 py-2">';
+      html += '<div class="fw-semibold"><i class="bi bi-shield me-1 text-primary"></i>' + esc(tm.name) + '</div>';
+      if (tm.competitions && tm.competitions.length > 0) {
+        tm.competitions.forEach(function(c) {
+          var phase = phaseLabels[c.phase] || c.phase;
+          html += '<div class="ms-3 d-flex align-items-center gap-2 mt-1">';
+          html += '<i class="bi bi-calendar-event text-muted small"></i>';
+          html += '<span class="text-muted small">' + esc(c.tname) + '</span>';
+          html += '<i class="bi bi-chevron-right text-muted" style="font-size:.65rem"></i>';
+          html += '<a href="' + esc(profileBaseUrl.replace(/\/player$/, '/competition/') + c.cid) + '" class="text-decoration-none small">' + esc(c.cname) + '</a>';
+          html += '<span class="badge bg-light text-secondary border" style="font-size:.7rem">' + esc(phase) + '</span>';
+          html += '</div>';
+        });
+      } else {
+        html += '<div class="ms-3 text-muted small mt-1">Noch keinem Bewerb zugeordnet.</div>';
+      }
+      html += '</div>';
+    });
+    html += '</div>';
+  } else {
+    html += '<p class="text-muted small">Keinem Team zugeordnet.</p>';
   }
 
   return html;

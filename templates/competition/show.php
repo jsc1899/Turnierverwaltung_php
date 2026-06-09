@@ -1,6 +1,8 @@
 <?php
 $phase_labels = ['setup'=>'Einrichtung','group'=>'Gruppenphase','ko'=>'KO-Phase','done'=>'Beendet'];
 $phase_colors = ['setup'=>'bg-secondary','group'=>'bg-warning text-dark','ko'=>'bg-info text-dark','done'=>'bg-success'];
+
+
 ob_start(); ?>
 <nav aria-label="breadcrumb" class="mb-3">
   <ol class="breadcrumb">
@@ -94,7 +96,9 @@ ob_start(); ?>
   <li class="nav-item" role="presentation">
     <button class="nav-link" id="tab-players-btn"
             data-bs-toggle="tab" data-bs-target="#tab-players" type="button" role="tab">
-      <?php if ($is_doubles): ?>
+      <?php if ($is_team): ?>
+      <i class="bi bi-shield-fill me-1"></i>Teams (<?= count($assigned_teams) ?>)
+      <?php elseif ($is_doubles): ?>
       <i class="bi bi-people-fill me-1"></i>Doppel (<?= count($assigned_doubles) ?>)
       <?php else: ?>
       <i class="bi bi-people me-1"></i>Spieler (<?= count($assigned) ?>)
@@ -116,15 +120,40 @@ ob_start(); ?>
   <?php if (can_edit()): ?>
   <!-- Tab: Einstellungen -->
   <div class="tab-pane fade p-3" id="tab-settings" role="tabpanel">
+    <?php
+      $can_change_type = $c['phase'] === 'setup'
+          && count($assigned) === 0 && count($assigned_doubles) === 0 && count($assigned_teams) === 0;
+      $comp_type = !empty($c['is_team']) ? 'team' : (!empty($c['is_doubles']) ? 'doubles' : 'single');
+    ?>
     <form method="post" action="<?= url('competition/'.$c['id'].'/settings') ?>" class="row g-3 align-items-end">
       <?= csrf_field() ?>
       <div class="col-auto">
-        <label class="form-label">Name</label>
+        <label class="form-label">Bewerbsname</label>
         <input type="text" name="name" class="form-control form-control-sm" style="min-width:180px"
                value="<?= e($c['name']) ?>" required>
       </div>
       <div class="col-auto">
-        <label class="form-label">Modus</label>
+        <label class="form-label">Bewerbstyp</label>
+        <select name="comp_type" class="form-select form-select-sm"<?= !$can_change_type ? ' disabled' : '' ?>>
+          <option value="single"<?= $comp_type === 'single'  ? ' selected' : '' ?>>Einzelbewerb</option>
+          <option value="doubles"<?= $comp_type === 'doubles' ? ' selected' : '' ?>>Doppelbewerb</option>
+          <option value="team"<?= $comp_type === 'team'    ? ' selected' : '' ?>>Teambewerb</option>
+        </select>
+        <?php if (!$can_change_type): ?>
+        <input type="hidden" name="comp_type" value="<?= $comp_type ?>">
+        <?php endif; ?>
+      </div>
+      <div class="col-auto" id="field-team-size"<?= $comp_type !== 'team' ? ' style="display:none"' : '' ?>>
+        <label class="form-label">Spieler pro Team</label>
+        <input type="number" name="team_size" class="form-control form-control-sm" style="width:90px"
+               min="0" max="20" value="<?= (int)($c['team_size'] ?? 0) ?>"<?= $c['phase'] !== 'setup' ? ' disabled' : '' ?>>
+        <?php if ($c['phase'] !== 'setup'): ?>
+        <input type="hidden" name="team_size" value="<?= (int)($c['team_size'] ?? 0) ?>">
+        <?php endif; ?>
+        <div class="form-text">0 = direkte Eingabe</div>
+      </div>
+      <div class="col-auto">
+        <label class="form-label">Spielmodus</label>
         <select name="mode" class="form-select form-select-sm"<?= $c['phase'] !== 'setup' ? ' disabled' : '' ?>>
           <option value="groups_ko"<?= $c['mode'] === 'groups_ko' ? ' selected' : '' ?>>Gruppen + KO</option>
           <option value="ko_only"<?= $c['mode'] === 'ko_only'   ? ' selected' : '' ?>>Nur KO</option>
@@ -140,7 +169,7 @@ ob_start(); ?>
         <label class="form-label">Gruppengröße</label>
         <select name="group_size" class="form-select form-select-sm">
           <?php foreach ([3,4,5,6,7,8] as $s): ?>
-          <option value="<?= $s ?>"<?= (int)$c['group_size'] === $s ? ' selected' : '' ?>><?= $s ?> Spieler</option>
+          <option value="<?= $s ?>"<?= (int)$c['group_size'] === $s ? ' selected' : '' ?>><?= $s ?> Teilnehmer</option>
           <?php endforeach; ?>
         </select>
       </div>
@@ -155,7 +184,14 @@ ob_start(); ?>
         </select>
       </div>
       <?php endif; ?>
-      <?php if (in_array($c['mode'], ['ko_only', 'double_ko', 'groups_ko'])): ?>
+      <div class="col-auto d-flex align-items-end pb-1"
+           id="third_place_wrap"<?= (!in_array($c['mode'], ['ko_only','double_ko']) && (int)$c['advance_count'] === 0) ? ' style="display:none"' : '' ?>>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="third_place" id="third_place"
+                 <?= $c['third_place'] ? 'checked' : '' ?>>
+          <label class="form-check-label" for="third_place">Platz-3-Spiel</label>
+        </div>
+      </div>
       <div class="col-auto">
         <label class="form-label">Setzungsreihenfolge</label>
         <select name="seeding_order" class="form-select form-select-sm">
@@ -163,42 +199,31 @@ ob_start(); ?>
           <option value="asc"<?= ($c['seeding_order'] ?? 'desc') === 'asc'  ? ' selected' : '' ?>>Niedrigere Stärke = stärker (Tennis)</option>
         </select>
       </div>
-      <?php endif; ?>
-      <div class="col-auto d-flex flex-column gap-2 justify-content-end">
-        <div id="third_place_wrap"<?= (!in_array($c['mode'], ['ko_only','double_ko']) && (int)$c['advance_count'] === 0) ? ' style="display:none"' : '' ?>>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="third_place" id="third_place"
-                   <?= $c['third_place'] ? 'checked' : '' ?>>
-            <label class="form-check-label" for="third_place">Platz-3-Spiel</label>
-          </div>
+      <div class="col-auto d-flex align-items-end pb-1">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="show_skill" id="show_skill"
+                 <?= ($c['show_skill'] ?? 0) ? 'checked' : '' ?>>
+          <label class="form-check-label" for="show_skill">Spielstärke anzeigen (Gruppe)</label>
         </div>
-        <?php if (in_array($c['mode'], ['ko_only', 'double_ko', 'groups_ko'])): ?>
+      </div>
+      <div class="col-auto d-flex align-items-end pb-1">
         <div class="form-check">
           <input class="form-check-input" type="checkbox" name="show_seeding" id="show_seeding"
                  <?= ($c['show_seeding'] ?? 1) ? 'checked' : '' ?>>
-          <label class="form-check-label" for="show_seeding">Setzungen anzeigen</label>
-        </div>
-        <?php endif; ?>
-        <?php $can_change_doubles = $c['phase'] === 'setup' && count($assigned) === 0 && count($assigned_doubles) === 0; ?>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" name="is_doubles" id="is_doubles"
-                 <?= ($c['is_doubles'] ?? 0) ? 'checked' : '' ?>
-                 <?= !$can_change_doubles ? 'disabled' : '' ?>>
-          <label class="form-check-label" for="is_doubles">Doppelbewerb</label>
-        </div>
-        <?php if (!$can_change_doubles && ($c['is_doubles'] ?? 0)): ?>
-        <input type="hidden" name="is_doubles" value="1">
-        <?php endif; ?>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" name="registrations_open" id="regs_open"
-                 <?= $c['registrations_open'] ? 'checked' : '' ?>>
-          <label class="form-check-label" for="regs_open">Nennung offen</label>
+          <label class="form-check-label" for="show_seeding">Setzungen anzeigen (KO)</label>
         </div>
       </div>
       <div class="col-auto">
         <label class="form-label">Max. Teilnehmer</label>
         <input type="number" name="max_players" class="form-control form-control-sm" style="width:90px"
                value="<?= (int)$c['max_players'] ?>" min="0">
+      </div>
+      <div class="col-auto d-flex align-items-end pb-1">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="registrations_open" id="regs_open"
+                 <?= $c['registrations_open'] ? 'checked' : '' ?>>
+          <label class="form-check-label" for="regs_open">Nennung offen</label>
+        </div>
       </div>
       <div class="col-auto">
         <button class="btn btn-primary btn-sm">Speichern</button>
@@ -212,8 +237,12 @@ ob_start(); ?>
     <?php if ($is_doubles): ?>
     <!-- ── Doppel-Verwaltung ── -->
     <?php if ($assigned_doubles): ?>
+    <div class="mb-2">
+      <input type="search" class="form-control form-control-sm table-filter" style="max-width:220px"
+             placeholder="Filtern…" data-target="tbl-comp-doubles" aria-label="Doppel filtern">
+    </div>
     <div class="table-responsive">
-      <table class="table table-sm table-hover align-middle mb-0" data-sortable>
+      <table class="table table-sm table-hover align-middle mb-0" data-sortable id="tbl-comp-doubles">
         <thead class="table-light">
           <tr>
             <th>Doppel</th><th>Spieler 1</th><th>Spieler 2</th><th class="text-center">Spielstärke</th><th>Angemeldet</th>
@@ -353,6 +382,91 @@ ob_start(); ?>
     <?php endif; ?>
     <?php endif; ?>
 
+    <?php elseif ($is_team): ?>
+    <!-- ── Team-Verwaltung ── -->
+    <?php if ($assigned_teams): ?>
+    <div class="mb-2">
+      <input type="search" class="form-control form-control-sm table-filter" style="max-width:220px"
+             placeholder="Filtern…" data-target="tbl-comp-teams" aria-label="Teams filtern">
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle mb-0" data-sortable id="tbl-comp-teams">
+        <thead class="table-light">
+          <tr>
+            <th>Teamname</th><th>Mitglieder</th><th class="text-center">Spielstärke</th><th>Angemeldet</th>
+            <?php if ($c['phase'] === 'setup' && can_edit()): ?><th class="no-sort"></th><?php endif; ?>
+          </tr>
+        </thead>
+        <tbody>
+        <?php foreach ($assigned_teams as $team): ?>
+        <tr>
+          <td class="small fw-semibold"><?= e($team['name']) ?></td>
+          <td class="small text-muted">
+            <?php if ($team['members']): ?>
+              <?= e(implode(', ', array_column($team['members'], 'fullname'))) ?>
+            <?php else: ?><span class="text-muted">—</span><?php endif; ?>
+          </td>
+          <td class="text-center" data-sort="<?= (float)$team['skill'] ?>">
+            <?php if (can_edit()): ?>
+            <form method="post" action="<?= url('competition/'.$c['id'].'/team/'.$team['id'].'/skill') ?>"
+                  class="d-inline-flex align-items-center gap-1">
+              <?= csrf_field() ?>
+              <input type="number" name="skill" value="<?= (int)$team['skill'] ?>"
+                     step="1" min="0" class="form-control form-control-sm text-center" style="width:5rem">
+              <button type="submit" class="btn btn-outline-secondary btn-sm py-0 px-1" title="Speichern">
+                <i class="bi bi-check-lg"></i>
+              </button>
+            </form>
+            <?php else: ?>
+            <?php if ($team['skill']): ?><span class="badge bg-secondary"><?= (int)$team['skill'] ?></span><?php endif; ?>
+            <?php endif; ?>
+          </td>
+          <td class="small text-muted" data-sort="<?= e($team['reg_date'] ?? '') ?>">
+            <?= $team['reg_date'] ? date('d.m.Y', strtotime($team['reg_date'])) : '—' ?>
+          </td>
+          <?php if ($c['phase'] === 'setup' && can_edit()): ?>
+          <td>
+            <form method="post" action="<?= url('competition/'.$c['id'].'/team/'.$team['id'].'/remove') ?>">
+              <?= csrf_field() ?>
+              <button class="btn btn-outline-danger btn-sm py-0 px-1"><i class="bi bi-x"></i></button>
+            </form>
+          </td>
+          <?php endif; ?>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+    <?php else: ?>
+    <p class="text-muted small">Noch keine Teams eingetragen.</p>
+    <?php endif; ?>
+
+    <?php if ($c['phase'] === 'setup' && can_edit()): ?>
+    <?php if ($unassigned_teams): ?>
+    <div class="mt-3 pt-3 border-top">
+      <form method="post" action="<?= url('competition/'.$c['id'].'/team/add') ?>">
+        <?= csrf_field() ?>
+        <select name="team_ids[]" class="form-select form-select-sm mb-2" multiple size="4">
+          <?php foreach ($unassigned_teams as $team): ?>
+          <option value="<?= $team['id'] ?>">
+            <?= e($team['name']) ?>
+            <?php if ($team['skill']): ?>· <?= (int)$team['skill'] ?><?php endif; ?>
+          </option>
+          <?php endforeach; ?>
+        </select>
+        <button class="btn btn-sm btn-primary w-100"><i class="bi bi-plus me-1"></i>Teams hinzufügen</button>
+      </form>
+    </div>
+    <?php elseif (!$unassigned_teams && $t): ?>
+    <div class="mt-3 pt-3 border-top">
+      <p class="text-muted small mb-1">Alle vorhandenen Teams sind bereits eingetragen.</p>
+      <a href="<?= url('players#tab-teams') ?>" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-plus-circle me-1"></i>Teams verwalten
+      </a>
+    </div>
+    <?php endif; ?>
+    <?php endif; ?>
+
     <?php else: ?>
     <!-- ── Spieler-Verwaltung (Einzelbewerb) ── -->
     <?php if ($assigned): ?>
@@ -365,8 +479,12 @@ ob_start(); ?>
       </a>
     </div>
     <?php endif; ?>
+    <div class="mb-2">
+      <input type="search" class="form-control form-control-sm table-filter" style="max-width:220px"
+             placeholder="Filtern…" data-target="tbl-comp-players" aria-label="Spieler filtern">
+    </div>
     <div class="table-responsive">
-      <table class="table table-sm table-hover align-middle mb-0" data-sortable>
+      <table class="table table-sm table-hover align-middle mb-0" data-sortable id="tbl-comp-players">
         <thead class="table-light">
           <tr>
             <th>Name</th><th>Verein</th><th>Angemeldet</th><th class="text-center">Spielstärke</th>
@@ -457,7 +575,7 @@ ob_start(); ?>
   <!-- Tab: Bewerb (active, last in DOM) -->
   <div class="tab-pane fade show active p-3" id="tab-competition" role="tabpanel">
   <?php if (can_edit() && $c['phase'] === 'setup'): ?>
-  <?php $draw_count = $is_doubles ? count($assigned_doubles) : count($assigned); ?>
+  <?php $draw_count = $is_team ? count($assigned_teams) : ($is_doubles ? count($assigned_doubles) : count($assigned)); ?>
   <?php if (!in_array($c['mode'], ['ko_only','double_ko']) && $draw_count >= 3): ?>
   <div class="mb-3">
     <form method="post" action="<?= url('competition/'.$c['id'].'/draw/groups') ?>">
@@ -551,7 +669,7 @@ ob_start(); ?>
                 <td>
                   <?= e($pl['name']) ?>
                   <small class="text-muted"><?= e($pl['club']) ?></small>
-                  <?php if (($t['show_skill'] ?? 0) && $pl['skill']):
+                  <?php if (($c['show_skill'] ?? 0) && $pl['skill']):
                     $sv = ($t['sport'] ?? '') === 'tennis' ? number_format((float)$pl['skill'], 1) : (int)$pl['skill']; ?>
                   <span class="badge bg-secondary ms-1"><?= $sv ?></span>
                   <?php endif; ?>
@@ -569,15 +687,105 @@ ob_start(); ?>
           </table>
         </div>
         <!-- Match results -->
-        <?php if (can_edit()): ?>
         <div class="p-3 border-top">
           <h6 class="text-muted mb-2">Spielergebnisse</h6>
+          <?php
+          $use_duels = $is_team && (int)($c['team_size'] ?? 0) > 0;
+          if (can_edit() && !$use_duels): ?>
           <form id="grp-form-<?= $g['id'] ?>" method="post"
                 action="<?= url('competition/'.$c['id'].'/results/bulk') ?>">
             <?= csrf_field() ?>
           </form>
-          <?php foreach ($matches as $m): ?>
-          <?php if (!$m['player1_id'] || !$m['player2_id']) continue; ?>
+          <?php endif; ?>
+          <?php foreach ($matches as $m):
+            $has_p1 = $is_team ? !empty($m['team1_id']) : !empty($m['player1_id']);
+            $has_p2 = $is_team ? !empty($m['team2_id']) : !empty($m['player2_id']);
+            if (!$has_p1 || !$has_p2) continue;
+            if ($use_duels):
+              $t1id = (int)($m['team1_id'] ?? 0);
+              $t2id = (int)($m['team2_id'] ?? 0);
+              $t1members = $team_members[$t1id] ?? [];
+              $t2members = $team_members[$t2id] ?? [];
+              $duel_rows = $existing_duels[$m['id']] ?? [];
+              $team_size_val = (int)($c['team_size'] ?? 0);
+          ?>
+          <div class="mb-3 border rounded overflow-hidden">
+            <div class="d-flex align-items-center px-2 py-2 bg-light border-bottom">
+              <span class="text-truncate fw-semibold" style="min-width:0;flex:1;text-align:right"><?= e($m['p1name']) ?></span>
+              <span class="fw-bold fs-6 text-center flex-shrink-0" style="width:110px">
+                <?= $m['played'] ? (int)$m['score1'].':'.(int)$m['score2'] : '—:—' ?>
+              </span>
+              <span class="text-truncate fw-semibold" style="min-width:0;flex:1"><?= e($m['p2name']) ?></span>
+              <?php if ($m['played'] && can_edit()): ?>
+              <form method="post" action="<?= url('match/'.$m['id'].'/result/clear') ?>" class="flex-shrink-0 ms-1">
+                <?= csrf_field() ?>
+                <button class="btn btn-sm btn-outline-danger p-0" style="width:26px;height:26px" title="Ergebnis löschen">
+                  <i class="bi bi-x-circle"></i>
+                </button>
+              </form>
+              <?php endif; ?>
+            </div>
+            <?php if (can_edit()): ?>
+            <form class="duel-form" method="post" action="<?= url('match/'.$m['id'].'/duels') ?>">
+              <?= csrf_field() ?>
+              <table class="table table-sm align-middle mb-0" style="table-layout:fixed;font-size:.82rem">
+                <colgroup><col><col style="width:110px"><col></colgroup>
+                <tbody>
+                <?php for ($i = 0; $i < $team_size_val; $i++):
+                      $d = $duel_rows[$i] ?? []; ?>
+                <tr>
+                  <td class="text-end py-1">
+                    <select name="duels[<?= $i ?>][player1_id]" class="form-select form-select-sm duel-player-select" data-side="p1" style="direction:rtl;text-align:right;font-size:.82rem">
+                      <option value="">— auswählen —</option>
+                      <?php foreach ($t1members as $pl): ?>
+                      <option value="<?= $pl['id'] ?>"<?= (($d['player1_id'] ?? null) == $pl['id']) ? ' selected' : '' ?>><?= e($pl['fullname']) ?></option>
+                      <?php endforeach; ?>
+                    </select>
+                  </td>
+                  <td class="text-center py-1">
+                    <div class="d-flex align-items-center justify-content-center gap-1">
+                      <input type="number" name="duels[<?= $i ?>][score1]" min="0"
+                             class="form-control form-control-sm text-center duel-score" style="width:48px;font-size:.82rem"
+                             value="<?= (isset($d['score1']) && $d['played']) ? $d['score1'] : '' ?>">
+                      <span class="text-muted">:</span>
+                      <input type="number" name="duels[<?= $i ?>][score2]" min="0"
+                             class="form-control form-control-sm text-center duel-score" style="width:48px;font-size:.82rem"
+                             value="<?= (isset($d['score2']) && $d['played']) ? $d['score2'] : '' ?>">
+                    </div>
+                  </td>
+                  <td class="py-1">
+                    <select name="duels[<?= $i ?>][player2_id]" class="form-select form-select-sm duel-player-select" data-side="p2" style="font-size:.82rem">
+                      <option value="">— auswählen —</option>
+                      <?php foreach ($t2members as $pl): ?>
+                      <option value="<?= $pl['id'] ?>"<?= (($d['player2_id'] ?? null) == $pl['id']) ? ' selected' : '' ?>><?= e($pl['fullname']) ?></option>
+                      <?php endforeach; ?>
+                    </select>
+                  </td>
+                </tr>
+                <?php endfor; ?>
+                </tbody>
+              </table>
+              <div class="px-2 py-1 text-end border-top">
+                <button type="submit" class="btn btn-primary btn-sm">Speichern</button>
+              </div>
+            </form>
+            <?php elseif (!empty($duel_rows)): ?>
+            <table class="table table-sm align-middle mb-0" style="table-layout:fixed">
+              <colgroup><col><col style="width:80px"><col></colgroup>
+              <tbody>
+                <?php foreach ($duel_rows as $d): ?>
+                <tr>
+                  <td class="small text-end"><?= e($d['player1_name'] ?? '—') ?></td>
+                  <td class="text-center small fw-semibold"><?= $d['played'] ? $d['score1'].':'.$d['score2'] : '—:—' ?></td>
+                  <td class="small"><?= e($d['player2_name'] ?? '—') ?></td>
+                </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+            <?php endif; ?>
+          </div>
+          <?php else: ?>
+          <?php if (can_edit()): ?>
           <div class="mb-2" style="display:grid;grid-template-columns:1fr 56px 1.2rem 56px 1fr 30px;align-items:center;column-gap:4px">
             <span class="text-end small text-truncate"><?= e($m['p1name']) ?></span>
             <input type="number" name="matches[<?= $m['id'] ?>][score1]" min="0"
@@ -601,13 +809,21 @@ ob_start(); ?>
             <div></div>
             <?php endif; ?>
           </div>
-          <?php endforeach; ?>
+          <?php elseif ($m['played']): ?>
+          <div class="mb-1 d-flex align-items-center gap-2 small">
+            <span class="text-end text-truncate" style="min-width:0;flex:1"><?= e($m['p1name']) ?></span>
+            <span class="badge bg-secondary"><?= $m['score1'] ?>:<?= $m['score2'] ?></span>
+            <span class="text-truncate" style="min-width:0;flex:1"><?= e($m['p2name']) ?></span>
+          </div>
+          <?php endif; ?>
+          <?php endif; endforeach; ?>
+          <?php if (can_edit() && !$use_duels): ?>
           <button form="grp-form-<?= $g['id'] ?>" type="submit"
                   class="btn btn-primary btn-sm mt-2 w-100">
             <i class="bi bi-save me-1"></i>Alle speichern
           </button>
+          <?php endif; ?>
         </div>
-        <?php endif; ?>
         </div><!-- /.grp-normal-view -->
         <?php if (can_edit() && ($group_no_results ?? false)): ?>
         <div class="grp-edit-panel p-2" data-gid="<?= $g['id'] ?>"
@@ -667,6 +883,7 @@ ob_start(); ?>
       $slot_h = 115;
       $bracket_h = $first_count * $slot_h;
       $bracket_w = count($ko_rounds) * 270;
+      $ko_use_duels = $is_team && (int)($c['team_size'] ?? 0) > 0;
     ?>
 
     <?php if (can_edit()): ?>
@@ -692,7 +909,7 @@ ob_start(); ?>
         <?php foreach ($ko_rounds as $ri => $round): ?>
         <div class="ko-round" style="display:flex;flex-direction:column;justify-content:space-around;width:270px;flex-shrink:0;height:100%;padding:0 8px">
           <?php foreach ($round['matches'] as $m): $ko_match_num++; ?>
-          <div class="ko-match" style="border:1px solid #dee2e6;border-radius:6px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.07);overflow:hidden">
+          <div class="ko-match" style="border:1px solid #dee2e6;border-radius:6px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.07);overflow:<?= $ko_use_duels ? 'visible' : 'hidden' ?>">
             <div style="font-size:.65rem;color:#9e9e9e;padding:1px 6px;border-bottom:1px solid #f5f5f5;background:#fafafa">Spiel <?= $ko_match_num ?></div>
             <!-- Spieler 1 -->
             <?php $isFirstRound = ($ri === 0); ?>
@@ -711,7 +928,7 @@ ob_start(); ?>
                     <?php endif; ?>>
                 <?= $m['player1_id'] ? e($m['p1name']) : '<span class="text-muted fst-italic">—</span>' ?>
               </span>
-              <?php if (can_edit() && $m['player1_id'] && $m['player2_id']): ?>
+              <?php if (!$ko_use_duels && can_edit() && $m['player1_id'] && $m['player2_id']): ?>
               <input type="number" name="matches[<?= $m['id'] ?>][score1]" min="0"
                      form="ko-form"
                      class="form-control form-control-sm text-center ms-auto" style="width:40px;height:24px;padding:0 2px;font-size:.8rem;flex-shrink:0"
@@ -736,7 +953,7 @@ ob_start(); ?>
                     <?php endif; ?>>
                 <?= $m['player2_id'] ? e($m['p2name']) : '<span class="text-muted fst-italic">—</span>' ?>
               </span>
-              <?php if (can_edit() && $m['player1_id'] && $m['player2_id']): ?>
+              <?php if (!$ko_use_duels && can_edit() && $m['player1_id'] && $m['player2_id']): ?>
               <input type="number" name="matches[<?= $m['id'] ?>][score2]" min="0"
                      form="ko-form"
                      class="form-control form-control-sm text-center ms-auto" style="width:40px;height:24px;padding:0 2px;font-size:.8rem;flex-shrink:0"
@@ -745,7 +962,87 @@ ob_start(); ?>
               <span class="fw-bold small ms-auto" style="flex-shrink:0"><?= $m['score2'] ?></span>
               <?php endif; ?>
             </div>
-            <?php if (can_edit() && $m['played'] && $m['player1_id'] && $m['player2_id']): ?>
+            <?php if ($ko_use_duels && $m['player1_id'] && $m['player2_id']): ?>
+            <?php
+              $ko_t1members = $team_members[(int)($m['team1_id'] ?? 0)] ?? [];
+              $ko_t2members = $team_members[(int)($m['team2_id'] ?? 0)] ?? [];
+              $ko_duel_rows = $existing_duels[$m['id']] ?? [];
+              $ko_ts = (int)($c['team_size'] ?? 0);
+            ?>
+            <div style="border-top:1px solid #f0f0f0;padding:3px 6px">
+              <details>
+                <summary style="font-size:.72rem;cursor:pointer;color:#0d6efd;user-select:none;list-style:none;padding:2px 0">
+                  &#9656; <?= $m['played'] ? $m['score1'].':'.$m['score2'].' (Duelle)' : 'Duelle' ?>
+                </summary>
+                <?php if (can_edit()): ?>
+                <form class="duel-form" method="post" action="<?= url('match/'.$m['id'].'/duels') ?>" style="margin-top:4px">
+                  <?= csrf_field() ?>
+                  <table class="table table-sm align-middle mb-1" style="font-size:.72rem;table-layout:fixed">
+                    <colgroup><col><col style="width:76px"><col></colgroup>
+                    <tbody>
+                    <?php for ($i = 0; $i < $ko_ts; $i++):
+                          $d = $ko_duel_rows[$i] ?? []; ?>
+                    <tr>
+                      <td>
+                        <select name="duels[<?= $i ?>][player1_id]" class="form-select form-select-sm duel-player-select" data-side="p1" style="font-size:.7rem">
+                          <option value="">—</option>
+                          <?php foreach ($ko_t1members as $pl): ?>
+                          <option value="<?= $pl['id'] ?>"<?= (($d['player1_id'] ?? null) == $pl['id']) ? ' selected' : '' ?>><?= e($pl['fullname']) ?></option>
+                          <?php endforeach; ?>
+                        </select>
+                      </td>
+                      <td>
+                        <div class="d-flex align-items-center justify-content-center gap-1">
+                          <input type="number" name="duels[<?= $i ?>][score1]" min="0"
+                                 class="form-control form-control-sm text-center duel-score" style="width:32px;height:22px;font-size:.7rem;padding:0 2px"
+                                 value="<?= (isset($d['score1']) && $d['played']) ? $d['score1'] : '' ?>">
+                          <span style="font-size:.7rem">:</span>
+                          <input type="number" name="duels[<?= $i ?>][score2]" min="0"
+                                 class="form-control form-control-sm text-center duel-score" style="width:32px;height:22px;font-size:.7rem;padding:0 2px"
+                                 value="<?= (isset($d['score2']) && $d['played']) ? $d['score2'] : '' ?>">
+                        </div>
+                      </td>
+                      <td>
+                        <select name="duels[<?= $i ?>][player2_id]" class="form-select form-select-sm duel-player-select" data-side="p2" style="font-size:.7rem">
+                          <option value="">—</option>
+                          <?php foreach ($ko_t2members as $pl): ?>
+                          <option value="<?= $pl['id'] ?>"<?= (($d['player2_id'] ?? null) == $pl['id']) ? ' selected' : '' ?>><?= e($pl['fullname']) ?></option>
+                          <?php endforeach; ?>
+                        </select>
+                      </td>
+                    </tr>
+                    <?php endfor; ?>
+                    </tbody>
+                  </table>
+                  <div class="text-end mb-1">
+                    <button type="submit" class="btn btn-primary btn-sm py-0 px-2" style="font-size:.72rem">Speichern</button>
+                  </div>
+                </form>
+                <?php if ($m['played']): ?>
+                <form method="post" action="<?= url('match/'.$m['id'].'/result/clear') ?>" style="display:inline">
+                  <?= csrf_field() ?>
+                  <button class="btn btn-link text-danger p-0" style="font-size:.7rem;line-height:1.4" title="Ergebnis löschen">
+                    <i class="bi bi-x-circle"></i>
+                  </button>
+                </form>
+                <?php endif; ?>
+                <?php elseif (!empty($ko_duel_rows)): ?>
+                <table class="table table-sm align-middle mb-0 mt-1" style="font-size:.72rem;table-layout:fixed">
+                  <colgroup><col><col style="width:60px"><col></colgroup>
+                  <tbody>
+                    <?php foreach ($ko_duel_rows as $d): ?>
+                    <tr>
+                      <td class="py-0 text-end"><?= e($d['player1_name'] ?? '—') ?></td>
+                      <td class="text-center py-0 fw-semibold"><?= $d['played'] ? $d['score1'].':'.$d['score2'] : '—:—' ?></td>
+                      <td class="py-0"><?= e($d['player2_name'] ?? '—') ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                  </tbody>
+                </table>
+                <?php endif; ?>
+              </details>
+            </div>
+            <?php elseif (can_edit() && $m['played'] && $m['player1_id'] && $m['player2_id']): ?>
             <div style="border-top:1px solid #f0f0f0;padding:0 4px 1px;text-align:right">
               <form method="post" action="<?= url('match/'.$m['id'].'/result/clear') ?>" style="display:inline">
                 <?= csrf_field() ?>
@@ -1271,6 +1568,49 @@ function drawAllBrackets() {
 }
 document.addEventListener('DOMContentLoaded', drawAllBrackets);
 window.addEventListener('resize', drawAllBrackets);
+
+// ── Bewerbstyp → team_size-Feld ein-/ausblenden ──────────────────
+(function() {
+  var sel = document.querySelector('select[name="comp_type"]');
+  var fld = document.getElementById('field-team-size');
+  if (!sel || !fld) return;
+  sel.addEventListener('change', function() {
+    fld.style.display = this.value === 'team' ? '' : 'none';
+  });
+})();
+
+// ── Duel inline: Live-Gesamtergebnis ─────────────────────────────
+document.addEventListener('input', function(e) {
+  if (!e.target.classList.contains('duel-score')) return;
+  var form = e.target.closest('.duel-form');
+  if (!form) return;
+  var s1 = 0, s2 = 0;
+  form.querySelectorAll('tbody tr').forEach(function(row) {
+    var inp = row.querySelectorAll('.duel-score');
+    if (inp.length < 2) return;
+    var v1 = parseInt(inp[0].value), v2 = parseInt(inp[1].value);
+    if (!isNaN(v1) && !isNaN(v2)) { if (v1 > v2) s1++; else if (v2 > v1) s2++; }
+  });
+  var t1 = form.querySelector('.duel-total-1'), t2 = form.querySelector('.duel-total-2');
+  if (t1) t1.textContent = s1;
+  if (t2) t2.textContent = s2;
+});
+
+// ── Duel inline: Duplikat-Spieler verhindern ─────────────────────
+document.addEventListener('change', function(e) {
+  if (!e.target.classList.contains('duel-player-select')) return;
+  var form = e.target.closest('.duel-form');
+  if (!form) return;
+  var side = e.target.dataset.side;
+  var selects = Array.from(form.querySelectorAll('select.duel-player-select[data-side="' + side + '"]'));
+  var used = new Set(selects.map(function(s) { return s.value; }).filter(Boolean));
+  selects.forEach(function(sel) {
+    sel.querySelectorAll('option').forEach(function(opt) {
+      if (!opt.value) return;
+      opt.disabled = used.has(opt.value) && sel.value !== opt.value;
+    });
+  });
+});
 </script>
 JS;
 $content = ob_get_clean();

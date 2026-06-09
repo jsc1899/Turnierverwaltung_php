@@ -92,8 +92,81 @@ function clear_result(array $p): void {
     $m   = db_fetch("SELECT * FROM `match` WHERE id=?", [$mid]);
     if (!$m) { redirect(''); return; }
     db_execute("UPDATE `match` SET score1=NULL, score2=NULL, played=0 WHERE id=?", [$mid]);
+    $comp = db_fetch("SELECT team_size FROM competition WHERE id=?", [(int)$m['competition_id']]);
+    if (!empty($comp['team_size'])) {
+        db_execute("DELETE FROM team_match_duel WHERE match_id=?", [$mid]);
+    }
     if ($m['group_id'] === null) {
         _propagate_result((int)$m['competition_id'], $m);
+    }
+    redirect('competition/' . $m['competition_id']);
+}
+
+function save_duels(array $p): void {
+    require_edit();
+    csrf_verify();
+    $mid = (int)$p['id'];
+    $m   = db_fetch(
+        "SELECT m.*, c.team_size, c.id as cid FROM `match` m
+         JOIN competition c ON c.id=m.competition_id WHERE m.id=?",
+        [$mid]
+    );
+    if (!$m || !(int)$m['team_size']) { redirect(''); return; }
+
+    $duels      = $_POST['duels'] ?? [];
+    $team_size  = (int)$m['team_size'];
+
+    $p1ids = []; $p2ids = [];
+    foreach ($duels as $d) {
+        if (!empty($d['player1_id'])) {
+            $id = (int)$d['player1_id'];
+            if (in_array($id, $p1ids)) {
+                flash('warning', 'Jeder Spieler darf nur einmal ausgewählt werden.');
+                redirect('competition/' . $m['cid']); return;
+            }
+            $p1ids[] = $id;
+        }
+        if (!empty($d['player2_id'])) {
+            $id = (int)$d['player2_id'];
+            if (in_array($id, $p2ids)) {
+                flash('warning', 'Jeder Spieler darf nur einmal ausgewählt werden.');
+                redirect('competition/' . $m['cid']); return;
+            }
+            $p2ids[] = $id;
+        }
+    }
+
+    db_execute("DELETE FROM team_match_duel WHERE match_id=?", [$mid]);
+
+    $s1 = 0; $s2 = 0; $played_count = 0;
+    foreach ($duels as $order => $d) {
+        $p1id  = !empty($d['player1_id']) ? (int)$d['player1_id'] : null;
+        $p2id  = !empty($d['player2_id']) ? (int)$d['player2_id'] : null;
+        $ds1   = ($d['score1'] ?? '') !== '' ? (int)$d['score1'] : null;
+        $ds2   = ($d['score2'] ?? '') !== '' ? (int)$d['score2'] : null;
+        $dplayed = ($ds1 !== null && $ds2 !== null) ? 1 : 0;
+        db_insert(
+            "INSERT INTO team_match_duel
+             (match_id, duel_order, player1_id, player2_id, score1, score2, played)
+             VALUES (?,?,?,?,?,?,?)",
+            [$mid, (int)$order, $p1id, $p2id, $ds1, $ds2, $dplayed]
+        );
+        if ($dplayed) {
+            $played_count++;
+            if ($ds1 > $ds2) $s1++;
+            elseif ($ds2 > $ds1) $s2++;
+        }
+    }
+
+    if ($played_count > 0) {
+        $all_played = ($played_count >= $team_size) ? 1 : 0;
+        db_execute(
+            "UPDATE `match` SET score1=?, score2=?, played=? WHERE id=?",
+            [$s1, $s2, $all_played, $mid]
+        );
+        if ($all_played) {
+            _propagate_result((int)$m['competition_id'], $m);
+        }
     }
     redirect('competition/' . $m['competition_id']);
 }

@@ -149,6 +149,17 @@
     });
   });
 })();
+(function() {
+  document.addEventListener('input', function(e) {
+    if (!e.target.classList.contains('table-filter')) return;
+    var q = e.target.value.toLowerCase().trim();
+    var table = document.getElementById(e.target.dataset.target);
+    if (!table) return;
+    table.querySelectorAll('tbody tr').forEach(function(row) {
+      row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  });
+})();
 </script>
 <?php if (!empty($extra_js)): ?>
 <?= $extra_js ?>

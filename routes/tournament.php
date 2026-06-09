@@ -48,7 +48,9 @@ function show(array $p): void {
     $comps = db_fetchall("SELECT * FROM competition WHERE tournament_id = ? ORDER BY id", [$p['id']]);
     $comp_info = [];
     foreach ($comps as $c) {
-        if (!empty($c['is_doubles'])) {
+        if (!empty($c['is_team'])) {
+            $cnt = db_fetch("SELECT COUNT(*) as n FROM competition_team WHERE competition_id=?", [$c['id']])['n'];
+        } elseif (!empty($c['is_doubles'])) {
             $cnt = db_fetch("SELECT COUNT(*) as n FROM competition_double WHERE competition_id=?", [$c['id']])['n'];
         } else {
             $cnt = db_fetch("SELECT COUNT(*) as n FROM competition_player WHERE competition_id=?", [$c['id']])['n'];

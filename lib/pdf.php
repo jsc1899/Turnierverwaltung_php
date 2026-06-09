@@ -144,16 +144,34 @@ function generate_aushang_pdf(int $tid): void {
 function generate_groups_pdf(int $cid): void {
     $c = db_fetch("SELECT * FROM competition WHERE id=?", [$cid]);
     if (!$c) { http_response_code(404); exit; }
-    $t    = db_fetch("SELECT name FROM tournament WHERE id=?", [$c['tournament_id']]);
-    $grps = db_fetchall("SELECT * FROM grp WHERE competition_id=? ORDER BY name", [$cid]);
+    $t         = db_fetch("SELECT name FROM tournament WHERE id=?", [$c['tournament_id']]);
+    $grps      = db_fetchall("SELECT * FROM grp WHERE competition_id=? ORDER BY name", [$cid]);
+    $is_team   = !empty($c['is_team']);
+    $team_size = (int)($c['team_size'] ?? 0);
 
-    $html  = pdf_css();
+    $html = pdf_css();
+    if ($is_team && $team_size > 0) {
+        $html .= '<style>
+            .mblock { border:0.5pt solid #d1d5db; margin-bottom:4mm; page-break-inside:avoid; }
+            .mblock-hdr { background:#eff6ff; padding:1mm 3mm; font-weight:bold; font-size:8pt;
+                          color:#1e40af; border-bottom:0.3pt solid #bfdbfe; }
+            .mtbl { width:100%; border-collapse:collapse; }
+            .mtbl td { border:0.3pt solid #e5e7eb; padding:1.2mm 3mm; }
+            .mnm-l { width:43%; text-align:right; font-weight:bold; font-size:9.5pt; background:#f8fafc; }
+            .mnm-r { width:43%; font-weight:bold; font-size:9.5pt; background:#f8fafc; }
+            .msc   { width:14%; text-align:center; font-size:10pt; background:#f8fafc; }
+            .wline { border-bottom:0.6pt solid #374151; min-height:5mm; display:block; }
+            .dlbl  { font-size:7.5pt; color:#6b7280; white-space:nowrap; }
+        </style>';
+    }
     $html .= '<h2 style="margin-top:0">' . e($c['name']) . ' — Gruppenstand</h2>';
     if ($t) $html .= '<div class="meta">' . e($t['name']) . '</div>';
 
     foreach ($grps as $g) {
         $html .= '<h3>' . e($g['name']) . '</h3>';
-        $st    = group_standings($g['id']);
+        $st = $is_team
+            ? team_standings($g['id'], $c['seeding_order'] ?? 'desc')
+            : group_standings($g['id'], $c['seeding_order'] ?? 'desc');
         $html .= '<table><tr><th>#</th><th>Spieler</th><th>Verein</th>'
                . '<th>Sp</th><th>S</th><th>U</th><th>N</th>'
                . '<th>Erg.</th><th>Diff</th><th>Pkt</th></tr>';
@@ -171,6 +189,58 @@ function generate_groups_pdf(int $cid): void {
                 . '</td><td><strong>' . $pl['points'] . '</strong></td></tr>';
         }
         $html .= '</table>';
+
+        if ($is_team && $team_size > 0) {
+            $gmatches = db_fetchall(
+                "SELECT m.*, t1.name as p1name, t2.name as p2name
+                 FROM `match` m
+                 JOIN `team` t1 ON t1.id = m.team1_id
+                 JOIN `team` t2 ON t2.id = m.team2_id
+                 WHERE m.group_id = ?
+                 ORDER BY m.match_order, m.id",
+                [$g['id']]
+            );
+            if ($gmatches) {
+                $html .= '<h4 style="font-size:9pt;color:#374151;margin:3mm 0 2mm">Spielpaarungen</h4>';
+                foreach ($gmatches as $im => $gm) {
+                    $sc = $gm['played']
+                        ? $gm['score1'] . ' : ' . $gm['score2']
+                        : '&nbsp;&nbsp;&nbsp;:&nbsp;&nbsp;&nbsp;';
+                    // Duel-Ergebnisse laden
+                    $duels = db_fetchall(
+                        "SELECT d.*,
+                         TRIM(CONCAT(COALESCE(p1.firstname,''), IF(COALESCE(p1.firstname,'')!='', ' ',''), p1.name)) as player1_name,
+                         TRIM(CONCAT(COALESCE(p2.firstname,''), IF(COALESCE(p2.firstname,'')!='', ' ',''), p2.name)) as player2_name
+                         FROM team_match_duel d
+                         LEFT JOIN player p1 ON p1.id = d.player1_id
+                         LEFT JOIN player p2 ON p2.id = d.player2_id
+                         WHERE d.match_id = ?
+                         ORDER BY d.duel_order",
+                        [$gm['id']]
+                    );
+                    $html .= '<div class="mblock">'
+                           . '<div class="mblock-hdr">Spiel ' . ($im + 1) . '</div>'
+                           . '<table class="mtbl">'
+                           . '<tr>'
+                           . '<td class="mnm-l">' . e($gm['p1name']) . '</td>'
+                           . '<td class="msc">' . $sc . '</td>'
+                           . '<td class="mnm-r">' . e($gm['p2name']) . '</td>'
+                           . '</tr>';
+                    for ($di = 0; $di < $team_size; $di++) {
+                        $d   = $duels[$di] ?? [];
+                        $n1  = !empty($d['player1_name']) ? e($d['player1_name']) : '&nbsp;';
+                        $n2  = !empty($d['player2_name']) ? e($d['player2_name']) : '&nbsp;';
+                        $dsc = !empty($d['played']) ? $d['score1'] . ' : ' . $d['score2'] : '&nbsp;:&nbsp;';
+                        $html .= '<tr>'
+                               . '<td style="text-align:right;padding:1mm 3mm;font-size:8.5pt">' . $n1 . '</td>'
+                               . '<td class="msc" style="font-size:9pt">' . $dsc . '</td>'
+                               . '<td style="padding:1mm 3mm;font-size:8.5pt">' . $n2 . '</td>'
+                               . '</tr>';
+                    }
+                    $html .= '</table></div>';
+                }
+            }
+        }
     }
 
     $pdf = mpdf();
@@ -192,17 +262,41 @@ function generate_ko_pdf(int $cid): void {
         return;
     }
 
-    $matches = db_fetchall(
-        "SELECT m.*,
-         TRIM(CONCAT(p1.name,IF(COALESCE(p1.firstname,'')!='',CONCAT(' ',p1.firstname),''))) as p1name,
-         TRIM(CONCAT(p2.name,IF(COALESCE(p2.firstname,'')!='',CONCAT(' ',p2.firstname),''))) as p2name
-         FROM `match` m
-         LEFT JOIN player p1 ON p1.id=m.player1_id
-         LEFT JOIN player p2 ON p2.id=m.player2_id
-         WHERE m.competition_id=? AND m.group_id IS NULL
-         ORDER BY m.ko_round DESC, m.ko_position",
-        [$cid]
-    );
+    $is_team    = !empty($c['is_team']);
+    $is_doubles = !$is_team && !empty($c['is_doubles']);
+    if ($is_team) {
+        $matches = db_fetchall(
+            "SELECT m.*, t1.name as p1name, t2.name as p2name
+             FROM `match` m
+             LEFT JOIN `team` t1 ON t1.id=m.team1_id
+             LEFT JOIN `team` t2 ON t2.id=m.team2_id
+             WHERE m.competition_id=? AND m.group_id IS NULL
+             ORDER BY m.ko_round DESC, m.ko_position",
+            [$cid]
+        );
+    } elseif ($is_doubles) {
+        $matches = db_fetchall(
+            "SELECT m.*, d1.name as p1name, d2.name as p2name
+             FROM `match` m
+             LEFT JOIN `double` d1 ON d1.id=m.double1_id
+             LEFT JOIN `double` d2 ON d2.id=m.double2_id
+             WHERE m.competition_id=? AND m.group_id IS NULL
+             ORDER BY m.ko_round DESC, m.ko_position",
+            [$cid]
+        );
+    } else {
+        $matches = db_fetchall(
+            "SELECT m.*,
+             TRIM(CONCAT(p1.name,IF(COALESCE(p1.firstname,'')!='',CONCAT(' ',p1.firstname),''))) as p1name,
+             TRIM(CONCAT(p2.name,IF(COALESCE(p2.firstname,'')!='',CONCAT(' ',p2.firstname),''))) as p2name
+             FROM `match` m
+             LEFT JOIN player p1 ON p1.id=m.player1_id
+             LEFT JOIN player p2 ON p2.id=m.player2_id
+             WHERE m.competition_id=? AND m.group_id IS NULL
+             ORDER BY m.ko_round DESC, m.ko_position",
+            [$cid]
+        );
+    }
     $round_names = [
         2=>'Finale', 4=>'Halbfinale', 8=>'Viertelfinale',
         16=>'Achtelfinale', 32=>'Runde der 32', 64=>'Runde der 64', 3=>'Platz 3',
@@ -255,17 +349,41 @@ function _generate_dko_bracket_pdf(array $c, ?array $t): void {
             : ($r === $lb_total - 1 ? 'LB Halbfinale' : 'LB Runde ' . $r);
     }
 
-    $matches = db_fetchall(
-        "SELECT m.*,
-         TRIM(CONCAT(p1.name,IF(COALESCE(p1.firstname,'')!='',CONCAT(' ',p1.firstname),''))) as p1name,
-         TRIM(CONCAT(p2.name,IF(COALESCE(p2.firstname,'')!='',CONCAT(' ',p2.firstname),''))) as p2name
-         FROM `match` m
-         LEFT JOIN player p1 ON p1.id=m.player1_id
-         LEFT JOIN player p2 ON p2.id=m.player2_id
-         WHERE m.competition_id=? AND m.group_id IS NULL
-         ORDER BY FIELD(m.bracket,'W','L','GF'), m.ko_round, m.ko_position",
-        [$cid]
-    );
+    $is_team    = !empty($c['is_team']);
+    $is_doubles = !$is_team && !empty($c['is_doubles']);
+    if ($is_team) {
+        $matches = db_fetchall(
+            "SELECT m.*, t1.name as p1name, t2.name as p2name
+             FROM `match` m
+             LEFT JOIN `team` t1 ON t1.id=m.team1_id
+             LEFT JOIN `team` t2 ON t2.id=m.team2_id
+             WHERE m.competition_id=? AND m.group_id IS NULL
+             ORDER BY FIELD(m.bracket,'W','L','GF'), m.ko_round, m.ko_position",
+            [$cid]
+        );
+    } elseif ($is_doubles) {
+        $matches = db_fetchall(
+            "SELECT m.*, d1.name as p1name, d2.name as p2name
+             FROM `match` m
+             LEFT JOIN `double` d1 ON d1.id=m.double1_id
+             LEFT JOIN `double` d2 ON d2.id=m.double2_id
+             WHERE m.competition_id=? AND m.group_id IS NULL
+             ORDER BY FIELD(m.bracket,'W','L','GF'), m.ko_round, m.ko_position",
+            [$cid]
+        );
+    } else {
+        $matches = db_fetchall(
+            "SELECT m.*,
+             TRIM(CONCAT(p1.name,IF(COALESCE(p1.firstname,'')!='',CONCAT(' ',p1.firstname),''))) as p1name,
+             TRIM(CONCAT(p2.name,IF(COALESCE(p2.firstname,'')!='',CONCAT(' ',p2.firstname),''))) as p2name
+             FROM `match` m
+             LEFT JOIN player p1 ON p1.id=m.player1_id
+             LEFT JOIN player p2 ON p2.id=m.player2_id
+             WHERE m.competition_id=? AND m.group_id IS NULL
+             ORDER BY FIELD(m.bracket,'W','L','GF'), m.ko_round, m.ko_position",
+            [$cid]
+        );
+    }
 
     $wb_rounds = []; $lb_rounds = []; $gf = null;
     foreach ($matches as $m) {
@@ -366,11 +484,27 @@ function generate_match_cards_pdf(int $cid): void {
         }
     }
 
-    $is_doubles = !empty($c['is_doubles']);
+    $is_team    = !empty($c['is_team']);
+    $is_doubles = !$is_team && !empty($c['is_doubles']);
     $order   = $is_dko
         ? "FIELD(m.bracket,'W','L','GF'), m.ko_round, m.ko_position"
         : "g.name, m.match_order, m.id";
-    if ($is_doubles) {
+    if ($is_team) {
+        $matches = db_fetchall(
+            "SELECT m.*,
+             t1.name as p1name, '' as p1club,
+             t2.name as p2name, '' as p2club,
+             g.name as group_name
+             FROM `match` m
+             LEFT JOIN `team` t1 ON t1.id=m.team1_id
+             LEFT JOIN `team` t2 ON t2.id=m.team2_id
+             LEFT JOIN grp g ON g.id=m.group_id
+             WHERE m.competition_id=? AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL
+               AND m.played=0
+             ORDER BY $order",
+            [$cid]
+        );
+    } elseif ($is_doubles) {
         $matches = db_fetchall(
             "SELECT m.*,
              d1.name as p1name,
@@ -414,10 +548,14 @@ function generate_match_cards_pdf(int $cid): void {
         );
     }
 
-    // 6 Karten pro A4-Seite: Ränder 5mm → Druckbereich 287mm → 6×46mm + 5×2mm = 286mm
+    $team_size = (int)($c['team_size'] ?? 0);
+    // Karten pro Seite: bei Teambewerb mit Duellen 3, sonst 6
+    $cards_per_page = ($is_team && $team_size > 0) ? 3 : 6;
+    $card_min_h     = ($is_team && $team_size > 0) ? (18 + $team_size * 8) . 'mm' : '46mm';
+
     $html = pdf_css() . '<style>
         .card { border: 0.8pt solid #d1d5db; border-radius: 2mm; padding: 3mm 5mm;
-                margin-bottom: 2mm; page-break-inside: avoid; min-height: 46mm; }
+                margin-bottom: 2mm; page-break-inside: avoid; min-height: ' . $card_min_h . '; }
         .card-hdr { background: #eff6ff; padding: 1mm 4mm; margin: -3mm -5mm 2mm;
                     border-radius: 2mm 2mm 0 0; font-weight: bold; font-size: 9pt; color: #1e40af; }
         .players { width: 100%; border-collapse: collapse; margin-bottom: 2mm; }
@@ -427,6 +565,19 @@ function generate_match_cards_pdf(int $cid): void {
         .sig-table { width: 100%; border-collapse: collapse; }
         .sig-write { height: 6mm; border-bottom: 0.6pt solid #374151; }
         .sig-label { font-size: 8pt; color: #4b5563; padding-top: 0.8mm; }
+        .dtbl  { width:100%; border-collapse:collapse; margin-bottom:2mm; }
+        .dtbl td { border:0.3pt solid #e5e7eb; }
+        .dnm-l { width:43%; text-align:right; padding:1.2mm 3mm; }
+        .dnm-r { width:43%; padding:1.2mm 3mm; }
+        .dsc   { width:14%; text-align:center; font-size:9pt; padding:1.2mm 2mm; color:#374151; }
+        .dhdr-l { width:43%; text-align:right; font-weight:bold; font-size:10pt;
+                  padding:1.5mm 3mm; background:#eff6ff; }
+        .dhdr-r { width:43%; font-weight:bold; font-size:10pt;
+                  padding:1.5mm 3mm; background:#eff6ff; }
+        .dhdr-sc { width:14%; text-align:center; font-size:11pt; padding:1.5mm 2mm;
+                   background:#eff6ff; letter-spacing:1mm; }
+        .wl  { display:block; border-bottom:0.6pt solid #374151; min-height:5.5mm; }
+        .dlbl { font-size:7.5pt; color:#6b7280; }
     </style>';
 
     if (!$matches) {
@@ -457,26 +608,47 @@ function generate_match_cards_pdf(int $cid): void {
         $html .= '<div class="card">';
         $html .= '<div class="card-hdr">' . e($c['name']) . ' &nbsp;·&nbsp; ' . $label . ' &nbsp;·&nbsp; Spiel ' . $game_nr . '</div>';
 
-        // Spieler + Ergebnis
-        $html .= '<table class="players">'
-            . '<tr><th style="width:44%">Spieler 1</th><th style="width:12%;text-align:center">Ergebnis</th><th style="width:44%">Spieler 2</th></tr>'
-            . '<tr>'
-            . '<td>' . e($m['p1name'] ?? '') . ($m['p1club'] ? '<br><span style="font-size:8pt;color:#6b7280">' . e($m['p1club']) . '</span>' : '') . '</td>'
-            . '<td style="text-align:center;font-size:14pt;letter-spacing:2mm">&nbsp;:&nbsp;</td>'
-            . '<td>' . e($m['p2name'] ?? '') . ($m['p2club'] ? '<br><span style="font-size:8pt;color:#6b7280">' . e($m['p2club']) . '</span>' : '') . '</td>'
-            . '</tr></table>';
+        if ($is_team && $team_size > 0) {
+            // Team-Bewerb: Teamname-Zeile + Duel-Eintragszeilen
+            $sc = $m['played'] ? $m['score1'] . ' : ' . $m['score2'] : '&nbsp;:&nbsp;';
+            $html .= '<table class="dtbl">'
+                   . '<tr>'
+                   . '<td class="dhdr-l">' . e($m['p1name'] ?? '') . '</td>'
+                   . '<td class="dhdr-sc">' . $sc . '</td>'
+                   . '<td class="dhdr-r">' . e($m['p2name'] ?? '') . '</td>'
+                   . '</tr>';
+            for ($di = 1; $di <= $team_size; $di++) {
+                $html .= '<tr>'
+                       . '<td class="dnm-l" style="height:8mm">&nbsp;</td>'
+                       . '<td class="dsc" style="height:8mm">__ : __</td>'
+                       . '<td class="dnm-r" style="height:8mm">&nbsp;</td>'
+                       . '</tr>';
+            }
+            $html .= '</table>';
+        } else {
+            // Einzel / Doppel: bisherige Darstellung
+            $html .= '<table class="players">'
+                . '<tr><th style="width:44%">Spieler 1</th><th style="width:12%;text-align:center">Ergebnis</th><th style="width:44%">Spieler 2</th></tr>'
+                . '<tr>'
+                . '<td>' . e($m['p1name'] ?? '') . ($m['p1club'] ? '<br><span style="font-size:8pt;color:#6b7280">' . e($m['p1club']) . '</span>' : '') . '</td>'
+                . '<td style="text-align:center;font-size:14pt;letter-spacing:2mm">&nbsp;:&nbsp;</td>'
+                . '<td>' . e($m['p2name'] ?? '') . ($m['p2club'] ? '<br><span style="font-size:8pt;color:#6b7280">' . e($m['p2club']) . '</span>' : '') . '</td>'
+                . '</tr></table>';
+        }
 
-        // Unterschriften: volle Breite, Linie darüber
+        // Unterschriften
+        $sig1 = $is_team ? e($m['p1name'] ?? 'Team 1') : 'Spieler 1';
+        $sig2 = $is_team ? e($m['p2name'] ?? 'Team 2') : 'Spieler 2';
         $html .= '<table class="sig-table">'
             . '<tr>'
-            . '<td style="width:50%;padding-right:6mm"><div class="sig-write"></div><div class="sig-label">Unterschrift Spieler 1</div></td>'
-            . '<td style="width:50%;padding-left:6mm"><div class="sig-write"></div><div class="sig-label">Unterschrift Spieler 2</div></td>'
+            . '<td style="width:50%;padding-right:6mm"><div class="sig-write"></div><div class="sig-label">Unterschrift ' . $sig1 . '</div></td>'
+            . '<td style="width:50%;padding-left:6mm"><div class="sig-write"></div><div class="sig-label">Unterschrift ' . $sig2 . '</div></td>'
             . '</tr></table>';
 
         $html .= '</div>';
 
-        // Seitenumbruch nach jeder 6. Karte (nicht nach der letzten)
-        if (($i + 1) % 6 === 0 && isset($matches[$i + 1])) {
+        // Seitenumbruch nach jeder N-ten Karte (nicht nach der letzten)
+        if (($i + 1) % $cards_per_page === 0 && isset($matches[$i + 1])) {
             $html .= '<div style="page-break-after:always"></div>';
         }
     }

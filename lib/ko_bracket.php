@@ -48,8 +48,12 @@ function seeded_match_order(int $num_matches): array {
 
 function advance_ko_winner(array $match): void {
     if ($match['score1'] === $match['score2']) return;
-    $is_doubles = !empty($match['double1_id']) || !empty($match['double2_id']);
-    if ($is_doubles) {
+    $is_team    = !empty($match['team1_id'])   || !empty($match['team2_id']);
+    $is_doubles = !$is_team && (!empty($match['double1_id']) || !empty($match['double2_id']));
+    if ($is_team) {
+        $winner_id = $match['score1'] > $match['score2'] ? $match['team1_id'] : $match['team2_id'];
+        $p1col = 'team1_id'; $p2col = 'team2_id';
+    } elseif ($is_doubles) {
         $winner_id = $match['score1'] > $match['score2'] ? $match['double1_id'] : $match['double2_id'];
         $p1col = 'double1_id'; $p2col = 'double2_id';
     } else {
@@ -72,14 +76,14 @@ function advance_ko_winner(array $match): void {
 function recompute_ko_from(int $cid, int $from_ko_round): void {
     db_execute(
         "UPDATE `match` SET player1_id=NULL, player2_id=NULL, double1_id=NULL, double2_id=NULL,
-         score1=NULL, score2=NULL, played=0
+         team1_id=NULL, team2_id=NULL, score1=NULL, score2=NULL, played=0
          WHERE competition_id=? AND group_id IS NULL AND ko_round < ? AND ko_round != 3",
         [$cid, $from_ko_round]
     );
     if ($from_ko_round >= 4) {
         db_execute(
             "UPDATE `match` SET player1_id=NULL, player2_id=NULL, double1_id=NULL, double2_id=NULL,
-             score1=NULL, score2=NULL, played=0
+             team1_id=NULL, team2_id=NULL, score1=NULL, score2=NULL, played=0
              WHERE competition_id=? AND ko_round=3",
             [$cid]
         );
@@ -95,8 +99,12 @@ function recompute_ko_from(int $cid, int $from_ko_round): void {
             if ($r === 4) {
                 $comp = db_fetch("SELECT third_place FROM competition WHERE id=?", [$cid]);
                 if ($comp && $comp['third_place']) {
-                    $is_doubles = !empty($m['double1_id']) || !empty($m['double2_id']);
-                    if ($is_doubles) {
+                    $is_team    = !empty($m['team1_id']) || !empty($m['team2_id']);
+                    $is_doubles = !$is_team && (!empty($m['double1_id']) || !empty($m['double2_id']));
+                    if ($is_team) {
+                        $loser_id = $m['score2'] > $m['score1'] ? $m['team1_id'] : $m['team2_id'];
+                        $p1col = 'team1_id'; $p2col = 'team2_id';
+                    } elseif ($is_doubles) {
                         $loser_id = $m['score2'] > $m['score1'] ? $m['double1_id'] : $m['double2_id'];
                         $p1col = 'double1_id'; $p2col = 'double2_id';
                     } else {
