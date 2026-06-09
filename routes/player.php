@@ -68,12 +68,12 @@ function create_double_global(array $p): void {
 
     if (!$p1 || !$p2) {
         flash('danger', 'Beide Spieler müssen ausgewählt werden.');
-        redirect('players#doppel');
+        redirect('players#tab-doppel');
         return;
     }
     if ($p1 === $p2) {
         flash('danger', 'Ein Spieler kann nicht mit sich selbst ein Doppel bilden.');
-        redirect('players#doppel');
+        redirect('players#tab-doppel');
         return;
     }
     $existing = db_fetch(
@@ -83,14 +83,14 @@ function create_double_global(array $p): void {
     );
     if ($existing) {
         flash('warning', 'Dieses Doppel existiert bereits.');
-        redirect('players#doppel');
+        redirect('players#tab-doppel');
         return;
     }
     $pl1 = db_fetch("SELECT name, firstname, skill FROM player WHERE id=?", [$p1]);
     $pl2 = db_fetch("SELECT name, firstname, skill FROM player WHERE id=?", [$p2]);
     if (!$pl1 || !$pl2) {
         flash('danger', 'Spieler nicht gefunden.');
-        redirect('players#doppel');
+        redirect('players#tab-doppel');
         return;
     }
     $n1   = trim(($pl1['firstname'] ? $pl1['firstname'] . ' ' : '') . $pl1['name']);
@@ -104,7 +104,7 @@ function create_double_global(array $p): void {
         [$p1, $p2, $name, $skill]
     );
     flash('success', 'Doppel „' . $name . '" erstellt.');
-    redirect('players#doppel');
+    redirect('players#tab-doppel');
 }
 
 function edit_double_global(array $p): void {
@@ -114,7 +114,7 @@ function edit_double_global(array $p): void {
     $name = trim(post('name'));
     if (!$name) {
         flash('danger', 'Name darf nicht leer sein.');
-        redirect('players#doppel');
+        redirect('players#tab-doppel');
         return;
     }
     $skill_raw = post('skill', '');
@@ -124,7 +124,7 @@ function edit_double_global(array $p): void {
         db_execute("UPDATE `double` SET name=? WHERE id=?", [$name, $did]);
     }
     flash('success', 'Doppel gespeichert.');
-    redirect('players#doppel');
+    redirect('players#tab-doppel');
 }
 
 function delete_double_global(array $p): void {
@@ -139,15 +139,15 @@ function delete_double_global(array $p): void {
     );
     if ($active) {
         flash('danger', 'Doppel kann nicht gelöscht werden: Bewerb läuft bereits.');
-        redirect('players#doppel');
+        redirect('players#tab-doppel');
         return;
     }
     $d = db_fetch("SELECT name FROM `double` WHERE id=?", [$did]);
-    if (!$d) { redirect('players#doppel'); return; }
+    if (!$d) { redirect('players#tab-doppel'); return; }
 
     db_execute("DELETE FROM `double` WHERE id=?", [$did]);
     flash('info', 'Doppel „' . $d['name'] . '" gelöscht.');
-    redirect('players#doppel');
+    redirect('players#tab-doppel');
 }
 
 function new_player(array $p): void {
@@ -162,7 +162,7 @@ function new_player(array $p): void {
 
     if (!$name || !$firstname) {
         flash('danger', 'Nachname und Vorname sind Pflichtfelder.');
-        redirect('players#spieler');
+        redirect('players#tab-spieler');
         return;
     }
     $pid = db_insert(
@@ -170,7 +170,7 @@ function new_player(array $p): void {
         [$name, $firstname, $club, $gender, $pass_nr, $email]
     );
     _save_player_skills((int)$pid);
-    redirect('players#spieler');
+    redirect('players#tab-spieler');
 }
 
 function edit(array $p): void {
@@ -186,7 +186,7 @@ function edit(array $p): void {
 
     if (!$name || !$firstname) {
         flash('danger', 'Nachname und Vorname sind Pflichtfelder.');
-        redirect('players#spieler');
+        redirect('players#tab-spieler');
         return;
     }
     db_execute(
@@ -207,14 +207,89 @@ function edit(array $p): void {
             db_execute("DELETE FROM player_skill WHERE player_id=? AND sport=?", [$pid, $sport_key]);
         }
     }
-    redirect('players#spieler');
+    redirect('players#tab-spieler');
 }
 
 function delete(array $p): void {
     require_edit();
     csrf_verify();
-    db_execute("DELETE FROM player WHERE id=?", [(int)$p['id']]);
-    redirect('players#spieler');
+    $pid = (int)$p['id'];
+
+    $active_comp = db_fetch(
+        "SELECT c.name FROM competition c
+         JOIN competition_player cp ON cp.competition_id=c.id
+         WHERE cp.player_id=? AND c.phase != 'setup'
+         LIMIT 1",
+        [$pid]
+    );
+    if ($active_comp) {
+        flash('danger', 'Spieler kann nicht gelöscht werden: läuft in Bewerb „' . $active_comp['name'] . '".');
+        redirect('players#tab-spieler');
+        return;
+    }
+
+    $in_double = db_fetch(
+        "SELECT d.name FROM `double` d WHERE d.player1_id=? OR d.player2_id=? LIMIT 1",
+        [$pid, $pid]
+    );
+    if ($in_double) {
+        flash('danger', 'Spieler kann nicht gelöscht werden: ist Teil von Doppel „' . $in_double['name'] . '".');
+        redirect('players#tab-spieler');
+        return;
+    }
+
+    db_execute("DELETE FROM player WHERE id=?", [$pid]);
+    redirect('players#tab-spieler');
+}
+
+function player_profile_json(array $p): void {
+    require_edit();
+    $pid = (int)$p['id'];
+    $player = db_fetch("SELECT * FROM player WHERE id=?", [$pid]);
+    if (!$player) {
+        http_response_code(404);
+        header('Content-Type: application/json');
+        echo '{"error":"not found"}';
+        exit;
+    }
+    $skills_rows = db_fetchall("SELECT sport, skill FROM player_skill WHERE player_id=?", [$pid]);
+    $skills = array_column($skills_rows, 'skill', 'sport');
+
+    $comps = db_fetchall(
+        "SELECT t.id as tid, t.name as tname, c.id as cid, c.name as cname, c.phase
+         FROM competition_player cp
+         JOIN competition c ON c.id=cp.competition_id
+         JOIN tournament t ON t.id=c.tournament_id
+         WHERE cp.player_id=?
+         ORDER BY t.name, c.name",
+        [$pid]
+    );
+
+    $doubles = db_fetchall(
+        "SELECT d.id, d.name,
+         TRIM(CONCAT(COALESCE(pp.firstname,''), IF(COALESCE(pp.firstname,'')!='', ' ',''), pp.name)) as partner_name
+         FROM `double` d
+         JOIN player pp ON pp.id = IF(d.player1_id=?, d.player2_id, d.player1_id)
+         WHERE d.player1_id=? OR d.player2_id=?
+         ORDER BY d.name",
+        [$pid, $pid, $pid]
+    );
+    foreach ($doubles as &$dbl) {
+        $dbl['competitions'] = db_fetchall(
+            "SELECT t.id as tid, t.name as tname, c.id as cid, c.name as cname, c.phase
+             FROM competition_double cd
+             JOIN competition c ON c.id=cd.competition_id
+             JOIN tournament t ON t.id=c.tournament_id
+             WHERE cd.double_id=?
+             ORDER BY t.name, c.name",
+            [$dbl['id']]
+        );
+    }
+    unset($dbl);
+
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['player' => $player, 'skills' => $skills, 'comps' => $comps, 'doubles' => $doubles]);
+    exit;
 }
 
 function import_template(array $p): void {

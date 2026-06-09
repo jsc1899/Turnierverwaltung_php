@@ -187,7 +187,7 @@ function settings(array $p): void {
          $p['id']]
     );
     flash('success', 'Einstellungen gespeichert.');
-    redirect('tournament/' . $p['id'] . '#einstellungen');
+    redirect('tournament/' . $p['id'] . '#tab-settings');
 }
 
 function delete(array $p): void {

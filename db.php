@@ -268,26 +268,4 @@ function init_db(): void {
     // Admin-Rolle sicherstellen
     db_execute("UPDATE user SET role = 'admin' WHERE email = ?", [ADMIN_EMAIL]);
 
-    // competition_double.skill neu berechnen (Tennis-Standard 10.0 wenn kein Eintrag)
-    try {
-        $pdo->exec("
-            UPDATE competition_double cd
-            JOIN `double` d ON d.id = cd.double_id
-            JOIN competition c ON c.id = cd.competition_id
-            JOIN tournament t ON t.id = c.tournament_id
-            SET cd.skill = (
-                COALESCE(
-                    (SELECT ps.skill FROM player_skill ps
-                     WHERE ps.player_id = d.player1_id AND ps.sport = t.sport LIMIT 1),
-                    IF(t.sport = 'tennis', 10.0, 0)
-                ) +
-                COALESCE(
-                    (SELECT ps.skill FROM player_skill ps
-                     WHERE ps.player_id = d.player2_id AND ps.sport = t.sport LIMIT 1),
-                    IF(t.sport = 'tennis', 10.0, 0)
-                )
-            )
-            WHERE t.sport != '' AND t.sport IS NOT NULL
-        ");
-    } catch (\PDOException $e) { /* competition_double existiert noch nicht */ }
 }

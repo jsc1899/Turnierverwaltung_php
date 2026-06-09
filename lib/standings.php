@@ -102,7 +102,8 @@ function double_standings(int $group_id, string $seeding_order = 'desc'): array 
            ' / ',
            COALESCE(p2.firstname,''), IF(COALESCE(p2.firstname,'') != '', ' ', ''), p2.name
          )) as name,
-         '' as club, COALESCE(cd.skill, 0) as skill
+         COALESCE(p1.club,'') as p1club, COALESCE(p2.club,'') as p2club,
+         COALESCE(cd.skill, 0) as skill
          FROM `double` d
          JOIN player p1 ON p1.id = d.player1_id
          JOIN player p2 ON p2.id = d.player2_id
@@ -114,6 +115,18 @@ function double_standings(int $group_id, string $seeding_order = 'desc'): array 
     $matches = db_fetchall(
         "SELECT * FROM `match` WHERE group_id = ? AND played = 1", [$group_id]
     );
+
+    foreach ($doubles as &$d) {
+        $c1 = $d['p1club']; $c2 = $d['p2club'];
+        if ($c1 === $c2) {
+            $d['club'] = $c1;
+        } elseif ($c1 !== '' && $c2 !== '') {
+            $d['club'] = $c1 . ' / ' . $c2;
+        } else {
+            $d['club'] = $c1 . $c2;
+        }
+    }
+    unset($d);
 
     $stats = [];
     foreach ($doubles as $d) {

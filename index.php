@@ -137,6 +137,7 @@ $routes = [
     ['GET|POST', '/player/new',                     'player', 'new_player'],
     ['GET|POST', '/player/{id}/edit',               'player', 'edit'],
     ['POST',     '/player/{id}/delete',             'player', 'delete'],
+    ['GET',      '/player/{id}/profile',            'player', 'player_profile_json'],
     ['POST',     '/players/double/new',             'player', 'create_double_global'],
     ['POST',     '/players/double/{did}/edit',      'player', 'edit_double_global'],
     ['POST',     '/players/double/{did}/delete',    'player', 'delete_double_global'],

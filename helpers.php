@@ -40,6 +40,13 @@ function url(string $path = ''): string {
 }
 
 function redirect(string $path): never {
+    // Pfad hat kein eigenes Fragment → aktiven Tab aus POST-Param wiederherstellen
+    if (!str_contains($path, '#')) {
+        $tab = $_POST['_tab'] ?? '';
+        if (preg_match('/^#tab-[\w-]+$/', $tab)) {
+            $path .= $tab;
+        }
+    }
     header('Location: ' . url($path));
     exit;
 }

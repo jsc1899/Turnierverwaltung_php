@@ -123,6 +123,17 @@ ob_start(); ?>
         <input type="text" name="name" class="form-control form-control-sm" style="min-width:180px"
                value="<?= e($c['name']) ?>" required>
       </div>
+      <div class="col-auto">
+        <label class="form-label">Modus</label>
+        <select name="mode" class="form-select form-select-sm"<?= $c['phase'] !== 'setup' ? ' disabled' : '' ?>>
+          <option value="groups_ko"<?= $c['mode'] === 'groups_ko' ? ' selected' : '' ?>>Gruppen + KO</option>
+          <option value="ko_only"<?= $c['mode'] === 'ko_only'   ? ' selected' : '' ?>>Nur KO</option>
+          <option value="double_ko"<?= $c['mode'] === 'double_ko' ? ' selected' : '' ?>>Doppel-KO</option>
+        </select>
+        <?php if ($c['phase'] !== 'setup'): ?>
+        <input type="hidden" name="mode" value="<?= e($c['mode']) ?>">
+        <?php endif; ?>
+      </div>
       <?php if (!in_array($c['mode'], ['ko_only', 'double_ko'])): ?>
       <?php if ($c['phase'] === 'setup'): ?>
       <div class="col-auto">
@@ -144,13 +155,6 @@ ob_start(); ?>
         </select>
       </div>
       <?php endif; ?>
-      <div class="col-auto" id="third_place_wrap"<?= (!in_array($c['mode'], ['ko_only','double_ko']) && (int)$c['advance_count'] === 0) ? ' style="display:none"' : '' ?>>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" name="third_place" id="third_place"
-                 <?= $c['third_place'] ? 'checked' : '' ?>>
-          <label class="form-check-label" for="third_place">Platz-3-Spiel</label>
-        </div>
-      </div>
       <?php if (in_array($c['mode'], ['ko_only', 'double_ko', 'groups_ko'])): ?>
       <div class="col-auto">
         <label class="form-label">Setzungsreihenfolge</label>
@@ -159,29 +163,32 @@ ob_start(); ?>
           <option value="asc"<?= ($c['seeding_order'] ?? 'desc') === 'asc'  ? ' selected' : '' ?>>Niedrigere Stärke = stärker (Tennis)</option>
         </select>
       </div>
-      <div class="col-auto">
+      <?php endif; ?>
+      <div class="col-auto d-flex flex-column gap-2 justify-content-end">
+        <div id="third_place_wrap"<?= (!in_array($c['mode'], ['ko_only','double_ko']) && (int)$c['advance_count'] === 0) ? ' style="display:none"' : '' ?>>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="third_place" id="third_place"
+                   <?= $c['third_place'] ? 'checked' : '' ?>>
+            <label class="form-check-label" for="third_place">Platz-3-Spiel</label>
+          </div>
+        </div>
+        <?php if (in_array($c['mode'], ['ko_only', 'double_ko', 'groups_ko'])): ?>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" name="show_seeding" id="show_seeding"
                  <?= ($c['show_seeding'] ?? 1) ? 'checked' : '' ?>>
           <label class="form-check-label" for="show_seeding">Setzungen anzeigen</label>
         </div>
-      </div>
-      <?php endif; ?>
-      <?php if ($c['phase'] === 'setup' && empty($is_doubles) && empty(count($assigned)) && empty(count($assigned_doubles))): ?>
-      <div class="col-auto">
+        <?php endif; ?>
+        <?php $can_change_doubles = $c['phase'] === 'setup' && count($assigned) === 0 && count($assigned_doubles) === 0; ?>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" name="is_doubles" id="is_doubles"
-                 <?= ($c['is_doubles'] ?? 0) ? 'checked' : '' ?>>
+                 <?= ($c['is_doubles'] ?? 0) ? 'checked' : '' ?>
+                 <?= !$can_change_doubles ? 'disabled' : '' ?>>
           <label class="form-check-label" for="is_doubles">Doppelbewerb</label>
         </div>
-      </div>
-      <?php elseif ($c['is_doubles'] ?? 0): ?>
-      <div class="col-auto">
-        <span class="badge bg-info text-dark fs-6"><i class="bi bi-people-fill me-1"></i>Doppelbewerb</span>
+        <?php if (!$can_change_doubles && ($c['is_doubles'] ?? 0)): ?>
         <input type="hidden" name="is_doubles" value="1">
-      </div>
-      <?php endif; ?>
-      <div class="col-auto">
+        <?php endif; ?>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" name="registrations_open" id="regs_open"
                  <?= $c['registrations_open'] ? 'checked' : '' ?>>
@@ -339,7 +346,7 @@ ob_start(); ?>
     <?php elseif (!$unassigned_doubles && $t): ?>
     <div class="mt-3 pt-3 border-top">
       <p class="text-muted small mb-1">Alle vorhandenen Doppel sind bereits eingetragen.</p>
-      <a href="<?= url('players#doppel') ?>" class="btn btn-sm btn-outline-secondary">
+      <a href="<?= url('players#tab-doppel') ?>" class="btn btn-sm btn-outline-secondary">
         <i class="bi bi-plus-circle me-1"></i>Doppel verwalten
       </a>
     </div>
@@ -1061,14 +1068,6 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
 <?php
 $extra_js = <<<'JS'
 <script>
-// Aktiven Tab aus URL-Hash wiederherstellen
-(function() {
-  var hash = window.location.hash;
-  var map = { '#spieler': 'tab-players-btn', '#einstellungen': 'tab-settings-btn', '#bewerb': 'tab-competition-btn' };
-  var btnId = map[hash];
-  if (btnId) { var btn = document.getElementById(btnId); if (btn) bootstrap.Tab.getOrCreateInstance(btn).show(); }
-})();
-
 // ── Group Drag-and-Drop ──────────────────────────────────────────
 var grpDragEl = null, grpEditActive = false;
 function toggleGrpEdit() {

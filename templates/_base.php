@@ -73,6 +73,39 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+// URL-Hash <-> Bootstrap-Tabs (alle Seiten)
+(function() {
+  // Bei jedem Form-Submit den aktiven Tab als _tab-Parameter mitschicken.
+  // redirect() in helpers.php liest ihn aus und hängt ihn als Fragment ans Redirect-Ziel.
+  document.addEventListener('submit', function(e) {
+    var hash = location.hash;
+    if (!hash || !hash.startsWith('#tab-')) return;
+    var form = e.target;
+    if (form.querySelector('input[name="_tab"]')) return;
+    var inp = document.createElement('input');
+    inp.type = 'hidden'; inp.name = '_tab'; inp.value = hash;
+    form.appendChild(inp);
+  });
+
+  // Beim Laden: Tab aus Hash aktivieren; bei Tab-Klick: Hash in URL schreiben.
+  document.addEventListener('DOMContentLoaded', function() {
+    var hash = location.hash;
+    if (hash) {
+      var btns = document.querySelectorAll('[data-bs-toggle="tab"]');
+      for (var i = 0; i < btns.length; i++) {
+        if (btns[i].getAttribute('data-bs-target') === hash && !btns[i].closest('.modal')) {
+          bootstrap.Tab.getOrCreateInstance(btns[i]).show();
+          break;
+        }
+      }
+    }
+    document.addEventListener('shown.bs.tab', function(e) {
+      if (e.target.closest('.modal')) return;
+      var t = e.target.getAttribute('data-bs-target');
+      if (t) history.replaceState(null, '', t);
+    });
+  });
+})();
 (function() {
   function cellVal(row, idx) {
     var c = row.cells[idx];

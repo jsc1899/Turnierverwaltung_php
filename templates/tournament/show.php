@@ -386,16 +386,6 @@ $nennung_badge = $pending_count + $change_count;
 <?php
 $extra_js = <<<'JS'
 <script>
-(function() {
-  var hash = window.location.hash;
-  var map = {
-    '#bewerbe':      'tab-competitions-btn',
-    '#nennungen':    'tab-registrations-btn',
-    '#einstellungen':'tab-settings-btn'
-  };
-  var btnId = map[hash];
-  if (btnId) { var btn = document.getElementById(btnId); if (btn) bootstrap.Tab.getOrCreateInstance(btn).show(); }
-})();
 function openImageModal(src) {
   document.getElementById('imageModalImg').src = src;
   new bootstrap.Modal(document.getElementById('imageModal')).show();

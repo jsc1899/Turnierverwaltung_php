@@ -366,23 +366,53 @@ function generate_match_cards_pdf(int $cid): void {
         }
     }
 
+    $is_doubles = !empty($c['is_doubles']);
     $order   = $is_dko
         ? "FIELD(m.bracket,'W','L','GF'), m.ko_round, m.ko_position"
         : "g.name, m.match_order, m.id";
-    $matches = db_fetchall(
-        "SELECT m.*,
-         TRIM(CONCAT(p1.name,IF(COALESCE(p1.firstname,'')!='',CONCAT(' ',p1.firstname),''))) as p1name, p1.club as p1club,
-         TRIM(CONCAT(p2.name,IF(COALESCE(p2.firstname,'')!='',CONCAT(' ',p2.firstname),''))) as p2name, p2.club as p2club,
-         g.name as group_name
-         FROM `match` m
-         LEFT JOIN player p1 ON p1.id=m.player1_id
-         LEFT JOIN player p2 ON p2.id=m.player2_id
-         LEFT JOIN grp g ON g.id=m.group_id
-         WHERE m.competition_id=? AND m.player1_id IS NOT NULL AND m.player2_id IS NOT NULL
-           AND m.played=0
-         ORDER BY $order",
-        [$cid]
-    );
+    if ($is_doubles) {
+        $matches = db_fetchall(
+            "SELECT m.*,
+             d1.name as p1name,
+             CASE WHEN COALESCE(dp1a.club,'')='' THEN COALESCE(dp1b.club,'')
+                  WHEN COALESCE(dp1b.club,'')='' THEN COALESCE(dp1a.club,'')
+                  WHEN dp1a.club=dp1b.club THEN dp1a.club
+                  ELSE CONCAT(dp1a.club,' / ',dp1b.club) END as p1club,
+             d2.name as p2name,
+             CASE WHEN COALESCE(dp2a.club,'')='' THEN COALESCE(dp2b.club,'')
+                  WHEN COALESCE(dp2b.club,'')='' THEN COALESCE(dp2a.club,'')
+                  WHEN dp2a.club=dp2b.club THEN dp2a.club
+                  ELSE CONCAT(dp2a.club,' / ',dp2b.club) END as p2club,
+             g.name as group_name
+             FROM `match` m
+             LEFT JOIN `double` d1 ON d1.id=m.double1_id
+             LEFT JOIN `double` d2 ON d2.id=m.double2_id
+             LEFT JOIN player dp1a ON dp1a.id=d1.player1_id
+             LEFT JOIN player dp1b ON dp1b.id=d1.player2_id
+             LEFT JOIN player dp2a ON dp2a.id=d2.player1_id
+             LEFT JOIN player dp2b ON dp2b.id=d2.player2_id
+             LEFT JOIN grp g ON g.id=m.group_id
+             WHERE m.competition_id=? AND m.double1_id IS NOT NULL AND m.double2_id IS NOT NULL
+               AND m.played=0
+             ORDER BY $order",
+            [$cid]
+        );
+    } else {
+        $matches = db_fetchall(
+            "SELECT m.*,
+             TRIM(CONCAT(p1.name,IF(COALESCE(p1.firstname,'')!='',CONCAT(' ',p1.firstname),''))) as p1name, p1.club as p1club,
+             TRIM(CONCAT(p2.name,IF(COALESCE(p2.firstname,'')!='',CONCAT(' ',p2.firstname),''))) as p2name, p2.club as p2club,
+             g.name as group_name
+             FROM `match` m
+             LEFT JOIN player p1 ON p1.id=m.player1_id
+             LEFT JOIN player p2 ON p2.id=m.player2_id
+             LEFT JOIN grp g ON g.id=m.group_id
+             WHERE m.competition_id=? AND m.player1_id IS NOT NULL AND m.player2_id IS NOT NULL
+               AND m.played=0
+             ORDER BY $order",
+            [$cid]
+        );
+    }
 
     // 6 Karten pro A4-Seite: Ränder 5mm → Druckbereich 287mm → 6×46mm + 5×2mm = 286mm
     $html = pdf_css() . '<style>

@@ -483,6 +483,15 @@ function settings(array $p): void {
     if (!$c) { redirect('competition/' . $cid); return; }
     if ($name) db_execute("UPDATE competition SET name=? WHERE id=?", [$name, $cid]);
 
+    // Modus nur in Setup-Phase änderbar
+    if ($c['phase'] === 'setup') {
+        $new_mode = post('mode', '');
+        if (in_array($new_mode, ['groups_ko', 'ko_only', 'double_ko'], true)) {
+            db_execute("UPDATE competition SET mode=? WHERE id=?", [$new_mode, $cid]);
+            $c['mode'] = $new_mode;
+        }
+    }
+
     // is_doubles nur ändern solange noch keine Teilnehmer eingetragen
     $has_participants = $c['is_doubles']
         ? (int)db_fetch("SELECT COUNT(*) as n FROM competition_double WHERE competition_id=?", [$cid])['n']
@@ -545,7 +554,7 @@ function add_player(array $p): void {
     if ($skipped > 0) {
         flash('warning', "Maximale Spieleranzahl ($max) erreicht — $skipped Spieler nicht hinzugefügt.");
     }
-    redirect('competition/' . $cid . '#spieler');
+    redirect('competition/' . $cid . '#tab-players');
 }
 
 function remove_player(array $p): void {
@@ -553,7 +562,7 @@ function remove_player(array $p): void {
     csrf_verify();
     db_execute("DELETE FROM competition_player WHERE competition_id=? AND player_id=?",
         [(int)$p['id'], (int)$p['pid']]);
-    redirect('competition/' . $p['id'] . '#spieler');
+    redirect('competition/' . $p['id'] . '#tab-players');
 }
 
 function add_double(array $p): void {
@@ -599,7 +608,7 @@ function add_double(array $p): void {
     if ($skipped > 0) {
         flash('warning', "Maximale Anzahl ($max) erreicht — $skipped Doppel nicht hinzugefügt.");
     }
-    redirect('competition/' . $cid . '#spieler');
+    redirect('competition/' . $cid . '#tab-players');
 }
 
 function pair_double_from_reg(array $p): void {
@@ -610,7 +619,7 @@ function pair_double_from_reg(array $p): void {
     $p2  = (int)post('player2_id');
     if (!$p1 || !$p2 || $p1 === $p2) {
         flash('danger', 'Zwei verschiedene Spieler auswählen.');
-        redirect('competition/' . $cid . '#spieler');
+        redirect('competition/' . $cid . '#tab-players');
         return;
     }
     // Konfliktprüfung
@@ -623,7 +632,7 @@ function pair_double_from_reg(array $p): void {
     );
     if ($conflict) {
         flash('warning', 'Mindestens ein Spieler nimmt bereits im Doppel „' . $conflict['name'] . '" teil.');
-        redirect('competition/' . $cid . '#spieler');
+        redirect('competition/' . $cid . '#tab-players');
         return;
     }
     // Bestehendes Doppel suchen oder neu anlegen
@@ -638,7 +647,7 @@ function pair_double_from_reg(array $p): void {
         $pl2 = db_fetch("SELECT name, firstname FROM player WHERE id=?", [$p2]);
         if (!$pl1 || !$pl2) {
             flash('danger', 'Spieler nicht gefunden.');
-            redirect('competition/' . $cid . '#spieler');
+            redirect('competition/' . $cid . '#tab-players');
             return;
         }
         $name = $pl1['name'] . ' / ' . $pl2['name'];
@@ -656,7 +665,7 @@ function pair_double_from_reg(array $p): void {
         [$cid, $did, $skill]
     );
     flash('success', 'Doppel gebildet und dem Bewerb hinzugefügt.');
-    redirect('competition/' . $cid . '#spieler');
+    redirect('competition/' . $cid . '#tab-players');
 }
 
 function remove_double(array $p): void {
@@ -664,7 +673,7 @@ function remove_double(array $p): void {
     csrf_verify();
     db_execute("DELETE FROM competition_double WHERE competition_id=? AND double_id=?",
         [(int)$p['id'], (int)$p['did']]);
-    redirect('competition/' . $p['id'] . '#spieler');
+    redirect('competition/' . $p['id'] . '#tab-players');
 }
 
 function update_player_skill(array $p): void {
@@ -677,7 +686,7 @@ function update_player_skill(array $p): void {
         "UPDATE competition_player SET skill=? WHERE competition_id=? AND player_id=?",
         [$skill, $cid, $pid]
     );
-    redirect('competition/' . $cid . '#spieler');
+    redirect('competition/' . $cid . '#tab-players');
 }
 
 function update_double_skill(array $p): void {
@@ -690,7 +699,7 @@ function update_double_skill(array $p): void {
         "UPDATE competition_double SET skill=? WHERE competition_id=? AND double_id=?",
         [$skill, $cid, $did]
     );
-    redirect('competition/' . $cid . '#spieler');
+    redirect('competition/' . $cid . '#tab-players');
 }
 
 function draw_groups(array $p): void {

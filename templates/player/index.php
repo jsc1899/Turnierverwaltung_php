@@ -57,7 +57,12 @@ ob_start(); ?>
         <tbody>
           <?php foreach ($players as $p): $ps = $player_skills[$p['id']] ?? []; ?>
           <tr>
-            <td class="fw-semibold"><?= e($p['name']) ?></td>
+            <td class="fw-semibold">
+              <button class="btn btn-link btn-sm p-0 text-start text-decoration-none text-dark fw-semibold"
+                      data-bs-toggle="modal" data-bs-target="#playerProfileModal"
+                      data-player-id="<?= $p['id'] ?>"
+                      title="Profil öffnen"><?= e($p['name']) ?></button>
+            </td>
             <td><?= e($p['firstname'] ?? '') ?></td>
             <td class="text-center">
               <?php if ($p['gender']): ?>
@@ -79,12 +84,14 @@ ob_start(); ?>
               </span>
               <?php endforeach; ?>
             </td>
-            <td class="text-end">
-              <?php if (can_edit()): ?>
+            <td class="text-end text-nowrap">
               <button class="btn btn-outline-secondary btn-sm"
-                      data-bs-toggle="modal" data-bs-target="#editModal<?= $p['id'] ?>">
+                      data-bs-toggle="modal" data-bs-target="#playerProfileModal"
+                      data-player-id="<?= $p['id'] ?>" data-open-tab="edit"
+                      title="Bearbeiten">
                 <i class="bi bi-pencil"></i>
               </button>
+              <?php if (can_edit()): ?>
               <form method="post" action="<?= url('player/' . $p['id'] . '/delete') ?>"
                     class="d-inline ms-1"
                     onsubmit="return confirm('Spieler <?= e($p['firstname'].' '.$p['name']) ?> wirklich löschen?')">
@@ -94,68 +101,6 @@ ob_start(); ?>
               <?php endif; ?>
             </td>
           </tr>
-          <?php if (can_edit()): ?>
-          <div class="modal fade" id="editModal<?= $p['id'] ?>" tabindex="-1">
-            <div class="modal-dialog modal-lg">
-              <div class="modal-content">
-                <form method="post" action="<?= url('player/' . $p['id'] . '/edit') ?>">
-                  <?= csrf_field() ?>
-                  <div class="modal-header">
-                    <h5 class="modal-title">Spieler bearbeiten — <?= e($p['name'].' '.($p['firstname']??'')) ?></h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                  </div>
-                  <div class="modal-body row g-3">
-                    <div class="col-6">
-                      <label class="form-label">Nachname <span class="text-danger">*</span></label>
-                      <input type="text" name="name" class="form-control" value="<?= e($p['name']) ?>" required>
-                    </div>
-                    <div class="col-6">
-                      <label class="form-label">Vorname <span class="text-danger">*</span></label>
-                      <input type="text" name="firstname" class="form-control" value="<?= e($p['firstname']??'') ?>" required>
-                    </div>
-                    <div class="col-6">
-                      <label class="form-label">Verein</label>
-                      <input type="text" name="club" class="form-control" value="<?= e($p['club']??'') ?>">
-                    </div>
-                    <div class="col-3">
-                      <label class="form-label">Geschlecht</label>
-                      <select name="gender" class="form-select">
-                        <option value="">—</option>
-                        <option value="m"<?= ($p['gender']??'')==='m'?' selected':'' ?>>m</option>
-                        <option value="w"<?= ($p['gender']??'')==='w'?' selected':'' ?>>w</option>
-                      </select>
-                    </div>
-                    <div class="col-3">
-                      <label class="form-label">Pass-Nr.</label>
-                      <input type="text" name="pass_nr" class="form-control" value="<?= e($p['pass_nr']??'') ?>">
-                    </div>
-                    <div class="col-12">
-                      <label class="form-label">E-Mail</label>
-                      <input type="email" name="email" class="form-control" value="<?= e($p['email']??'') ?>">
-                    </div>
-                    <div class="col-12">
-                      <label class="form-label">Spielstärken</label>
-                      <div class="row g-2">
-                        <?php foreach ($sports_list as [$sk, $sl, $se]): ?>
-                        <div class="col-3">
-                          <label class="form-label small"><?= $se ? $se : '<img src="'.url('static/cornhole_icon.svg').'" height="14">' ?> <?= e($sl) ?></label>
-                          <input type="number" step="<?= $sk === 'tennis' ? '0.1' : '1' ?>" min="0"
-                                 name="skill_<?= $sk ?>" class="form-control form-control-sm"
-                                 value="<?= $ps[$sk] ?? '' ?>" placeholder="0">
-                        </div>
-                        <?php endforeach; ?>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
-                    <button type="submit" class="btn btn-primary">Speichern</button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>
-          <?php endif; ?>
           <?php endforeach; ?>
         </tbody>
       </table>
@@ -326,9 +271,7 @@ ob_start(); ?>
     </div>
   </div>
 </div>
-<?php endif; ?>
 
-<?php if (can_edit()): ?>
 <!-- Edit-Modals für jedes Doppel -->
 <?php foreach ($all_doubles as $d): ?>
 <?php $dsums = $double_sport_skills[$d['id']] ?? []; ?>
@@ -378,10 +321,124 @@ ob_start(); ?>
 <?php endforeach; ?>
 <?php endif; ?>
 
+<!-- ── Spieler-Profil-Modal (shared, AJAX-geladen) ────────────────────────── -->
+<div class="modal fade" id="playerProfileModal" tabindex="-1" aria-labelledby="profileModalTitle">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="profileModalTitle">
+          <i class="bi bi-person-circle me-2 text-primary"></i><span id="profileModalName">…</span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+        <!-- Ladezustand -->
+        <div id="profileLoading" class="text-center py-5">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Lade…</span>
+          </div>
+        </div>
+        <!-- Inhalt nach AJAX -->
+        <div id="profileContent" style="display:none">
+          <ul class="nav nav-tabs px-3 pt-2 border-bottom-0" id="profileModalTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active" id="profileTabStammBtn"
+                      data-bs-toggle="tab" data-bs-target="#profileTabStamm" type="button">
+                <i class="bi bi-person me-1"></i>Stammdaten
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="profileTabCompsBtn"
+                      data-bs-toggle="tab" data-bs-target="#profileTabComps" type="button">
+                <i class="bi bi-trophy me-1"></i>Bewerbe &amp; Doppel
+              </button>
+            </li>
+          </ul>
+          <div class="tab-content px-3 pt-3 pb-2">
+            <!-- Tab: Stammdaten -->
+            <div class="tab-pane fade show active" id="profileTabStamm" role="tabpanel">
+              <form method="post" id="profileEditForm" action="#">
+                <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
+                <div class="row g-3">
+                  <div class="col-sm-6">
+                    <label class="form-label fw-semibold">Nachname <span class="text-danger">*</span></label>
+                    <input type="text" name="name" id="pf-name" class="form-control"
+                           required <?= can_edit() ? '' : 'readonly' ?>>
+                  </div>
+                  <div class="col-sm-6">
+                    <label class="form-label fw-semibold">Vorname <span class="text-danger">*</span></label>
+                    <input type="text" name="firstname" id="pf-firstname" class="form-control"
+                           required <?= can_edit() ? '' : 'readonly' ?>>
+                  </div>
+                  <div class="col-sm-6">
+                    <label class="form-label fw-semibold">Verein</label>
+                    <input type="text" name="club" id="pf-club" class="form-control"
+                           <?= can_edit() ? '' : 'readonly' ?>>
+                  </div>
+                  <div class="col-sm-3">
+                    <label class="form-label fw-semibold">Geschlecht</label>
+                    <select name="gender" id="pf-gender" class="form-select" <?= can_edit() ? '' : 'disabled' ?>>
+                      <option value="">—</option>
+                      <option value="m">m</option>
+                      <option value="w">w</option>
+                    </select>
+                  </div>
+                  <div class="col-sm-3">
+                    <label class="form-label fw-semibold">Pass-Nr.</label>
+                    <input type="text" name="pass_nr" id="pf-pass_nr" class="form-control"
+                           <?= can_edit() ? '' : 'readonly' ?>>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label fw-semibold">E-Mail</label>
+                    <input type="email" name="email" id="pf-email" class="form-control"
+                           <?= can_edit() ? '' : 'readonly' ?>>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label fw-semibold">Spielstärken</label>
+                    <div class="row g-2">
+                      <?php foreach ($sports_list as [$sk, $sl, $se]): ?>
+                      <div class="col-6 col-sm-3">
+                        <label class="form-label small">
+                          <?php if ($se): echo $se; else: ?>
+                          <img src="<?= url('static/cornhole_icon.svg') ?>" height="14" alt="">
+                          <?php endif; ?>
+                          <?= e($sl) ?>
+                        </label>
+                        <input type="number" step="<?= $sk === 'tennis' ? '0.1' : '1' ?>" min="0"
+                               name="skill_<?= $sk ?>" id="pf-skill-<?= $sk ?>"
+                               class="form-control form-control-sm" placeholder="0"
+                               <?= can_edit() ? '' : 'readonly' ?>>
+                      </div>
+                      <?php endforeach; ?>
+                    </div>
+                  </div>
+                </div>
+              </form>
+            </div>
+            <!-- Tab: Bewerbe & Doppel -->
+            <div class="tab-pane fade" id="profileTabComps" role="tabpanel">
+              <div id="profileCompsContent"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" id="profileFooter" style="display:none">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schließen</button>
+        <?php if (can_edit()): ?>
+        <button type="submit" form="profileEditForm" class="btn btn-primary">
+          <i class="bi bi-check2 me-1"></i>Speichern
+        </button>
+        <?php endif; ?>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 var playerSkillsData = <?= json_encode($player_skills) ?>;
 var sportLabels = {'tischtennis':'Tischtennis','tennis':'Tennis','fussball':'Fußball','cornhole':'Cornhole'};
 var sportDefaults = {'tennis': 10.0};
+var profileBaseUrl = <?= json_encode(url('player')) ?>;
 
 function calcDoubleSkill() {
   var p1 = document.getElementById('new_p1')?.value;
@@ -403,18 +460,160 @@ function calcDoubleSkill() {
   else { box.style.display='none'; }
 }
 
-// Tab-Persistenz: Bootstrap erst nach $content geladen → DOMContentLoaded abwarten
+// ── Profil-Modal ─────────────────────────────────────────────────────────────
+
+var phaseLabels = {
+  'setup': 'Vorbereitung', 'group': 'Gruppenphase',
+  'ko': 'KO-Phase', 'done': 'Abgeschlossen'
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+  var modal = document.getElementById('playerProfileModal');
+  if (!modal) return;
+
+  modal.addEventListener('show.bs.modal', function(e) {
+    var trigger = e.relatedTarget;
+    var pid = trigger ? trigger.dataset.playerId : null;
+    var openTab = trigger ? trigger.dataset.openTab : null;
+    if (!pid) return;
+
+    // Reset
+    document.getElementById('profileLoading').style.display = '';
+    document.getElementById('profileContent').style.display = 'none';
+    document.getElementById('profileFooter').style.display = 'none';
+    document.getElementById('profileModalName').textContent = '…';
+
+    // Switch to requested tab or default to Stammdaten
+    if (openTab === 'edit') {
+      bootstrap.Tab.getOrCreateInstance(document.getElementById('profileTabStammBtn')).show();
+    }
+
+    fetch(profileBaseUrl + '/' + pid + '/profile')
+      .then(function(r) { return r.json(); })
+      .then(function(data) { fillProfileModal(data, pid); })
+      .catch(function() {
+        document.getElementById('profileLoading').innerHTML =
+          '<p class="text-danger p-4">Fehler beim Laden des Profils.</p>';
+      });
+  });
+});
+
+function fillProfileModal(data, pid) {
+  var p = data.player;
+
+  // Titel
+  var fullName = ((p.firstname || '') + ' ' + (p.name || '')).trim();
+  document.getElementById('profileModalName').textContent = fullName + (p.club ? ' · ' + p.club : '');
+
+  // Formular-Action
+  document.getElementById('profileEditForm').action = profileBaseUrl + '/' + pid + '/edit';
+
+  // Stammdaten-Felder füllen
+  document.getElementById('pf-name').value      = p.name      || '';
+  document.getElementById('pf-firstname').value = p.firstname || '';
+  document.getElementById('pf-club').value      = p.club      || '';
+  document.getElementById('pf-gender').value    = p.gender    || '';
+  document.getElementById('pf-pass_nr').value   = p.pass_nr   || '';
+  document.getElementById('pf-email').value     = p.email     || '';
+
+  // Spielstärken
+  Object.keys(sportLabels).forEach(function(sk) {
+    var inp = document.getElementById('pf-skill-' + sk);
+    if (inp) inp.value = data.skills[sk] || '';
+  });
+
+  // Bewerbe & Doppel Tab
+  document.getElementById('profileCompsContent').innerHTML = buildCompsHtml(data);
+
+  // Anzeigen
+  document.getElementById('profileLoading').style.display = 'none';
+  document.getElementById('profileContent').style.display = '';
+  document.getElementById('profileFooter').style.display = '';
+}
+
+function buildCompsHtml(data) {
+  var html = '';
+
+  // Einzelbewerbe
+  html += '<h6 class="mb-2"><i class="bi bi-person me-1 text-secondary"></i>Bewerbe als Einzelspieler</h6>';
+  if (data.comps && data.comps.length > 0) {
+    // Nach Turnier gruppieren
+    var byTournament = {};
+    data.comps.forEach(function(c) {
+      if (!byTournament[c.tname]) byTournament[c.tname] = [];
+      byTournament[c.tname].push(c);
+    });
+    html += '<div class="list-group list-group-flush mb-3">';
+    Object.keys(byTournament).forEach(function(tname) {
+      html += '<div class="list-group-item px-0 py-1">';
+      html += '<div class="text-muted small fw-semibold mb-1"><i class="bi bi-calendar-event me-1"></i>' + esc(tname) + '</div>';
+      byTournament[tname].forEach(function(c) {
+        var phase = phaseLabels[c.phase] || c.phase;
+        html += '<div class="ms-3 d-flex align-items-center gap-2 mb-1">';
+        html += '<i class="bi bi-trophy text-warning small"></i>';
+        html += '<a href="' + esc(profileBaseUrl.replace(/\/player$/, '/competition/') + c.cid) + '" class="text-decoration-none">' + esc(c.cname) + '</a>';
+        html += '<span class="badge bg-light text-secondary border small">' + esc(phase) + '</span>';
+        html += '</div>';
+      });
+      html += '</div>';
+    });
+    html += '</div>';
+  } else {
+    html += '<p class="text-muted small mb-3">Kein Bewerb als Einzelspieler.</p>';
+  }
+
+  // Doppel
+  html += '<h6 class="mb-2"><i class="bi bi-people-fill me-1 text-secondary"></i>Doppelpaarungen</h6>';
+  if (data.doubles && data.doubles.length > 0) {
+    html += '<div class="list-group list-group-flush mb-2">';
+    data.doubles.forEach(function(d) {
+      html += '<div class="list-group-item px-0 py-2">';
+      html += '<div class="fw-semibold"><i class="bi bi-people me-1 text-primary"></i>' + esc(d.name) + '</div>';
+      html += '<div class="text-muted small ms-3">Partner: ' + esc(d.partner_name) + '</div>';
+      if (d.competitions && d.competitions.length > 0) {
+        d.competitions.forEach(function(c) {
+          var phase = phaseLabels[c.phase] || c.phase;
+          html += '<div class="ms-3 d-flex align-items-center gap-2 mt-1">';
+          html += '<i class="bi bi-calendar-event text-muted small"></i>';
+          html += '<span class="text-muted small">' + esc(c.tname) + '</span>';
+          html += '<i class="bi bi-chevron-right text-muted" style="font-size:.65rem"></i>';
+          html += '<a href="' + esc(profileBaseUrl.replace(/\/player$/, '/competition/') + c.cid) + '" class="text-decoration-none small">' + esc(c.cname) + '</a>';
+          html += '<span class="badge bg-light text-secondary border" style="font-size:.7rem">' + esc(phase) + '</span>';
+          html += '</div>';
+        });
+      } else {
+        html += '<div class="ms-3 text-muted small mt-1">Noch keinem Bewerb zugeordnet.</div>';
+      }
+      html += '</div>';
+    });
+    html += '</div>';
+  } else {
+    html += '<p class="text-muted small">Keine Doppelpaarungen.</p>';
+  }
+
+  return html;
+}
+
+function esc(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// Tab-Persistenz via localStorage
 document.addEventListener('DOMContentLoaded', function() {
   var STORE = 'players_active_tab';
-  var hash = window.location.hash;
-  var btnId = null;
-  if (hash === '#doppel')       btnId = 'tab-doppel-btn';
-  else if (hash === '#spieler') btnId = 'tab-players-btn';
-  else                          btnId = localStorage.getItem(STORE);
-
-  if (btnId) {
-    var btn = document.getElementById(btnId);
-    if (btn) bootstrap.Tab.getOrCreateInstance(btn).show();
+  // Hash hat Vorrang (wird vom globalen Handler in _base.php aktiviert),
+  // sonst letzten Tab aus localStorage wiederherstellen
+  if (!location.hash) {
+    var btnId = localStorage.getItem(STORE);
+    if (btnId) {
+      var btn = document.getElementById(btnId);
+      if (btn) bootstrap.Tab.getOrCreateInstance(btn).show();
+    }
   }
   document.querySelectorAll('#players-tabs button[data-bs-toggle="tab"]').forEach(function(b) {
     b.addEventListener('shown.bs.tab', function() { localStorage.setItem(STORE, b.id); });

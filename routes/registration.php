@@ -159,7 +159,7 @@ function confirm_all(array $p): void {
         flash('warning', 'Spieler nicht zugeordnet (Bewerb voll): ' . implode(', ', $full_comps));
     }
     flash('success', "Alle Nennungen bestätigt — Spieler $added Bewerb(en) zugeordnet.");
-    redirect('tournament/' . $r['tournament_id'] . '#nennungen');
+    redirect('tournament/' . $r['tournament_id'] . '#tab-registrations');
 }
 
 function reject_all(array $p): void {
@@ -172,7 +172,7 @@ function reject_all(array $p): void {
     db_execute("UPDATE registration SET status='rejected' WHERE id=?", [$rid]);
     _notify_reg_status($r);
     flash('info', 'Alle Nennungen abgelehnt.');
-    redirect('tournament/' . $r['tournament_id'] . '#nennungen');
+    redirect('tournament/' . $r['tournament_id'] . '#tab-registrations');
 }
 
 function confirm_comp(array $p): void {
@@ -200,7 +200,7 @@ function confirm_comp(array $p): void {
         flash('warning', 'Bewerb ist voll — Spieler wurde nicht zugeordnet.');
     }
     flash('success', 'Nennung bestätigt.');
-    redirect('tournament/' . $r['tournament_id'] . '#nennungen');
+    redirect('tournament/' . $r['tournament_id'] . '#tab-registrations');
 }
 
 function reject_comp(array $p): void {
@@ -216,7 +216,7 @@ function reject_comp(array $p): void {
     )['n'];
     if ($still_pending == 0) _notify_reg_status($r);
     flash('info', 'Nennung abgelehnt.');
-    redirect('tournament/' . $r['tournament_id'] . '#nennungen');
+    redirect('tournament/' . $r['tournament_id'] . '#tab-registrations');
 }
 
 // ── Magic-Link: Link anfordern ────────────────────────────────────────────────
@@ -515,7 +515,7 @@ function change_confirm_all(array $p): void {
         flash('warning', 'Spieler nicht zugeordnet (Bewerb voll): ' . implode(', ', $full_comps));
     }
     flash('success', 'Antrag bestätigt.');
-    redirect('tournament/' . $rcr['tournament_id'] . '#nennungen');
+    redirect('tournament/' . $rcr['tournament_id'] . '#tab-registrations');
 }
 
 function change_reject_all(array $p): void {
@@ -528,7 +528,7 @@ function change_reject_all(array $p): void {
     db_execute("UPDATE registration_change_request SET status='rejected' WHERE id=?", [$rcr_id]);
     _notify_change_request_status($rcr_id);
     flash('info', 'Antrag abgelehnt.');
-    redirect('tournament/' . $rcr['tournament_id'] . '#nennungen');
+    redirect('tournament/' . $rcr['tournament_id'] . '#tab-registrations');
 }
 
 function change_confirm_comp(array $p): void {
@@ -566,7 +566,7 @@ function change_confirm_comp(array $p): void {
         if ($closed_status !== 'pending') _notify_change_request_status($rcr_id);
     }
     flash('success', 'Bewerb bestätigt.');
-    redirect('tournament/' . $rcr['tournament_id'] . '#nennungen');
+    redirect('tournament/' . $rcr['tournament_id'] . '#tab-registrations');
 }
 
 function change_reject_comp(array $p): void {
@@ -580,7 +580,7 @@ function change_reject_comp(array $p): void {
     $closed_status = db_fetch("SELECT status FROM registration_change_request WHERE id=?", [$rcr_id])['status'] ?? 'pending';
     if ($closed_status !== 'pending') _notify_change_request_status($rcr_id);
     flash('info', 'Bewerb abgelehnt.');
-    redirect('tournament/' . $rcr['tournament_id'] . '#nennungen');
+    redirect('tournament/' . $rcr['tournament_id'] . '#tab-registrations');
 }
 
 // ── Internal helpers ───────────────────────────────────────────────────────────
