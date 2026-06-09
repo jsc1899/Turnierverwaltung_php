@@ -247,7 +247,26 @@ function request_link(array $p): void {
         redirect('nennung/link');
         return;
     }
-    render('registration/request_link', ['page_title' => 'Nennungen verwalten']);
+    $open_tournaments = db_fetchall(
+        "SELECT t.id, t.name, t.event_date, t.organizer, t.sport
+         FROM tournament t
+         WHERE t.registrations_open = 1 AND t.is_done = 0 AND t.is_public = 1
+         ORDER BY t.sort_order ASC, t.event_date ASC, t.id ASC"
+    );
+    foreach ($open_tournaments as &$ot) {
+        $ot['competitions'] = db_fetchall(
+            "SELECT c.id, c.name, c.is_doubles, c.is_team, c.registrations_open
+             FROM competition c
+             WHERE c.tournament_id = ? AND c.registrations_open = 1
+             ORDER BY c.sort_order ASC, c.id ASC",
+            [$ot['id']]
+        );
+    }
+    unset($ot);
+    render('registration/request_link', [
+        'page_title'       => 'Nennungen verwalten',
+        'open_tournaments' => $open_tournaments,
+    ]);
 }
 
 // ── Magic-Link: Verwaltungsseite (alle Nennungen dieser Email) ────────────────

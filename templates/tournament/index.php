@@ -36,14 +36,24 @@ ob_start(); ?>
     </div>
 
     <?php if ($tournaments): ?>
-    <div class="row g-3" id="tournament-list">
+    <?php if (can_edit()): ?>
+    <span id="sort-saved" class="d-none badge bg-success mb-2"><i class="bi bi-check2 me-1"></i>Reihenfolge gespeichert</span>
+    <?php endif; ?>
+    <div class="row g-3" id="tournament-list" data-reorder-url="<?= url('tournaments/reorder') ?>">
       <?php foreach ($tournaments as $t):
         $t_status = $t['is_done'] ? 'done' : ($t['registrations_open'] ? 'open' : 'closed');
       ?>
       <div class="col-md-6 tournament-item"
            data-status="<?= e($t_status) ?>"
-           data-sport="<?= e($t['sport'] ?? '') ?>">
+           data-sport="<?= e($t['sport'] ?? '') ?>"
+           data-id="<?= $t['id'] ?>">
         <div class="card shadow-sm h-100">
+          <?php if (can_edit()): ?>
+          <div class="drag-handle d-flex justify-content-center align-items-center py-1 bg-light border-bottom"
+               style="cursor:grab;border-radius:calc(var(--bs-card-border-radius) - 1px) calc(var(--bs-card-border-radius) - 1px) 0 0;user-select:none">
+            <i class="bi bi-grip-horizontal text-muted"></i>
+          </div>
+          <?php endif; ?>
           <div class="card-body d-flex flex-column">
             <div class="d-flex align-items-start gap-2 mb-1">
               <div class="flex-grow-1">
@@ -223,16 +233,19 @@ ob_start(); ?>
 
 <?php
 $extra_js = <<<'JS'
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
 <script>
 (function() {
   var items = document.querySelectorAll('.tournament-item');
   var activeStatus = 'all', activeSport = 'all';
+  function isFiltered() { return activeStatus !== 'all' || activeSport !== 'all'; }
   function applyFilters() {
     items.forEach(function(item) {
       var okStatus = activeStatus === 'all' || item.dataset.status === activeStatus;
       var okSport  = activeSport  === 'all' || item.dataset.sport  === activeSport;
       item.style.display = (okStatus && okSport) ? '' : 'none';
     });
+    if (sortable) sortable.option('disabled', isFiltered());
   }
   document.querySelectorAll('#status-filter button').forEach(function(btn) {
     btn.addEventListener('click', function() {
@@ -250,6 +263,33 @@ $extra_js = <<<'JS'
       applyFilters();
     });
   });
+})();
+
+var sortable = null;
+(function() {
+  var list = document.getElementById('tournament-list');
+  if (!list || !list.querySelector('.drag-handle')) return;
+  sortable = Sortable.create(list, {
+    handle: '.drag-handle',
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    onEnd: function() {
+      var ids = Array.from(list.querySelectorAll('.tournament-item'))
+                     .map(function(el) { return el.dataset.id; });
+      var fd = new FormData();
+      fd.append('csrf_token', document.querySelector('meta[name=csrf-token]')?.content || '');
+      ids.forEach(function(id) { fd.append('ids[]', id); });
+      fetch(list.dataset.reorderUrl, { method: 'POST', body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(d) { if (d.ok) showSaved(); });
+    }
+  });
+  function showSaved() {
+    var el = document.getElementById('sort-saved');
+    if (!el) return;
+    el.classList.remove('d-none');
+    setTimeout(function() { el.classList.add('d-none'); }, 1800);
+  }
 })();
 function openImageModal(src) {
   document.getElementById('imageModalImg').src = src;

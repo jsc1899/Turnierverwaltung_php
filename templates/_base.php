@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="<?= csrf_token() ?>">
   <title><?= e($page_title ?? 'Turnierverwaltung') ?></title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -24,36 +25,36 @@
     </button>
     <div class="collapse navbar-collapse" id="navMain">
       <ul class="navbar-nav me-auto">
-        <li class="nav-item"><a class="nav-link" href="<?= url() ?>">Turniere</a></li>
+        <li class="nav-item"><a class="nav-link" href="<?= url() ?>"><i class="bi bi-trophy me-1"></i>Turniere</a></li>
         <?php if (can_edit()): ?>
-        <li class="nav-item"><a class="nav-link" href="<?= url('players') ?>">Spielerregister</a></li>
+        <li class="nav-item"><a class="nav-link" href="<?= url('players') ?>"><i class="bi bi-people me-1"></i>Spielerregister</a></li>
         <?php endif; ?>
-        <?php if (is_admin()): ?>
-        <li class="nav-item"><a class="nav-link" href="<?= url('admin/users') ?>">Benutzer</a></li>
-        <?php endif; ?>
-        <li class="nav-item"><a class="nav-link" href="<?= url('hilfe') ?>"><i class="bi bi-question-circle me-1"></i>Hilfe</a></li>
+        <li class="nav-item">
+          <a class="nav-link" href="<?= url('nennung/link') ?>">
+            <i class="bi bi-person-gear me-1"></i>Nennungen
+          </a>
+        </li>
       </ul>
       <ul class="navbar-nav">
         <?php $u = current_user(); ?>
-        <li class="nav-item">
-          <a class="nav-link" href="<?= url('nennung/link') ?>">
-            <i class="bi bi-person-gear me-1"></i>Nennung verwalten
-          </a>
-        </li>
+        <li class="nav-item"><a class="nav-link" href="<?= url('hilfe') ?>"><i class="bi bi-question-circle me-1"></i>Hilfe</a></li>
+        <?php if (is_admin()): ?>
+        <li class="nav-item"><a class="nav-link" href="<?= url('admin/users') ?>"><i class="bi bi-shield-lock me-1"></i>Benutzer</a></li>
+        <?php endif; ?>
         <?php if ($u): ?>
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
-            <i class="bi bi-person-circle"></i> <?= e($u['username']) ?>
+            <i class="bi bi-person-circle me-1"></i><?= e($u['username']) ?>
           </a>
           <ul class="dropdown-menu dropdown-menu-end">
             <li><span class="dropdown-item-text text-muted small"><?= e($u['email']) ?></span></li>
             <li><hr class="dropdown-divider"></li>
-            <li><a class="dropdown-item" href="<?= url('logout') ?>">Abmelden</a></li>
+            <li><a class="dropdown-item" href="<?= url('logout') ?>"><i class="bi bi-box-arrow-right me-1"></i>Abmelden</a></li>
           </ul>
         </li>
         <?php else: ?>
-        <li class="nav-item"><a class="nav-link" href="<?= url('login') ?>">Anmelden</a></li>
-        <li class="nav-item"><a class="nav-link" href="<?= url('register') ?>">Registrieren</a></li>
+        <li class="nav-item"><a class="nav-link" href="<?= url('login') ?>"><i class="bi bi-box-arrow-in-right me-1"></i>Anmelden</a></li>
+        <li class="nav-item"><a class="nav-link" href="<?= url('register') ?>"><i class="bi bi-person-plus me-1"></i>Registrieren</a></li>
         <?php endif; ?>
       </ul>
     </div>

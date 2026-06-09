@@ -2,9 +2,9 @@
 
 function index(array $p): void {
     if (can_edit()) {
-        $tournaments = db_fetchall("SELECT * FROM tournament ORDER BY event_date DESC, id DESC");
+        $tournaments = db_fetchall("SELECT * FROM tournament ORDER BY sort_order ASC, event_date DESC, id DESC");
     } else {
-        $tournaments = db_fetchall("SELECT * FROM tournament WHERE is_public=1 ORDER BY event_date DESC, id DESC");
+        $tournaments = db_fetchall("SELECT * FROM tournament WHERE is_public=1 ORDER BY sort_order ASC, event_date DESC, id DESC");
     }
     render('tournament/index', ['page_title' => 'Turniere', 'tournaments' => $tournaments]);
 }
@@ -45,7 +45,7 @@ function show(array $p): void {
         redirect('');
         return;
     }
-    $comps = db_fetchall("SELECT * FROM competition WHERE tournament_id = ? ORDER BY id", [$p['id']]);
+    $comps = db_fetchall("SELECT * FROM competition WHERE tournament_id = ? ORDER BY sort_order ASC, id", [$p['id']]);
     $comp_info = [];
     foreach ($comps as $c) {
         if (!empty($c['is_team'])) {
@@ -221,6 +221,31 @@ function ausschreibung(array $p): void {
     header('Content-Type: application/pdf');
     header('Content-Disposition: inline; filename="Ausschreibung.pdf"');
     readfile($file);
+    exit;
+}
+
+function reorder(array $p): void {
+    require_edit();
+    csrf_verify();
+    $ids = array_map('intval', $_POST['ids'] ?? []);
+    foreach ($ids as $i => $id) {
+        db_execute("UPDATE tournament SET sort_order=? WHERE id=?", [$i, $id]);
+    }
+    header('Content-Type: application/json');
+    echo '{"ok":true}';
+    exit;
+}
+
+function reorder_competitions(array $p): void {
+    require_edit();
+    csrf_verify();
+    $tid = (int)$p['tid'];
+    $ids = array_map('intval', $_POST['ids'] ?? []);
+    foreach ($ids as $i => $id) {
+        db_execute("UPDATE competition SET sort_order=? WHERE id=? AND tournament_id=?", [$i, $id, $tid]);
+    }
+    header('Content-Type: application/json');
+    echo '{"ok":true}';
     exit;
 }
 

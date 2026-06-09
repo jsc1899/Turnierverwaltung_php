@@ -126,10 +126,19 @@ $nennung_badge = $pending_count + $change_count;
       <?php endif; ?>
     </div>
     <?php if ($comp_info): ?>
-    <div class="row g-3">
+    <?php if (can_edit()): ?>
+    <span id="comp-sort-saved" class="d-none badge bg-success mb-2"><i class="bi bi-check2 me-1"></i>Reihenfolge gespeichert</span>
+    <?php endif; ?>
+    <div class="row g-3" id="comp-list" data-reorder-url="<?= url('tournament/'.$t['id'].'/competitions/reorder') ?>">
       <?php foreach ($comp_info as $ci): $c = $ci['comp']; ?>
-      <div class="col-md-6">
+      <div class="col-md-6" data-id="<?= $c['id'] ?>">
         <div class="card shadow-sm h-100">
+          <?php if (can_edit()): ?>
+          <div class="drag-handle d-flex justify-content-center align-items-center py-1 bg-light border-bottom"
+               style="cursor:grab;border-radius:calc(var(--bs-card-border-radius) - 1px) calc(var(--bs-card-border-radius) - 1px) 0 0;user-select:none">
+            <i class="bi bi-grip-horizontal text-muted"></i>
+          </div>
+          <?php endif; ?>
           <div class="card-body d-flex flex-column">
             <h6 class="card-title mb-1"><?= e($c['name']) ?></h6>
             <div class="text-muted small mb-2">
@@ -418,7 +427,32 @@ $nennung_badge = $pending_count + $change_count;
 
 <?php
 $extra_js = <<<'JS'
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
 <script>
+(function() {
+  var list = document.getElementById('comp-list');
+  if (!list || !list.querySelector('.drag-handle')) return;
+  Sortable.create(list, {
+    handle: '.drag-handle',
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    onEnd: function() {
+      var ids = Array.from(list.querySelectorAll('[data-id]'))
+                     .map(function(el) { return el.dataset.id; });
+      var fd = new FormData();
+      fd.append('csrf_token', document.querySelector('meta[name=csrf-token]')?.content || '');
+      ids.forEach(function(id) { fd.append('ids[]', id); });
+      fetch(list.dataset.reorderUrl, { method: 'POST', body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.ok) {
+            var el = document.getElementById('comp-sort-saved');
+            if (el) { el.classList.remove('d-none'); setTimeout(function(){ el.classList.add('d-none'); }, 1800); }
+          }
+        });
+    }
+  });
+})();
 function openImageModal(src) {
   document.getElementById('imageModalImg').src = src;
   new bootstrap.Modal(document.getElementById('imageModal')).show();

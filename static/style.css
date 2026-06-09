@@ -1,6 +1,10 @@
 /* ── General ─────────────────────────────────────────────────────────────── */
 body { background: #f4f6f9; }
 
+/* ── Drag-and-Drop ───────────────────────────────────────────────────────── */
+.sortable-ghost { opacity: .4; }
+.drag-handle:active { cursor: grabbing; }
+
 /* ── Sortierbare Tabellen ────────────────────────────────────────────────── */
 .sortable-col { cursor: pointer; user-select: none; white-space: nowrap; }
 .sortable-col:hover { background: rgba(0,0,0,.05); }
