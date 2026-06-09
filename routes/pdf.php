@@ -61,6 +61,26 @@ function players_registry_csv(array $p): void {
     generate_players_registry_csv();
 }
 
+function doubles_registry_pdf(array $p): void {
+    require_edit();
+    generate_doubles_registry_pdf();
+}
+
+function doubles_registry_csv(array $p): void {
+    require_edit();
+    generate_doubles_registry_csv();
+}
+
+function teams_registry_pdf(array $p): void {
+    require_edit();
+    generate_teams_registry_pdf();
+}
+
+function teams_registry_csv(array $p): void {
+    require_edit();
+    generate_teams_registry_csv();
+}
+
 function competition_players_pdf(array $p): void {
     require_edit();
     generate_competition_players_pdf((int)$p['id']);

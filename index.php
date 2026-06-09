@@ -168,6 +168,10 @@ $routes = [
     ['GET', '/tournament/{id}/registrations/csv', 'pdf', 'registrations_csv'],
     ['GET', '/players/pdf',                       'pdf', 'players_registry_pdf'],
     ['GET', '/players/csv',                       'pdf', 'players_registry_csv'],
+    ['GET', '/players/doubles/pdf',               'pdf', 'doubles_registry_pdf'],
+    ['GET', '/players/doubles/csv',               'pdf', 'doubles_registry_csv'],
+    ['GET', '/players/teams/pdf',                 'pdf', 'teams_registry_pdf'],
+    ['GET', '/players/teams/csv',                 'pdf', 'teams_registry_csv'],
     ['GET', '/competition/{id}/players/pdf',      'pdf', 'competition_players_pdf'],
     ['GET', '/competition/{id}/players/csv',      'pdf', 'competition_players_csv'],
 

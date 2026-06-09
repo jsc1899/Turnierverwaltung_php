@@ -122,9 +122,20 @@ ob_start(); ?>
   <div class="tab-pane fade p-3" id="tab-doppel" role="tabpanel">
     <?php $sport_labels = ['tischtennis'=>'Tischtennis','tennis'=>'Tennis','fussball'=>'Fußball','cornhole'=>'Cornhole']; ?>
     <?php if ($all_doubles): ?>
-    <div class="mb-2">
+    <div class="d-flex align-items-center mb-2 gap-2">
+      <span class="text-muted small"><?= count($all_doubles) ?> Einträge</span>
       <input type="search" class="form-control form-control-sm table-filter" style="max-width:220px"
              placeholder="Filtern…" data-target="tbl-doppel" aria-label="Doppel filtern">
+      <?php if (can_edit()): ?>
+      <div class="btn-group btn-group-sm ms-auto">
+        <a href="<?= url('players/doubles/pdf') ?>" class="btn btn-outline-danger" target="_blank">
+          <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+        </a>
+        <a href="<?= url('players/doubles/csv') ?>" class="btn btn-outline-success">
+          <i class="bi bi-filetype-csv me-1"></i>CSV
+        </a>
+      </div>
+      <?php endif; ?>
     </div>
     <div class="table-responsive mb-3">
       <table class="table table-sm table-hover align-middle mb-0" data-sortable id="tbl-doppel">
@@ -224,9 +235,20 @@ ob_start(); ?>
   <!-- ── Tab: Teams ── -->
   <div class="tab-pane fade p-3" id="tab-teams" role="tabpanel">
     <?php if ($all_teams): ?>
-    <div class="mb-2">
+    <div class="d-flex align-items-center mb-2 gap-2">
+      <span class="text-muted small"><?= count($all_teams) ?> Einträge</span>
       <input type="search" class="form-control form-control-sm table-filter" style="max-width:220px"
              placeholder="Filtern…" data-target="tbl-teams" aria-label="Teams filtern">
+      <?php if (can_edit()): ?>
+      <div class="btn-group btn-group-sm ms-auto">
+        <a href="<?= url('players/teams/pdf') ?>" class="btn btn-outline-danger" target="_blank">
+          <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+        </a>
+        <a href="<?= url('players/teams/csv') ?>" class="btn btn-outline-success">
+          <i class="bi bi-filetype-csv me-1"></i>CSV
+        </a>
+      </div>
+      <?php endif; ?>
     </div>
     <div class="table-responsive mb-3">
       <table class="table table-sm table-hover align-middle mb-0" data-sortable id="tbl-teams">
