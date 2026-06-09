@@ -5,7 +5,7 @@ ob_start(); ?>
 <div class="table-responsive">
   <table class="table table-hover align-middle" data-sortable>
     <thead class="table-light">
-      <tr><th>Benutzer</th><th>E-Mail</th><th class="no-sort">Rolle</th><th>Registriert</th><th class="no-sort"></th></tr>
+      <tr><th>Benutzer</th><th>E-Mail</th><th class="no-sort">Rolle</th><th>Registriert</th><th>Zuletzt online</th><th class="no-sort"></th></tr>
     </thead>
     <tbody>
       <?php foreach ($users as $u): ?>
@@ -27,6 +27,7 @@ ob_start(); ?>
           </form>
         </td>
         <td class="text-muted small"><?= e($u['created_at'] ?? '') ?></td>
+        <td class="text-muted small"><?= $u['last_login'] ? e($u['last_login']) : '<span class="text-secondary">–</span>' ?></td>
         <td>
           <?php if ($u['email'] !== ADMIN_EMAIL): ?>
           <form method="post" action="<?= url('admin/user/' . $u['id'] . '/delete') ?>"

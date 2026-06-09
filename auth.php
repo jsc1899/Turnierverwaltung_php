@@ -54,6 +54,7 @@ function require_admin(): void {
 function login_user_session(array $user): void {
     session_regenerate_id(true);
     $_SESSION['user_id'] = $user['id'];
+    db_execute("UPDATE user SET last_login=NOW() WHERE id=?", [$user['id']]);
 }
 
 function logout_user_session(): void {

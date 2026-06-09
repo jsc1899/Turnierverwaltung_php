@@ -30,6 +30,15 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-i
 // DB initialisieren
 init_db();
 
+// Letzten Besuch tracken (gedrosselt: max. 1 DB-Write pro 5 Minuten)
+if (!empty($_SESSION['user_id'])) {
+    $now = time();
+    if (empty($_SESSION['_last_activity_db']) || $now - $_SESSION['_last_activity_db'] > 300) {
+        db_execute("UPDATE user SET last_login=NOW() WHERE id=?", [$_SESSION['user_id']]);
+        $_SESSION['_last_activity_db'] = $now;
+    }
+}
+
 $uri = strtok($_SERVER['REQUEST_URI'], '?');
 $uri = '/' . trim(parse_url($uri, PHP_URL_PATH), '/');
 
