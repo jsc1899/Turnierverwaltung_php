@@ -45,7 +45,16 @@ ob_start(); ?>
       <span class="text-muted small"><?= count($players) ?> Einträge</span>
       <input type="search" class="form-control form-control-sm table-filter" style="max-width:220px"
              placeholder="Filtern…" data-target="tbl-spieler" aria-label="Spieler filtern">
-      <div class="btn-group btn-group-sm ms-auto">
+      <?php if (can_edit()): ?>
+      <button class="btn btn-outline-primary btn-sm ms-auto" id="btn-sync-all-tt"
+              title="Tischtennis-Spielstärke aller Spieler mit RatingsCentral-ID aktualisieren">
+        <i class="bi bi-arrow-clockwise me-1"></i>TT RC Abgleich
+      </button>
+      <span id="sync-all-status" class="small" style="display:none"></span>
+      <?php else: ?>
+      <span class="ms-auto"></span>
+      <?php endif; ?>
+      <div class="btn-group btn-group-sm ms-3">
         <a href="<?= url('players/pdf') ?>" class="btn btn-outline-danger" target="_blank">
           <i class="bi bi-file-earmark-pdf me-1"></i>PDF
         </a>
@@ -59,7 +68,15 @@ ob_start(); ?>
         <thead class="table-light">
           <tr>
             <th>Nachname</th><th>Vorname</th><th class="text-center">G</th>
-            <th>Verein</th><th>Pass-Nr.</th><th>E-Mail</th><th>Spielstärke</th><th class="no-sort"></th>
+            <th>Verein</th><th>Pass-Nr.</th><th>E-Mail</th>
+            <?php foreach ($sports_list as [$sk, $sl, $se]): ?>
+            <th class="text-center" title="<?= e($sl) ?>">
+              <?php if ($se): echo $se; else: ?>
+              <img src="<?= url('static/cornhole_icon.svg') ?>" height="14" alt="Cornhole">
+              <?php endif; ?>
+            </th>
+            <?php endforeach; ?>
+            <th class="no-sort"></th>
           </tr>
         </thead>
         <tbody>
@@ -80,18 +97,24 @@ ob_start(); ?>
             <td><?= e($p['club'] ?? '') ?></td>
             <td><span class="text-muted"><?= e($p['pass_nr'] ?? '') ?></span></td>
             <td><span class="text-muted small"><?= e($p['email'] ?? '') ?></span></td>
-            <td data-sort="<?= array_sum($ps) ?>">
-              <?php foreach ($sports_list as [$sk, $sl, $se]):
-                if (!isset($ps[$sk])) continue;
-                $sv = $sk === 'tennis' ? number_format((float)$ps[$sk], 1) : (int)$ps[$sk]; ?>
-              <span class="badge bg-secondary me-1" title="<?= e($sl) ?>">
-                <?php if ($se): echo $se; else: ?>
-                <img src="<?= url('static/cornhole_icon.svg') ?>" height="12" alt="Cornhole">
-                <?php endif; ?>
+            <?php foreach ($sports_list as [$sk, $sl, $se]):
+              $sv = isset($ps[$sk]) ? ($sk === 'tennis' ? number_format((float)$ps[$sk], 1) : (int)$ps[$sk]) : null; ?>
+            <td class="text-center" data-sort="<?= $sv ?? 0 ?>">
+              <?php if ($sv !== null): ?>
+              <span class="badge bg-secondary"
+                    <?= ($sk === 'tischtennis') ? 'id="tt-skill-'.$p['id'].'"' : '' ?>>
                 <?= $sv ?>
               </span>
-              <?php endforeach; ?>
+              <?php endif; ?>
+              <?php if ($sk === 'tischtennis' && !empty($p['ratingscentral_id']) && can_edit()): ?>
+              <button class="btn btn-link btn-sm p-0 ms-1 rc-sync-btn text-secondary"
+                      data-pid="<?= $p['id'] ?>" title="TT-Spielstärke von RatingsCentral abrufen"
+                      style="font-size:.75rem;vertical-align:middle">
+                <i class="bi bi-arrow-clockwise"></i>
+              </button>
+              <?php endif; ?>
             </td>
+            <?php endforeach; ?>
             <td class="text-end text-nowrap">
               <button class="btn btn-outline-secondary btn-sm"
                       data-bs-toggle="modal" data-bs-target="#playerProfileModal"
@@ -647,6 +670,27 @@ ob_start(); ?>
                            <?= can_edit() ? '' : 'readonly' ?>>
                   </div>
                   <div class="col-12">
+                    <label class="form-label fw-semibold">Externes Profil</label>
+                    <label class="form-label small">🏓 RatingsCentral-ID</label>
+                    <div class="input-group input-group-sm">
+                      <input type="text" name="ratingscentral_id" id="pf-ratingscentral_id"
+                             class="form-control" placeholder="z.B. 123456"
+                             <?= can_edit() ? '' : 'readonly' ?>>
+                      <?php if (can_edit()): ?>
+                      <a id="pf-rc-link" href="#" target="_blank" rel="noopener"
+                         class="btn btn-outline-secondary" title="Profil auf RatingsCentral öffnen"
+                         style="display:none">
+                        <i class="bi bi-box-arrow-up-right"></i>
+                      </a>
+                      <button type="button" class="btn btn-outline-primary" id="pf-rc-sync"
+                              title="Tischtennis-Spielstärke jetzt abrufen">
+                        <i class="bi bi-arrow-clockwise"></i>
+                      </button>
+                      <?php endif; ?>
+                    </div>
+                    <div id="pf-rc-status" class="form-text"></div>
+                  </div>
+                  <div class="col-12">
                     <label class="form-label fw-semibold">Spielstärken</label>
                     <div class="row g-2">
                       <?php foreach ($sports_list as [$sk, $sl, $se]): ?>
@@ -775,6 +819,23 @@ function fillProfileModal(data, pid) {
     if (inp) inp.value = data.skills[sk] || '';
   });
 
+  // Externes Profil (RatingsCentral)
+  var rcIdEl = document.getElementById('pf-ratingscentral_id');
+  if (rcIdEl) rcIdEl.value = p.ratingscentral_id || '';
+
+  var rcLink = document.getElementById('pf-rc-link');
+  if (rcLink) {
+    if (p.ratingscentral_id) {
+      rcLink.href = 'https://www.ratingscentral.com/Player.php?PlayerID=' + encodeURIComponent(p.ratingscentral_id);
+      rcLink.style.display = '';
+    } else {
+      rcLink.style.display = 'none';
+    }
+  }
+
+  var rcStatus = document.getElementById('pf-rc-status');
+  if (rcStatus) { rcStatus.className = 'form-text'; rcStatus.textContent = ''; }
+
   // Bewerbe Tab
   document.getElementById('profileCompsContent').innerHTML = buildCompsHtml(data);
 
@@ -883,6 +944,130 @@ function esc(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
+
+// ── RatingsCentral-Sync ───────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  var syncBtn = document.getElementById('pf-rc-sync');
+  if (!syncBtn) return;
+
+  syncBtn.addEventListener('click', function() {
+    var form   = document.getElementById('profileEditForm');
+    var action = form ? form.action : '';
+    var pidMatch = action.match(/\/player\/(\d+)\//);
+    var pid    = pidMatch ? pidMatch[1] : null;
+    var rcId   = (document.getElementById('pf-ratingscentral_id') || {}).value || '';
+    var status = document.getElementById('pf-rc-status');
+
+    if (!pid) { status.className = 'form-text text-danger'; status.textContent = 'Spieler-ID nicht ermittelbar.'; return; }
+    if (!rcId.trim()) { status.className = 'form-text text-warning'; status.textContent = 'Bitte zuerst RatingsCentral-ID eingeben und speichern.'; return; }
+
+    syncBtn.disabled = true;
+    status.className = 'form-text text-muted';
+    status.textContent = 'Abrufen…';
+
+    fetch(profileBaseUrl + '/' + pid + '/sync/ratingscentral')
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        syncBtn.disabled = false;
+        if (d.error) {
+          status.className = 'form-text text-danger';
+          status.textContent = d.error;
+        } else {
+          status.className = 'form-text text-success';
+          status.textContent = 'Gespeichert: ' + d.skill + ' Punkte';
+          var ttInp = document.getElementById('pf-skill-tischtennis');
+          if (ttInp) ttInp.value = d.skill;
+          // Link-Button aktualisieren
+          var rcLink = document.getElementById('pf-rc-link');
+          var rcId2  = (document.getElementById('pf-ratingscentral_id') || {}).value || '';
+          if (rcLink && rcId2) {
+            rcLink.href = 'https://www.ratingscentral.com/Player.php?PlayerID=' + encodeURIComponent(rcId2);
+            rcLink.style.display = '';
+          }
+        }
+      })
+      .catch(function() {
+        syncBtn.disabled = false;
+        status.className = 'form-text text-danger';
+        status.textContent = 'Netzwerkfehler';
+      });
+  });
+});
+
+// ── Einzel-Sync (Icon in Tabellenzeile) ──────────────────────────────────────
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('.rc-sync-btn');
+  if (!btn) return;
+  var pid = btn.dataset.pid;
+  var icon = btn.querySelector('i');
+  btn.disabled = true;
+  icon.className = 'bi bi-hourglass-split';
+  fetch(profileBaseUrl + '/' + pid + '/sync/ratingscentral')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      btn.disabled = false;
+      if (d.error) {
+        icon.className = 'bi bi-exclamation-circle text-danger';
+        btn.title = d.error;
+      } else {
+        icon.className = 'bi bi-check-circle text-success';
+        btn.title = 'Aktualisiert: ' + d.skill;
+        var badge = document.getElementById('tt-skill-' + pid);
+        if (badge) badge.lastChild.textContent = ' ' + d.skill;
+        setTimeout(function() { icon.className = 'bi bi-arrow-clockwise'; btn.title = 'TT-Spielstärke von RatingsCentral abrufen'; }, 3000);
+      }
+    })
+    .catch(function() {
+      btn.disabled = false;
+      icon.className = 'bi bi-exclamation-circle text-danger';
+      btn.title = 'Netzwerkfehler';
+    });
+});
+
+// ── Bulk-Sync (alle Spieler mit RatingsCentral-ID, einzeln nacheinander) ──────
+document.addEventListener('DOMContentLoaded', function() {
+  var bulkBtn = document.getElementById('btn-sync-all-tt');
+  if (!bulkBtn) return;
+  var statusEl = document.getElementById('sync-all-status');
+
+  bulkBtn.addEventListener('click', async function() {
+    var pids = Array.from(document.querySelectorAll('.rc-sync-btn[data-pid]'))
+                    .map(function(b) { return b.dataset.pid; });
+    if (!pids.length) return;
+
+    bulkBtn.disabled = true;
+    statusEl.style.display = '';
+    var synced = 0, errors = 0, total = pids.length;
+
+    for (var i = 0; i < pids.length; i++) {
+      var pid = pids[i];
+      statusEl.className = 'small ms-2 text-muted';
+      statusEl.textContent = (i + 1) + '/' + total + '…';
+      try {
+        var r = await fetch(profileBaseUrl + '/' + pid + '/sync/ratingscentral');
+        var d = await r.json();
+        if (d.error) {
+          errors++;
+        } else {
+          synced++;
+          var badge = document.getElementById('tt-skill-' + pid);
+          if (badge) badge.lastChild.textContent = ' ' + d.skill;
+        }
+      } catch(e) {
+        errors++;
+      }
+    }
+
+    bulkBtn.disabled = false;
+    if (errors > 0) {
+      statusEl.className = 'small ms-2 text-warning';
+      statusEl.textContent = synced + ' aktualisiert, ' + errors + ' Fehler';
+    } else {
+      statusEl.className = 'small ms-2 text-success';
+      statusEl.textContent = synced + ' aktualisiert';
+    }
+  });
+});
 
 // Tab-Persistenz via localStorage
 document.addEventListener('DOMContentLoaded', function() {

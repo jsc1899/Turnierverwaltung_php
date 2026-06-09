@@ -307,9 +307,10 @@ function new_player(array $p): void {
         redirect('players#tab-spieler');
         return;
     }
+    $ratingscentral_id = trim(post('ratingscentral_id', '')) ?: null;
     $pid = db_insert(
-        "INSERT INTO player (name, firstname, club, gender, pass_nr, email) VALUES (?,?,?,?,?,?)",
-        [$name, $firstname, $club, $gender, $pass_nr, $email]
+        "INSERT INTO player (name, firstname, club, gender, pass_nr, email, ratingscentral_id) VALUES (?,?,?,?,?,?,?)",
+        [$name, $firstname, $club, $gender, $pass_nr, $email, $ratingscentral_id]
     );
     _save_player_skills((int)$pid);
     redirect('players#tab-spieler');
@@ -326,14 +327,16 @@ function edit(array $p): void {
     $pass_nr   = trim(post('pass_nr'));
     $email     = trim(post('email'));
 
+    $ratingscentral_id = trim(post('ratingscentral_id', '')) ?: null;
+
     if (!$name || !$firstname) {
         flash('danger', 'Nachname und Vorname sind Pflichtfelder.');
         redirect('players#tab-spieler');
         return;
     }
     db_execute(
-        "UPDATE player SET name=?, firstname=?, club=?, gender=?, pass_nr=?, email=? WHERE id=?",
-        [$name, $firstname, $club, $gender, $pass_nr, $email, $pid]
+        "UPDATE player SET name=?, firstname=?, club=?, gender=?, pass_nr=?, email=?, ratingscentral_id=? WHERE id=?",
+        [$name, $firstname, $club, $gender, $pass_nr, $email, $ratingscentral_id, $pid]
     );
     foreach (SPORTS_LIST as [$sport_key]) {
         $raw = post("skill_$sport_key", '');
@@ -499,19 +502,20 @@ function import_players(array $p): void {
     $imported = 0; $skipped = 0; $errors = [];
 
     foreach ($rows as $i => $row) {
-        $row       = array_pad(array_values($row), 10, '');
-        $name      = trim($row[0]);
-        $firstname = trim($row[1]);
-        $gender    = trim($row[2]);
-        $club      = trim($row[3]);
-        $pass_nr   = trim($row[4]);
-        $email     = trim($row[5]);
-        $skills    = [
+        $row              = array_pad(array_values($row), 11, '');
+        $name             = trim($row[0]);
+        $firstname        = trim($row[1]);
+        $gender           = trim($row[2]);
+        $club             = trim($row[3]);
+        $pass_nr          = trim($row[4]);
+        $email            = trim($row[5]);
+        $skills           = [
             'tischtennis' => (float)str_replace(',', '.', $row[6]),
             'tennis'      => (float)str_replace(',', '.', $row[7]),
             'fussball'    => (float)str_replace(',', '.', $row[8]),
             'cornhole'    => (float)str_replace(',', '.', $row[9]),
         ];
+        $ratingscentral_id = trim($row[10]) ?: null;
 
         if (!$name || !$firstname) {
             $errors[] = 'Zeile ' . ($i + 2) . ': Nachname oder Vorname fehlt — übersprungen.';
@@ -529,8 +533,8 @@ function import_players(array $p): void {
         if ($dup) { $skipped++; continue; }
 
         $pid = db_insert(
-            "INSERT INTO player (name, firstname, club, gender, pass_nr, email) VALUES (?,?,?,?,?,?)",
-            [$name, $firstname, $club ?: null, $gender ?: null, $pass_nr ?: null, $email ?: null]
+            "INSERT INTO player (name, firstname, club, gender, pass_nr, email, ratingscentral_id) VALUES (?,?,?,?,?,?,?)",
+            [$name, $firstname, $club ?: null, $gender ?: null, $pass_nr ?: null, $email ?: null, $ratingscentral_id]
         );
         foreach ($skills as $sport => $sk) {
             if ($sk > 0) {
@@ -574,15 +578,16 @@ function _xlsx_build_template(): string {
     $headers = [
         'Nachname', 'Vorname', 'Geschlecht', 'Verein', 'Pass-Nr.', 'E-Mail',
         'Spielstärke Tischtennis', 'Spielstärke Tennis', 'Spielstärke Fußball', 'Spielstärke Cornhole',
+        'RatingsCentral-ID',
     ];
-    $example = ['Mustermann', 'Max', 'm', 'Muster SC', 'TT123', 'max@example.com', '1000', '4.5', '0', '0'];
+    $example = ['Mustermann', 'Max', 'm', 'Muster SC', 'TT123', 'max@example.com', '1000', '4.5', '0', '0', ''];
 
     // Shared strings: headers + example values
     $strings = array_unique(array_merge($headers, array_filter($example, fn($v) => !is_numeric($v) || $v === '')));
     $strings = array_values($strings);
     $strIdx  = array_flip($strings);
 
-    $colLetters = ['A','B','C','D','E','F','G','H','I','J'];
+    $colLetters = ['A','B','C','D','E','F','G','H','I','J','K'];
 
     // Row 1: bold headers (style s="1")
     $row1 = '';
@@ -732,6 +737,50 @@ function _xlsx_parse(string $path): array {
 function _xml_strip_ns(string $xml): string {
     // Remove default namespace declarations so SimpleXML xpath works without prefix
     return preg_replace('/\s+xmlns(?::[a-z0-9]+)?="[^"]*"/i', '', $xml) ?? $xml;
+}
+
+function sync_external_skill(array $p): void {
+    require_edit();
+    header('Content-Type: application/json; charset=utf-8');
+    $pid    = (int)$p['id'];
+    $source = $p['source'] ?? '';
+    $player = db_fetch("SELECT * FROM player WHERE id=?", [$pid]);
+    if (!$player) { echo json_encode(['error' => 'Spieler nicht gefunden']); exit; }
+
+    if ($source === 'ratingscentral') {
+        $ext_id = trim($player['ratingscentral_id'] ?? '');
+        if (!$ext_id) { echo json_encode(['error' => 'Keine RatingsCentral-ID hinterlegt']); exit; }
+        $result = _fetch_ratingscentral_rating($ext_id);
+        if (!empty($result['error'])) { echo json_encode($result); exit; }
+        db_execute(
+            "INSERT INTO player_skill (player_id, sport, skill, updated_at) VALUES (?,?,?,NOW())
+             ON DUPLICATE KEY UPDATE skill=VALUES(skill), updated_at=NOW()",
+            [$pid, 'tischtennis', $result['rating']]
+        );
+        echo json_encode(['success' => true, 'skill' => $result['rating']]);
+        exit;
+    }
+
+    echo json_encode(['error' => 'Unbekannte Quelle']);
+    exit;
+}
+
+
+function _fetch_ratingscentral_rating(string $id): array {
+    $url = 'https://www.ratingscentral.com/Player.php?PlayerID=' . urlencode($id);
+    $ctx = stream_context_create(['http' => [
+        'user_agent'    => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'timeout'       => 10,
+        'ignore_errors' => true,
+    ]]);
+    $html = @file_get_contents($url, false, $ctx);
+    if (!$html) return ['error' => 'Verbindungsfehler — bitte ID prüfen'];
+
+    // <span class="Subheader">1937​±73</span> — Zahl vor dem ±-Zeichen
+    if (preg_match('/<span[^>]*class="Subheader"[^>]*>\s*(\d+)\s*(?:​)?±/u', $html, $m)) {
+        return ['rating' => (float)$m[1]];
+    }
+    return ['error' => 'Rating nicht gefunden — bitte ID prüfen'];
 }
 
 function _csv_parse(string $path): array {
