@@ -129,7 +129,7 @@ $nennung_badge = $pending_count + $change_count;
     <?php if (can_edit()): ?>
     <div class="d-flex align-items-center gap-2 mb-2">
       <button id="comp-sort-toggle" class="btn btn-outline-secondary btn-sm">
-        <i class="bi bi-arrows-move me-1"></i>Umstellen
+        <i class="bi bi-arrows-move me-1"></i>Reihenfolge ändern
       </button>
       <span id="comp-sort-saved" class="d-none badge bg-success"><i class="bi bi-check2 me-1"></i>Reihenfolge gespeichert</span>
     </div>
@@ -470,7 +470,7 @@ $extra_js = <<<'JS'
       });
       toggleBtn.innerHTML = active
         ? '<i class="bi bi-check2 me-1"></i>Fertig'
-        : '<i class="bi bi-arrows-move me-1"></i>Umstellen';
+        : '<i class="bi bi-arrows-move me-1"></i>Reihenfolge ändern';
       toggleBtn.classList.toggle('btn-outline-secondary', !active);
       toggleBtn.classList.toggle('btn-outline-success', active);
     });
