@@ -783,8 +783,8 @@ function _fetch_ratingscentral_rating(string $id): array {
 
     if (!$html || $err) return ['error' => 'Verbindungsfehler — bitte ID prüfen'];
 
-    // <span class="Subheader">1937[ZWS U+200B]±73</span> — erste Zahl nach dem Tag
-    if (preg_match('/<span[^>]*class="Subheader"[^>]*>\s*(\d+)/u', $html, $m)) {
+    // <span class="Subheader">1937​±73</span> — Zahl vor dem ±-Zeichen
+    if (preg_match('/<span[^>]*class="Subheader"[^>]*>\s*(\d+)\s*(?:&#8203;)?±/u', $html, $m)) {
         return ['rating' => (float)$m[1]];
     }
     return ['error' => 'Rating nicht gefunden — bitte ID prüfen'];
