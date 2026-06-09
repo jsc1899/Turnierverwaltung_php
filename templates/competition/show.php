@@ -237,6 +237,14 @@ ob_start(); ?>
     <?php if ($is_doubles): ?>
     <!-- ── Doppel-Verwaltung ── -->
     <?php if ($assigned_doubles): ?>
+    <div class="btn-group btn-group-sm mb-3">
+      <a href="<?= url('competition/'.$c['id'].'/players/pdf') ?>" class="btn btn-outline-danger" target="_blank" title="PDF">
+        <i class="bi bi-file-earmark-pdf"></i>
+      </a>
+      <a href="<?= url('competition/'.$c['id'].'/players/csv') ?>" class="btn btn-outline-success" title="CSV">
+        <i class="bi bi-filetype-csv"></i>
+      </a>
+    </div>
     <div class="mb-2 d-flex align-items-center gap-2">
       <input type="search" class="form-control form-control-sm table-filter" style="max-width:220px"
              placeholder="Filtern…" data-target="tbl-comp-doubles" aria-label="Doppel filtern">
@@ -395,6 +403,14 @@ ob_start(); ?>
     <?php elseif ($is_team): ?>
     <!-- ── Team-Verwaltung ── -->
     <?php if ($assigned_teams): ?>
+    <div class="btn-group btn-group-sm mb-3">
+      <a href="<?= url('competition/'.$c['id'].'/players/pdf') ?>" class="btn btn-outline-danger" target="_blank" title="PDF">
+        <i class="bi bi-file-earmark-pdf"></i>
+      </a>
+      <a href="<?= url('competition/'.$c['id'].'/players/csv') ?>" class="btn btn-outline-success" title="CSV">
+        <i class="bi bi-filetype-csv"></i>
+      </a>
+    </div>
     <div class="mb-2 d-flex align-items-center gap-2">
       <input type="search" class="form-control form-control-sm table-filter" style="max-width:220px"
              placeholder="Filtern…" data-target="tbl-comp-teams" aria-label="Teams filtern">
