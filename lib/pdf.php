@@ -826,12 +826,19 @@ function generate_tournament_players_pdf(int $tid): void {
     if (!$t) { http_response_code(404); exit; }
 
     $players = db_fetchall(
-        "SELECT DISTINCT p.name, p.firstname, p.club, p.gender, p.pass_nr,
+        "SELECT p.name, p.firstname, p.club, p.gender, p.pass_nr,
          GROUP_CONCAT(DISTINCT c.name ORDER BY c.name SEPARATOR ', ') as competitions
          FROM player p
-         JOIN competition_player cp ON cp.player_id = p.id
-         JOIN competition c ON c.id = cp.competition_id
-         WHERE c.tournament_id = ?
+         JOIN (
+             SELECT cp.player_id, cp.competition_id FROM competition_player cp
+             UNION ALL
+             SELECT d.player1_id, cd.competition_id FROM competition_double cd JOIN `double` d ON d.id = cd.double_id
+             UNION ALL
+             SELECT d.player2_id, cd.competition_id FROM competition_double cd JOIN `double` d ON d.id = cd.double_id
+             UNION ALL
+             SELECT tp.player_id, ct.competition_id FROM competition_team ct JOIN team_player tp ON tp.team_id = ct.team_id
+         ) pc ON pc.player_id = p.id
+         JOIN competition c ON c.id = pc.competition_id AND c.tournament_id = ?
          GROUP BY p.id ORDER BY p.name, p.firstname",
         [$tid]
     );
@@ -868,12 +875,19 @@ function generate_tournament_players_pdf(int $tid): void {
 function generate_tournament_players_csv(int $tid): void {
     $t = db_fetch("SELECT name FROM tournament WHERE id=?", [$tid]);
     $players = db_fetchall(
-        "SELECT DISTINCT p.name, p.firstname, p.club, p.gender, p.pass_nr, p.email,
+        "SELECT p.name, p.firstname, p.club, p.gender, p.pass_nr, p.email,
          GROUP_CONCAT(DISTINCT c.name ORDER BY c.name SEPARATOR ', ') as competitions
          FROM player p
-         JOIN competition_player cp ON cp.player_id=p.id
-         JOIN competition c ON c.id=cp.competition_id
-         WHERE c.tournament_id=?
+         JOIN (
+             SELECT cp.player_id, cp.competition_id FROM competition_player cp
+             UNION ALL
+             SELECT d.player1_id, cd.competition_id FROM competition_double cd JOIN `double` d ON d.id = cd.double_id
+             UNION ALL
+             SELECT d.player2_id, cd.competition_id FROM competition_double cd JOIN `double` d ON d.id = cd.double_id
+             UNION ALL
+             SELECT tp.player_id, ct.competition_id FROM competition_team ct JOIN team_player tp ON tp.team_id = ct.team_id
+         ) pc ON pc.player_id = p.id
+         JOIN competition c ON c.id = pc.competition_id AND c.tournament_id = ?
          GROUP BY p.id ORDER BY p.name, p.firstname",
         [$tid]
     );
