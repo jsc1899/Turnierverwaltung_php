@@ -26,8 +26,8 @@ function index(array $p): void {
     }
     $all_doubles = db_fetchall(
         "SELECT d.*,
-         TRIM(CONCAT(COALESCE(p1.firstname,''), IF(COALESCE(p1.firstname,'')!='', ' ',''), p1.name)) as p1name,
-         TRIM(CONCAT(COALESCE(p2.firstname,''), IF(COALESCE(p2.firstname,'')!='', ' ',''), p2.name)) as p2name,
+         TRIM(CONCAT(p1.name, IF(COALESCE(p1.firstname,'')!='', CONCAT(' ', p1.firstname),''))) as p1name,
+         TRIM(CONCAT(p2.name, IF(COALESCE(p2.firstname,'')!='', CONCAT(' ', p2.firstname),''))) as p2name,
          p1.club as p1club, p2.club as p2club
          FROM `double` d
          JOIN player p1 ON p1.id = d.player1_id
@@ -67,7 +67,7 @@ function index(array $p): void {
     );
     foreach ($all_teams as &$team) {
         $team['members'] = db_fetchall(
-            "SELECT p.id, TRIM(CONCAT(COALESCE(p.firstname,''), IF(COALESCE(p.firstname,'')!='', ' ',''), p.name)) as fullname, p.club
+            "SELECT p.id, TRIM(CONCAT(p.name, IF(COALESCE(p.firstname,'')!='', CONCAT(' ', p.firstname),''))) as fullname, p.club
              FROM player p JOIN `team_player` tp ON tp.player_id = p.id
              WHERE tp.team_id = ? ORDER BY p.name",
             [$team['id']]
@@ -308,9 +308,10 @@ function new_player(array $p): void {
         return;
     }
     $ratingscentral_id = trim(post('ratingscentral_id', '')) ?: null;
+    $oetv_nr           = trim(post('oetv_nr', '')) ?: null;
     $pid = db_insert(
-        "INSERT INTO player (name, firstname, club, gender, pass_nr, email, ratingscentral_id) VALUES (?,?,?,?,?,?,?)",
-        [$name, $firstname, $club, $gender, $pass_nr, $email, $ratingscentral_id]
+        "INSERT INTO player (name, firstname, club, gender, pass_nr, email, ratingscentral_id, oetv_nr) VALUES (?,?,?,?,?,?,?,?)",
+        [$name, $firstname, $club, $gender, $pass_nr, $email, $ratingscentral_id, $oetv_nr]
     );
     _save_player_skills((int)$pid);
     redirect('players#tab-spieler');
@@ -328,6 +329,7 @@ function edit(array $p): void {
     $email     = trim(post('email'));
 
     $ratingscentral_id = trim(post('ratingscentral_id', '')) ?: null;
+    $oetv_nr           = trim(post('oetv_nr', '')) ?: null;
 
     if (!$name || !$firstname) {
         flash('danger', 'Nachname und Vorname sind Pflichtfelder.');
@@ -335,8 +337,8 @@ function edit(array $p): void {
         return;
     }
     db_execute(
-        "UPDATE player SET name=?, firstname=?, club=?, gender=?, pass_nr=?, email=?, ratingscentral_id=? WHERE id=?",
-        [$name, $firstname, $club, $gender, $pass_nr, $email, $ratingscentral_id, $pid]
+        "UPDATE player SET name=?, firstname=?, club=?, gender=?, pass_nr=?, email=?, ratingscentral_id=?, oetv_nr=? WHERE id=?",
+        [$name, $firstname, $club, $gender, $pass_nr, $email, $ratingscentral_id, $oetv_nr, $pid]
     );
     foreach (SPORTS_LIST as [$sport_key]) {
         $raw = post("skill_$sport_key", '');
@@ -385,6 +387,36 @@ function delete(array $p): void {
 
     db_execute("DELETE FROM player WHERE id=?", [$pid]);
     redirect('players#tab-spieler');
+}
+
+function toggle_active_player(array $p): void {
+    require_edit();
+    csrf_verify();
+    $pid    = (int)$p['id'];
+    $player = db_fetch("SELECT is_active FROM player WHERE id=?", [$pid]);
+    if (!$player) { redirect('players#tab-spieler'); return; }
+    db_execute("UPDATE player SET is_active=? WHERE id=?", [$player['is_active'] ? 0 : 1, $pid]);
+    redirect('players#tab-spieler');
+}
+
+function toggle_active_double(array $p): void {
+    require_edit();
+    csrf_verify();
+    $did    = (int)$p['did'];
+    $double = db_fetch("SELECT is_active FROM `double` WHERE id=?", [$did]);
+    if (!$double) { redirect('players#tab-doppel'); return; }
+    db_execute("UPDATE `double` SET is_active=? WHERE id=?", [$double['is_active'] ? 0 : 1, $did]);
+    redirect('players#tab-doppel');
+}
+
+function toggle_active_team(array $p): void {
+    require_edit();
+    csrf_verify();
+    $tid  = (int)$p['tid'];
+    $team = db_fetch("SELECT is_active FROM `team` WHERE id=?", [$tid]);
+    if (!$team) { redirect('players#tab-teams'); return; }
+    db_execute("UPDATE `team` SET is_active=? WHERE id=?", [$team['is_active'] ? 0 : 1, $tid]);
+    redirect('players#tab-teams');
 }
 
 function player_profile_json(array $p): void {
@@ -515,7 +547,8 @@ function import_players(array $p): void {
             'fussball'    => (float)str_replace(',', '.', $row[8]),
             'cornhole'    => (float)str_replace(',', '.', $row[9]),
         ];
-        $ratingscentral_id = trim($row[10]) ?: null;
+        $ratingscentral_id = trim($row[10] ?? '') ?: null;
+        $oetv_nr           = trim($row[11] ?? '') ?: null;
 
         if (!$name || !$firstname) {
             $errors[] = 'Zeile ' . ($i + 2) . ': Nachname oder Vorname fehlt — übersprungen.';
@@ -533,8 +566,8 @@ function import_players(array $p): void {
         if ($dup) { $skipped++; continue; }
 
         $pid = db_insert(
-            "INSERT INTO player (name, firstname, club, gender, pass_nr, email, ratingscentral_id) VALUES (?,?,?,?,?,?,?)",
-            [$name, $firstname, $club ?: null, $gender ?: null, $pass_nr ?: null, $email ?: null, $ratingscentral_id]
+            "INSERT INTO player (name, firstname, club, gender, pass_nr, email, ratingscentral_id, oetv_nr) VALUES (?,?,?,?,?,?,?,?)",
+            [$name, $firstname, $club ?: null, $gender ?: null, $pass_nr ?: null, $email ?: null, $ratingscentral_id, $oetv_nr]
         );
         foreach ($skills as $sport => $sk) {
             if ($sk > 0) {
@@ -578,16 +611,16 @@ function _xlsx_build_template(): string {
     $headers = [
         'Nachname', 'Vorname', 'Geschlecht', 'Verein', 'Pass-Nr.', 'E-Mail',
         'Spielstärke Tischtennis', 'Spielstärke Tennis', 'Spielstärke Fußball', 'Spielstärke Cornhole',
-        'RatingsCentral-ID',
+        'RatingsCentral-ID', 'ÖTV-ID',
     ];
-    $example = ['Mustermann', 'Max', 'm', 'Muster SC', 'TT123', 'max@example.com', '1000', '4.5', '0', '0', ''];
+    $example = ['Mustermann', 'Max', 'm', 'Muster SC', 'TT123', 'max@example.com', '1000', '4.5', '0', '0', '', ''];
 
     // Shared strings: headers + example values
     $strings = array_unique(array_merge($headers, array_filter($example, fn($v) => !is_numeric($v) || $v === '')));
     $strings = array_values($strings);
     $strIdx  = array_flip($strings);
 
-    $colLetters = ['A','B','C','D','E','F','G','H','I','J','K'];
+    $colLetters = ['A','B','C','D','E','F','G','H','I','J','K','L'];
 
     // Row 1: bold headers (style s="1")
     $row1 = '';
@@ -761,10 +794,29 @@ function sync_external_skill(array $p): void {
         exit;
     }
 
+    if ($source === 'oetv') {
+        $ext_id = trim($player['oetv_nr'] ?? '');
+        if (!$ext_id) { echo json_encode(['error' => 'Keine ÖTV-ID hinterlegt']); exit; }
+        $result = _fetch_oetv_rating($ext_id);
+        if (!empty($result['error'])) { echo json_encode($result); exit; }
+        db_execute(
+            "INSERT INTO player_skill (player_id, sport, skill, updated_at) VALUES (?,?,?,NOW())
+             ON DUPLICATE KEY UPDATE skill=VALUES(skill), updated_at=NOW()",
+            [$pid, 'tennis', $result['rating']]
+        );
+        echo json_encode(['success' => true, 'skill' => $result['rating']]);
+        exit;
+    }
+
     echo json_encode(['error' => 'Unbekannte Quelle']);
     exit;
 }
 
+
+function _fetch_oetv_rating(string $oetv_nr): array {
+    // Vorbereitet für späteren automatischen Abgleich über die ÖTV-Website/-API.
+    return ['error' => 'Automatischer Abgleich noch nicht verfügbar'];
+}
 
 function _fetch_ratingscentral_rating(string $id): array {
     $url  = 'https://www.ratingscentral.com/Player.php?PlayerID=' . urlencode($id);

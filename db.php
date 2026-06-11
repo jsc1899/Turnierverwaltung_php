@@ -302,6 +302,9 @@ function init_db(): void {
         "ALTER TABLE `player` ADD COLUMN ratingscentral_id VARCHAR(50) DEFAULT NULL",
         "ALTER TABLE `player` ADD COLUMN oetv_nr VARCHAR(50) DEFAULT NULL",
         "ALTER TABLE `user` ADD COLUMN last_login DATETIME NULL DEFAULT NULL",
+        "ALTER TABLE `player` ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1",
+        "ALTER TABLE `double` ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1",
+        "ALTER TABLE `team`   ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1",
     ];
     foreach ($migrations as $sql) {
         try { $pdo->exec($sql); } catch (\PDOException $e) { /* Spalte/Typ bereits korrekt */ }

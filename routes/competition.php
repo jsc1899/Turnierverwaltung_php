@@ -73,7 +73,7 @@ function show(array $p): void {
         unset($team);
         $unassigned_teams = db_fetchall(
             "SELECT t.id, t.name, t.skill FROM `team` t
-             WHERE t.id NOT IN (SELECT team_id FROM competition_team WHERE competition_id=?)
+             WHERE t.is_active=1 AND t.id NOT IN (SELECT team_id FROM competition_team WHERE competition_id=?)
              ORDER BY t.name",
             [$cid]
         );
@@ -127,7 +127,7 @@ function show(array $p): void {
         unset($d);
         $unassigned_doubles = db_fetchall(
             "SELECT d.id, d.name, d.player1_id, d.player2_id FROM `double` d
-             WHERE d.id NOT IN
+             WHERE d.is_active=1 AND d.id NOT IN
              (SELECT double_id FROM competition_double WHERE competition_id = ?)
              ORDER BY d.name",
             [$cid]
@@ -182,7 +182,7 @@ function show(array $p): void {
             [$cid]
         );
         $assigned_ids = array_column($assigned, 'id');
-        $all_players  = db_fetchall("SELECT * FROM player ORDER BY name, firstname");
+        $all_players  = db_fetchall("SELECT * FROM player WHERE is_active=1 ORDER BY name, firstname");
         $unassigned   = array_filter($all_players, fn($pl) => !in_array($pl['id'], $assigned_ids));
         $sport        = $t ? ($t['sport'] ?? '') : '';
         foreach ($assigned as &$pl) {

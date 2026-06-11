@@ -1,5 +1,7 @@
 <?php
 $sport_icons = ['tischtennis'=>'🏓','tennis'=>'🎾','fussball'=>'⚽','cornhole'=>null];
+// Fußball und Cornhole werden im Register nicht verwaltet — nur TT und Tennis anzeigen
+$registry_sports_list = array_values(array_filter($sports_list, fn($s) => !in_array($s[0], ['fussball', 'cornhole'])));
 ob_start(); ?>
 <div class="d-flex align-items-center mb-1 gap-2">
   <h2 class="mb-0"><i class="bi bi-person-lines-fill me-2"></i>Spielerregister</h2>
@@ -20,19 +22,19 @@ ob_start(); ?>
   <li class="nav-item" role="presentation">
     <button class="nav-link active" id="tab-players-btn"
             data-bs-toggle="tab" data-bs-target="#tab-spieler" type="button" role="tab">
-      <i class="bi bi-people me-1"></i>Spieler (<?= count($players) ?>)
+      <i class="bi bi-people me-1"></i>Spieler (<?= count(array_filter($players, fn($p) => $p['is_active'])) ?>)
     </button>
   </li>
   <li class="nav-item" role="presentation">
     <button class="nav-link" id="tab-doppel-btn"
             data-bs-toggle="tab" data-bs-target="#tab-doppel" type="button" role="tab">
-      <i class="bi bi-people-fill me-1"></i>Doppel (<?= count($all_doubles) ?>)
+      <i class="bi bi-people-fill me-1"></i>Doppel (<?= count(array_filter($all_doubles, fn($d) => $d['is_active'])) ?>)
     </button>
   </li>
   <li class="nav-item" role="presentation">
     <button class="nav-link" id="tab-teams-btn"
             data-bs-toggle="tab" data-bs-target="#tab-teams" type="button" role="tab">
-      <i class="bi bi-shield-fill me-1"></i>Teams (<?= count($all_teams) ?>)
+      <i class="bi bi-shield-fill me-1"></i>Teams (<?= count(array_filter($all_teams, fn($t) => $t['is_active'])) ?>)
     </button>
   </li>
 </ul>
@@ -42,7 +44,7 @@ ob_start(); ?>
   <div class="tab-pane fade show active p-3" id="tab-spieler" role="tabpanel">
     <?php if ($players): ?>
     <div class="d-flex align-items-center mb-2 gap-2">
-      <span class="text-muted small"><?= count($players) ?> Einträge</span>
+      <span class="text-muted small"><?= count(array_filter($players, fn($p) => $p['is_active'])) ?> Einträge</span>
       <input type="search" class="form-control form-control-sm table-filter" style="max-width:220px"
              placeholder="Filtern…" data-target="tbl-spieler" aria-label="Spieler filtern">
       <?php if (can_edit()): ?>
@@ -54,6 +56,11 @@ ob_start(); ?>
       <?php else: ?>
       <span class="ms-auto"></span>
       <?php endif; ?>
+      <div class="form-check form-check-inline mb-0">
+        <input class="form-check-input show-inactive-cb" type="checkbox"
+               id="show-inactive-spieler" data-table="tbl-spieler">
+        <label class="form-check-label small text-muted" for="show-inactive-spieler">Inaktive anzeigen</label>
+      </div>
       <div class="btn-group btn-group-sm ms-3">
         <a href="<?= url('players/pdf') ?>" class="btn btn-outline-danger" target="_blank">
           <i class="bi bi-file-earmark-pdf me-1"></i>PDF
@@ -69,7 +76,7 @@ ob_start(); ?>
           <tr>
             <th>Nachname</th><th>Vorname</th><th class="text-center">G</th>
             <th>Verein</th><th>Pass-Nr.</th><th>E-Mail</th>
-            <?php foreach ($sports_list as [$sk, $sl, $se]): ?>
+            <?php foreach ($registry_sports_list as [$sk, $sl, $se]): ?>
             <th class="text-center" title="<?= e($sl) ?>">
               <?php if ($se): echo $se; else: ?>
               <img src="<?= url('static/cornhole_icon.svg') ?>" height="14" alt="Cornhole">
@@ -81,7 +88,7 @@ ob_start(); ?>
         </thead>
         <tbody>
           <?php foreach ($players as $p): $ps = $player_skills[$p['id']] ?? []; ?>
-          <tr>
+          <tr data-active="<?= $p['is_active'] ?>"<?= $p['is_active'] ? '' : ' class="opacity-50"' ?>>
             <td class="fw-semibold">
               <button class="btn btn-link btn-sm p-0 text-start text-decoration-none text-dark fw-semibold"
                       data-bs-toggle="modal" data-bs-target="#playerProfileModal"
@@ -97,7 +104,7 @@ ob_start(); ?>
             <td><?= e($p['club'] ?? '') ?></td>
             <td><span class="text-muted"><?= e($p['pass_nr'] ?? '') ?></span></td>
             <td><span class="text-muted small"><?= e($p['email'] ?? '') ?></span></td>
-            <?php foreach ($sports_list as [$sk, $sl, $se]):
+            <?php foreach ($registry_sports_list as [$sk, $sl, $se]):
               $sv = isset($ps[$sk]) ? ($sk === 'tennis' ? number_format((float)$ps[$sk], 1) : (int)$ps[$sk]) : null; ?>
             <td class="text-center" data-sort="<?= $sv ?? 0 ?>">
               <?php if ($sv !== null): ?>
@@ -106,12 +113,26 @@ ob_start(); ?>
                 <?= $sv ?>
               </span>
               <?php endif; ?>
+              <?php if ($sk === 'tischtennis' && !empty($p['ratingscentral_id'])): ?>
+              <a href="https://www.ratingscentral.com/Player.php?PlayerID=<?= e($p['ratingscentral_id']) ?>" target="_blank"
+                 rel="noopener" class="btn btn-link btn-sm p-0 ms-1 text-secondary"
+                 title="RatingsCentral-Profil öffnen" style="font-size:.75rem;vertical-align:middle">
+                <i class="bi bi-box-arrow-up-right"></i>
+              </a>
+              <?php endif; ?>
               <?php if ($sk === 'tischtennis' && !empty($p['ratingscentral_id']) && can_edit()): ?>
               <button class="btn btn-link btn-sm p-0 ms-1 rc-sync-btn text-secondary"
                       data-pid="<?= $p['id'] ?>" title="TT-Spielstärke von RatingsCentral abrufen"
                       style="font-size:.75rem;vertical-align:middle">
                 <i class="bi bi-arrow-clockwise"></i>
               </button>
+              <?php endif; ?>
+              <?php if ($sk === 'tennis' && !empty($p['oetv_nr'])): ?>
+              <a href="https://www.oetv.at/spieler/<?= e($p['oetv_nr']) ?>" target="_blank"
+                 rel="noopener" class="btn btn-link btn-sm p-0 ms-1 text-secondary"
+                 title="ÖTV-Profil öffnen" style="font-size:.75rem;vertical-align:middle">
+                <i class="bi bi-box-arrow-up-right"></i>
+              </a>
               <?php endif; ?>
             </td>
             <?php endforeach; ?>
@@ -123,6 +144,17 @@ ob_start(); ?>
                 <i class="bi bi-pencil"></i>
               </button>
               <?php if (can_edit()): ?>
+              <form method="post" action="<?= url('player/'.$p['id'].'/toggle-active') ?>"
+                    class="d-inline ms-1"
+                    data-confirm="<?= $p['is_active'] ? 'Spieler '.e($p['firstname'].' '.$p['name']).' inaktiv setzen?' : 'Spieler '.e($p['firstname'].' '.$p['name']).' wieder aktivieren?' ?>">
+                <?= csrf_field() ?>
+                <button class="btn btn-outline-<?= $p['is_active'] ? 'warning' : 'success' ?> btn-sm"
+                        title="<?= $p['is_active'] ? 'Inaktiv setzen' : 'Aktivieren' ?>">
+                  <i class="bi bi-<?= $p['is_active'] ? 'pause-circle' : 'play-circle' ?>"></i>
+                </button>
+              </form>
+              <?php endif; ?>
+              <?php if (is_admin()): ?>
               <form method="post" action="<?= url('player/' . $p['id'] . '/delete') ?>"
                     class="d-inline ms-1"
                     data-confirm="Spieler <?= e($p['firstname'].' '.$p['name']) ?> wirklich löschen?">
@@ -146,9 +178,14 @@ ob_start(); ?>
     <?php $sport_labels = ['tischtennis'=>'Tischtennis','tennis'=>'Tennis','fussball'=>'Fußball','cornhole'=>'Cornhole']; ?>
     <?php if ($all_doubles): ?>
     <div class="d-flex align-items-center mb-2 gap-2">
-      <span class="text-muted small"><?= count($all_doubles) ?> Einträge</span>
+      <span class="text-muted small"><?= count(array_filter($all_doubles, fn($d) => $d['is_active'])) ?> Einträge</span>
       <input type="search" class="form-control form-control-sm table-filter" style="max-width:220px"
              placeholder="Filtern…" data-target="tbl-doppel" aria-label="Doppel filtern">
+      <div class="form-check form-check-inline mb-0">
+        <input class="form-check-input show-inactive-cb" type="checkbox"
+               id="show-inactive-doppel" data-table="tbl-doppel">
+        <label class="form-check-label small text-muted" for="show-inactive-doppel">Inaktive anzeigen</label>
+      </div>
       <?php if (can_edit()): ?>
       <div class="btn-group btn-group-sm ms-auto">
         <a href="<?= url('players/doubles/pdf') ?>" class="btn btn-outline-danger" target="_blank">
@@ -171,7 +208,7 @@ ob_start(); ?>
         <tbody>
         <?php foreach ($all_doubles as $d): ?>
         <?php $dsums = $double_sport_skills[$d['id']] ?? []; ?>
-        <tr>
+        <tr data-active="<?= $d['is_active'] ?>"<?= $d['is_active'] ? '' : ' class="opacity-50"' ?>>
           <td class="fw-semibold small"><?= e($d['name']) ?></td>
           <td class="small text-muted">
             <?= e($d['p1name']) ?>
@@ -195,6 +232,16 @@ ob_start(); ?>
                     data-bs-toggle="modal" data-bs-target="#editDoubleModal<?= $d['id'] ?>" title="Bearbeiten">
               <i class="bi bi-pencil"></i>
             </button>
+            <form method="post" action="<?= url('players/double/'.$d['id'].'/toggle-active') ?>"
+                  class="d-inline me-1"
+                  data-confirm="<?= $d['is_active'] ? 'Doppel &bdquo;'.e($d['name']).'&ldquo; inaktiv setzen?' : 'Doppel &bdquo;'.e($d['name']).'&ldquo; wieder aktivieren?' ?>">
+              <?= csrf_field() ?>
+              <button class="btn btn-outline-<?= $d['is_active'] ? 'warning' : 'success' ?> btn-sm py-0 px-1"
+                      title="<?= $d['is_active'] ? 'Inaktiv setzen' : 'Aktivieren' ?>">
+                <i class="bi bi-<?= $d['is_active'] ? 'pause-circle' : 'play-circle' ?>"></i>
+              </button>
+            </form>
+            <?php if (is_admin()): ?>
             <form method="post" action="<?= url('players/double/'.$d['id'].'/delete') ?>"
                   class="d-inline"
                   data-confirm="Doppel &bdquo;<?= e($d['name']) ?>&ldquo; wirklich löschen?">
@@ -203,6 +250,7 @@ ob_start(); ?>
                 <i class="bi bi-trash"></i>
               </button>
             </form>
+            <?php endif; ?>
           </td>
           <?php endif; ?>
         </tr>
@@ -225,7 +273,7 @@ ob_start(); ?>
             <option value="">— auswählen —</option>
             <?php foreach ($players as $pl): ?>
             <option value="<?= $pl['id'] ?>">
-              <?= e(trim(($pl['firstname'] ? $pl['firstname'].' ' : '').$pl['name'])) ?>
+              <?= e(trim($pl['name'].($pl['firstname'] ? ' '.$pl['firstname'] : ''))) ?>
               <?php if ($pl['club']): ?>(<?= e($pl['club']) ?>)<?php endif; ?>
             </option>
             <?php endforeach; ?>
@@ -237,7 +285,7 @@ ob_start(); ?>
             <option value="">— auswählen —</option>
             <?php foreach ($players as $pl): ?>
             <option value="<?= $pl['id'] ?>">
-              <?= e(trim(($pl['firstname'] ? $pl['firstname'].' ' : '').$pl['name'])) ?>
+              <?= e(trim($pl['name'].($pl['firstname'] ? ' '.$pl['firstname'] : ''))) ?>
               <?php if ($pl['club']): ?>(<?= e($pl['club']) ?>)<?php endif; ?>
             </option>
             <?php endforeach; ?>
@@ -259,9 +307,14 @@ ob_start(); ?>
   <div class="tab-pane fade p-3" id="tab-teams" role="tabpanel">
     <?php if ($all_teams): ?>
     <div class="d-flex align-items-center mb-2 gap-2">
-      <span class="text-muted small"><?= count($all_teams) ?> Einträge</span>
+      <span class="text-muted small"><?= count(array_filter($all_teams, fn($t) => $t['is_active'])) ?> Einträge</span>
       <input type="search" class="form-control form-control-sm table-filter" style="max-width:220px"
              placeholder="Filtern…" data-target="tbl-teams" aria-label="Teams filtern">
+      <div class="form-check form-check-inline mb-0">
+        <input class="form-check-input show-inactive-cb" type="checkbox"
+               id="show-inactive-teams" data-table="tbl-teams">
+        <label class="form-check-label small text-muted" for="show-inactive-teams">Inaktive anzeigen</label>
+      </div>
       <?php if (can_edit()): ?>
       <div class="btn-group btn-group-sm ms-auto">
         <a href="<?= url('players/teams/pdf') ?>" class="btn btn-outline-danger" target="_blank">
@@ -277,13 +330,13 @@ ob_start(); ?>
       <table class="table table-sm table-hover align-middle mb-0" data-sortable id="tbl-teams">
         <thead class="table-light">
           <tr>
-            <th>Teamname</th><th>Mitglieder</th><th>Spielstärke</th>
+            <th>Teamname</th><th>Mitglieder</th>
             <?php if (can_edit()): ?><th class="no-sort"></th><?php endif; ?>
           </tr>
         </thead>
         <tbody>
         <?php foreach ($all_teams as $team): ?>
-        <tr>
+        <tr data-active="<?= $team['is_active'] ?>"<?= $team['is_active'] ? '' : ' class="opacity-50"' ?>>
           <td class="fw-semibold"><?= e($team['name']) ?></td>
           <td class="small">
             <?php if ($team['members']): ?>
@@ -293,13 +346,22 @@ ob_start(); ?>
               <span class="text-muted">—</span>
             <?php endif; ?>
           </td>
-          <td><?= $team['skill'] > 0 ? (int)$team['skill'] : '—' ?></td>
           <?php if (can_edit()): ?>
           <td class="text-end text-nowrap">
             <button class="btn btn-outline-secondary btn-sm py-0 px-1 me-1"
                     data-bs-toggle="modal" data-bs-target="#editTeamModal<?= $team['id'] ?>" title="Bearbeiten">
               <i class="bi bi-pencil"></i>
             </button>
+            <form method="post" action="<?= url('players/team/'.$team['id'].'/toggle-active') ?>"
+                  class="d-inline me-1"
+                  data-confirm="<?= $team['is_active'] ? 'Team &bdquo;'.e($team['name']).'&ldquo; inaktiv setzen?' : 'Team &bdquo;'.e($team['name']).'&ldquo; wieder aktivieren?' ?>">
+              <?= csrf_field() ?>
+              <button class="btn btn-outline-<?= $team['is_active'] ? 'warning' : 'success' ?> btn-sm py-0 px-1"
+                      title="<?= $team['is_active'] ? 'Inaktiv setzen' : 'Aktivieren' ?>">
+                <i class="bi bi-<?= $team['is_active'] ? 'pause-circle' : 'play-circle' ?>"></i>
+              </button>
+            </form>
+            <?php if (is_admin()): ?>
             <form method="post" action="<?= url('players/team/'.$team['id'].'/delete') ?>"
                   class="d-inline"
                   data-confirm="Team &bdquo;<?= e($team['name']) ?>&ldquo; wirklich löschen?">
@@ -308,6 +370,7 @@ ob_start(); ?>
                 <i class="bi bi-trash"></i>
               </button>
             </form>
+            <?php endif; ?>
           </td>
           <?php endif; ?>
         </tr>
@@ -324,28 +387,31 @@ ob_start(); ?>
       <h6 class="mb-3"><i class="bi bi-plus-circle me-1"></i>Neues Team erstellen</h6>
       <form method="post" action="<?= url('players/team/new') ?>" class="row g-2 align-items-end">
         <?= csrf_field() ?>
-        <div class="col-sm-4">
+        <div class="col-sm-8">
           <label class="form-label small">Teamname <span class="text-danger">*</span></label>
           <input type="text" name="name" class="form-control form-control-sm" required placeholder="z.B. Team Alpha">
-        </div>
-        <div class="col-sm-4">
-          <label class="form-label small">Spielstärke</label>
-          <input type="number" name="skill" step="1" min="0" class="form-control form-control-sm" value="0">
         </div>
         <div class="col-sm-4">
           <button class="btn btn-primary btn-sm w-100"><i class="bi bi-plus me-1"></i>Erstellen</button>
         </div>
         <?php if ($players): ?>
         <div class="col-12">
-          <label class="form-label small">Spieler hinzufügen <span class="text-muted">(optional, Mehrfachauswahl)</span></label>
-          <select name="player_ids[]" multiple class="form-select form-select-sm" style="height:120px">
+          <label class="form-label small">Spieler hinzufügen <span class="text-muted">(optional)</span></label>
+          <div class="d-flex gap-2 mb-1">
+            <a href="#" class="small text-muted add-select-all">Alle</a>
+            <a href="#" class="small text-muted add-select-none">Keine</a>
+          </div>
+          <div class="border rounded add-entry-list mb-2" style="max-height:220px;overflow-y:auto">
             <?php foreach ($players as $pl): ?>
-            <option value="<?= $pl['id'] ?>">
-              <?= e(trim(($pl['firstname'] ? $pl['firstname'].' ' : '').$pl['name'])) ?>
-              <?php if ($pl['club']): ?>(<?= e($pl['club']) ?>)<?php endif; ?>
-            </option>
+            <label class="add-entry-item d-flex align-items-center gap-2 px-2 py-1 border-bottom mb-0 user-select-none" style="cursor:pointer">
+              <input type="checkbox" name="player_ids[]" value="<?= $pl['id'] ?>" class="form-check-input mt-0 flex-shrink-0">
+              <span class="small">
+                <?= e(trim($pl['name'].($pl['firstname'] ? ' '.$pl['firstname'] : ''))) ?>
+                <?php if ($pl['club']): ?><span class="text-muted ms-1">(<?= e($pl['club']) ?>)</span><?php endif; ?>
+              </span>
+            </label>
             <?php endforeach; ?>
-          </select>
+          </div>
         </div>
         <?php endif; ?>
       </form>
@@ -369,14 +435,9 @@ ob_start(); ?>
         <form method="post" action="<?= url('players/team/'.$team['id'].'/edit') ?>" class="mb-3">
           <?= csrf_field() ?>
           <div class="row g-2 align-items-end">
-            <div class="col-sm-6">
+            <div class="col-sm-9">
               <label class="form-label small">Teamname <span class="text-danger">*</span></label>
               <input type="text" name="name" class="form-control form-control-sm" value="<?= e($team['name']) ?>" required>
-            </div>
-            <div class="col-sm-3">
-              <label class="form-label small">Spielstärke</label>
-              <input type="number" name="skill" step="1" min="0" class="form-control form-control-sm"
-                     value="<?= (int)$team['skill'] ?>">
             </div>
             <div class="col-sm-3">
               <button class="btn btn-primary btn-sm w-100"><i class="bi bi-check me-1"></i>Speichern</button>
@@ -429,7 +490,7 @@ ob_start(); ?>
                   <option value="">— auswählen —</option>
                   <?php foreach ($players as $pl): if (in_array($pl['id'], $assigned_ids)) continue; ?>
                   <option value="<?= $pl['id'] ?>">
-                    <?= e(trim(($pl['firstname'] ? $pl['firstname'].' ' : '').$pl['name'])) ?>
+                    <?= e(trim($pl['name'].($pl['firstname'] ? ' '.$pl['firstname'] : ''))) ?>
                     <?php if ($pl['club']): ?>(<?= e($pl['club']) ?>)<?php endif; ?>
                   </option>
                   <?php endforeach; ?>
@@ -507,7 +568,7 @@ ob_start(); ?>
           </div>
           <div class="mb-3">
             <label class="form-label">Spielstärken</label>
-            <?php foreach ($sports_list as [$sk, $sl, $se]): ?>
+            <?php foreach ($registry_sports_list as [$sk, $sl, $se]): ?>
             <div class="input-group input-group-sm mb-1">
               <span class="input-group-text"><?= $se ?: '<img src="'.url('static/cornhole_icon.svg').'" height="12">' ?></span>
               <input type="number" step="<?= $sk === 'tennis' ? '0.1' : '1' ?>" min="0"
@@ -689,11 +750,22 @@ ob_start(); ?>
                       <?php endif; ?>
                     </div>
                     <div id="pf-rc-status" class="form-text"></div>
+                    <label class="form-label small mt-2">🎾 ÖTV-ID</label>
+                    <div class="input-group input-group-sm">
+                      <input type="text" name="oetv_nr" id="pf-oetv_nr"
+                             class="form-control" placeholder="z.B. NU74391"
+                             <?= can_edit() ? '' : 'readonly' ?>>
+                      <a id="pf-oetv-link" href="#" target="_blank" rel="noopener"
+                         class="btn btn-outline-secondary" title="ÖTV-Profil öffnen"
+                         style="display:none">
+                        <i class="bi bi-box-arrow-up-right"></i>
+                      </a>
+                    </div>
                   </div>
                   <div class="col-12">
                     <label class="form-label fw-semibold">Spielstärken</label>
                     <div class="row g-2">
-                      <?php foreach ($sports_list as [$sk, $sl, $se]): ?>
+                      <?php foreach ($registry_sports_list as [$sk, $sl, $se]): ?>
                       <div class="col-6 col-sm-3">
                         <label class="form-label small">
                           <?php if ($se): echo $se; else: ?>
@@ -722,6 +794,18 @@ ob_start(); ?>
       <div class="modal-footer" id="profileFooter" style="display:none">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schließen</button>
         <?php if (can_edit()): ?>
+        <form id="profileToggleForm" method="post" action="" class="me-auto">
+          <?= csrf_field() ?>
+          <button type="submit" id="profileToggleBtn" class="btn btn-outline-warning btn-sm"></button>
+        </form>
+        <?php if (is_admin()): ?>
+        <form id="profileDeleteForm" method="post" action="">
+          <?= csrf_field() ?>
+          <button type="submit" id="profileDeleteBtn" class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-trash me-1"></i>Löschen
+          </button>
+        </form>
+        <?php endif; ?>
         <button type="submit" form="profileEditForm" class="btn btn-primary">
           <i class="bi bi-check2 me-1"></i>Speichern
         </button>
@@ -731,6 +815,10 @@ ob_start(); ?>
   </div>
 </div>
 
+<style>
+.add-entry-item:hover { background: var(--bs-tertiary-bg); }
+.add-entry-item:has(input:checked) { background: var(--bs-primary-bg-subtle); }
+</style>
 <script>
 var playerSkillsData = <?= json_encode($player_skills) ?>;
 var sportLabels = {'tischtennis':'Tischtennis','tennis':'Tennis','fussball':'Fußball','cornhole':'Cornhole'};
@@ -816,7 +904,10 @@ function fillProfileModal(data, pid) {
   // Spielstärken
   Object.keys(sportLabels).forEach(function(sk) {
     var inp = document.getElementById('pf-skill-' + sk);
-    if (inp) inp.value = data.skills[sk] || '';
+    if (!inp) return;
+    var v = data.skills[sk];
+    if (!v) { inp.value = ''; return; }
+    inp.value = (sk === 'tennis') ? parseFloat(v).toFixed(1) : parseInt(v, 10);
   });
 
   // Externes Profil (RatingsCentral)
@@ -835,6 +926,42 @@ function fillProfileModal(data, pid) {
 
   var rcStatus = document.getElementById('pf-rc-status');
   if (rcStatus) { rcStatus.className = 'form-text'; rcStatus.textContent = ''; }
+
+  // Externes Profil (ÖTV)
+  var oetvIdEl = document.getElementById('pf-oetv_nr');
+  if (oetvIdEl) oetvIdEl.value = p.oetv_nr || '';
+
+  var oetvLink = document.getElementById('pf-oetv-link');
+  if (oetvLink) {
+    if (p.oetv_nr) {
+      oetvLink.href = 'https://www.oetv.at/spieler/' + encodeURIComponent(p.oetv_nr);
+      oetvLink.style.display = '';
+    } else {
+      oetvLink.style.display = 'none';
+    }
+  }
+
+  // Löschen im Modal-Footer (nur Admin)
+  var deleteForm = document.getElementById('profileDeleteForm');
+  if (deleteForm) {
+    deleteForm.action = profileBaseUrl + '/' + pid + '/delete';
+    deleteForm.dataset.confirm = 'Spieler wirklich löschen?';
+  }
+
+  // Aktiv/Inaktiv-Toggle im Modal-Footer
+  var toggleForm = document.getElementById('profileToggleForm');
+  var toggleBtn  = document.getElementById('profileToggleBtn');
+  if (toggleForm && toggleBtn) {
+    toggleForm.action = profileBaseUrl + '/' + pid + '/toggle-active';
+    var isActive = p.is_active == 1;
+    toggleBtn.innerHTML = isActive
+      ? '<i class="bi bi-pause-circle me-1"></i>Inaktiv setzen'
+      : '<i class="bi bi-play-circle me-1"></i>Aktivieren';
+    toggleBtn.className = 'btn btn-sm ' + (isActive ? 'btn-outline-warning' : 'btn-outline-success');
+    toggleForm.dataset.confirm = isActive
+      ? 'Spieler inaktiv setzen?'
+      : 'Spieler wieder aktivieren?';
+  }
 
   // Bewerbe Tab
   document.getElementById('profileCompsContent').innerHTML = buildCompsHtml(data);
@@ -994,6 +1121,22 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 
+// ── ÖTV-Link live aktualisieren ──────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  var oetvInput = document.getElementById('pf-oetv_nr');
+  var oetvLink  = document.getElementById('pf-oetv-link');
+  if (!oetvInput || !oetvLink) return;
+  oetvInput.addEventListener('input', function() {
+    var val = oetvInput.value.trim();
+    if (val) {
+      oetvLink.href = 'https://www.oetv.at/spieler/' + encodeURIComponent(val);
+      oetvLink.style.display = '';
+    } else {
+      oetvLink.style.display = 'none';
+    }
+  });
+});
+
 // ── Einzel-Sync (Icon in Tabellenzeile) ──────────────────────────────────────
 document.addEventListener('click', function(e) {
   var btn = e.target.closest('.rc-sync-btn');
@@ -1083,6 +1226,32 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   document.querySelectorAll('#players-tabs button[data-bs-toggle="tab"]').forEach(function(b) {
     b.addEventListener('shown.bs.tab', function() { localStorage.setItem(STORE, b.id); });
+  });
+});
+
+// ── Alle/Keine für Checkbox-Listen ───────────────────────────────────────────
+document.addEventListener('click', function(e) {
+  var form = e.target.closest('form');
+  if (!form) return;
+  if (e.target.closest('.add-select-all')) {
+    e.preventDefault();
+    form.querySelectorAll('.add-entry-item input[type="checkbox"]').forEach(function(cb) { cb.checked = true; });
+  }
+  if (e.target.closest('.add-select-none')) {
+    e.preventDefault();
+    form.querySelectorAll('.add-entry-item input[type="checkbox"]').forEach(function(cb) { cb.checked = false; });
+  }
+});
+
+// ── Inaktive Einträge ein-/ausblenden ─────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.show-inactive-cb').forEach(function(cb) {
+    function applyFilter() {
+      var rows = document.querySelectorAll('#' + cb.dataset.table + ' tbody tr[data-active="0"]');
+      rows.forEach(function(r) { r.classList.toggle('d-none', !cb.checked); });
+    }
+    cb.addEventListener('change', applyFilter);
+    applyFilter(); // beim Laden inaktive sofort verstecken
   });
 });
 </script>

@@ -244,6 +244,7 @@ ob_start(); ?>
         <i class="bi bi-filetype-csv"></i>
       </a>
     </div>
+    <h6 class="mb-2"><i class="bi bi-people me-1 text-secondary"></i>Zugeteilte Doppel</h6>
     <div class="mb-2 d-flex align-items-center gap-2">
       <input type="search" class="form-control form-control-sm table-filter" style="max-width:220px"
              placeholder="Filtern…" data-target="tbl-comp-doubles" aria-label="Doppel filtern">
@@ -275,7 +276,7 @@ ob_start(); ?>
             <?php
               $d_comp  = (float)($d['skill'] ?? 0);
               $d_reg   = (float)($d['registry_skill'] ?? 0);
-              $d_diff  = abs($d_comp - $d_reg) > 0.049;
+              $d_diff  = in_array($t['sport'] ?? '', ['tischtennis', 'tennis']) && abs($d_comp - $d_reg) > 0.049;
             ?>
             <?php if (can_edit()): ?>
             <div class="d-inline-flex flex-column align-items-center gap-1">
@@ -376,16 +377,24 @@ ob_start(); ?>
     <?php if ($c['phase'] === 'setup' && can_edit()): ?>
     <?php if ($unassigned_doubles): ?>
     <div class="mt-3 pt-3 border-top">
+      <h6 class="mb-2"><i class="bi bi-plus-circle me-1 text-primary"></i>Doppel hinzufügen</h6>
       <form method="post" action="<?= url('competition/'.$c['id'].'/double/add') ?>">
         <?= csrf_field() ?>
-        <select name="double_ids[]" class="form-select form-select-sm mb-2" multiple size="4">
+        <div class="d-flex gap-2 mb-1">
+          <a href="#" class="small text-muted add-select-all">Alle</a>
+          <a href="#" class="small text-muted add-select-none">Keine</a>
+        </div>
+        <div class="border rounded add-entry-list mb-2" style="max-height:220px;overflow-y:auto">
           <?php foreach ($unassigned_doubles as $d): ?>
-          <option value="<?= $d['id'] ?>">
-            <?= e($d['name']) ?>
-            <?php if ($d['skill']): ?>· <?= (int)$d['skill'] ?><?php endif; ?>
-          </option>
+          <label class="add-entry-item d-flex align-items-center gap-2 px-2 py-1 border-bottom mb-0 user-select-none" style="cursor:pointer">
+            <input type="checkbox" name="double_ids[]" value="<?= $d['id'] ?>" class="form-check-input mt-0 flex-shrink-0">
+            <span class="small">
+              <?= e($d['name']) ?>
+              <?php if ($d['skill']): ?><span class="badge bg-secondary ms-1"><?= (int)$d['skill'] ?></span><?php endif; ?>
+            </span>
+          </label>
           <?php endforeach; ?>
-        </select>
+        </div>
         <button class="btn btn-sm btn-primary w-100"><i class="bi bi-plus me-1"></i>Doppel hinzufügen</button>
       </form>
     </div>
@@ -410,6 +419,7 @@ ob_start(); ?>
         <i class="bi bi-filetype-csv"></i>
       </a>
     </div>
+    <h6 class="mb-2"><i class="bi bi-shield me-1 text-secondary"></i>Zugeteilte Teams</h6>
     <div class="mb-2 d-flex align-items-center gap-2">
       <input type="search" class="form-control form-control-sm table-filter" style="max-width:220px"
              placeholder="Filtern…" data-target="tbl-comp-teams" aria-label="Teams filtern">
@@ -479,16 +489,24 @@ ob_start(); ?>
     <?php if ($c['phase'] === 'setup' && can_edit()): ?>
     <?php if ($unassigned_teams): ?>
     <div class="mt-3 pt-3 border-top">
+      <h6 class="mb-2"><i class="bi bi-plus-circle me-1 text-primary"></i>Teams hinzufügen</h6>
       <form method="post" action="<?= url('competition/'.$c['id'].'/team/add') ?>">
         <?= csrf_field() ?>
-        <select name="team_ids[]" class="form-select form-select-sm mb-2" multiple size="4">
+        <div class="d-flex gap-2 mb-1">
+          <a href="#" class="small text-muted add-select-all">Alle</a>
+          <a href="#" class="small text-muted add-select-none">Keine</a>
+        </div>
+        <div class="border rounded add-entry-list mb-2" style="max-height:220px;overflow-y:auto">
           <?php foreach ($unassigned_teams as $team): ?>
-          <option value="<?= $team['id'] ?>">
-            <?= e($team['name']) ?>
-            <?php if ($team['skill']): ?>· <?= (int)$team['skill'] ?><?php endif; ?>
-          </option>
+          <label class="add-entry-item d-flex align-items-center gap-2 px-2 py-1 border-bottom mb-0 user-select-none" style="cursor:pointer">
+            <input type="checkbox" name="team_ids[]" value="<?= $team['id'] ?>" class="form-check-input mt-0 flex-shrink-0">
+            <span class="small">
+              <?= e($team['name']) ?>
+              <?php if ($team['skill']): ?><span class="badge bg-secondary ms-1"><?= (int)$team['skill'] ?></span><?php endif; ?>
+            </span>
+          </label>
           <?php endforeach; ?>
-        </select>
+        </div>
         <button class="btn btn-sm btn-primary w-100"><i class="bi bi-plus me-1"></i>Teams hinzufügen</button>
       </form>
     </div>
@@ -514,6 +532,7 @@ ob_start(); ?>
       </a>
     </div>
     <?php endif; ?>
+    <h6 class="mb-2"><i class="bi bi-person-check me-1 text-secondary"></i>Zugeteilte Spieler</h6>
     <div class="mb-2 d-flex align-items-center gap-2">
       <input type="search" class="form-control form-control-sm table-filter" style="max-width:220px"
              placeholder="Filtern…" data-target="tbl-comp-players" aria-label="Spieler filtern">
@@ -548,7 +567,7 @@ ob_start(); ?>
               $is_tennis   = ($t['sport'] ?? '') === 'tennis';
               $reg_skill   = (float)($pl['registry_skill'] ?? 0);
               $comp_skill  = (float)($pl['skill'] ?? 0);
-              $skill_diff  = abs($comp_skill - $reg_skill) > 0.049;
+              $skill_diff  = in_array($t['sport'] ?? '', ['tischtennis', 'tennis']) && abs($comp_skill - $reg_skill) > 0.049;
             ?>
             <?php if (can_edit()): ?>
             <div class="d-inline-flex flex-column align-items-center gap-1">
@@ -599,17 +618,25 @@ ob_start(); ?>
     </div>
     <?php if ($c['phase'] === 'setup' && can_edit() && $unassigned): ?>
     <div class="mt-3 pt-3 border-top">
+      <h6 class="mb-2"><i class="bi bi-plus-circle me-1 text-primary"></i>Spieler hinzufügen</h6>
       <form method="post" action="<?= url('competition/'.$c['id'].'/player/add') ?>">
         <?= csrf_field() ?>
-        <select name="player_ids[]" class="form-select form-select-sm mb-2" multiple size="4">
+        <div class="d-flex gap-2 mb-1">
+          <a href="#" class="small text-muted add-select-all">Alle</a>
+          <a href="#" class="small text-muted add-select-none">Keine</a>
+        </div>
+        <div class="border rounded add-entry-list mb-2" style="max-height:220px;overflow-y:auto">
           <?php foreach ($unassigned as $pl): ?>
-          <option value="<?= $pl['id'] ?>">
-            <?= e(trim($pl['name'] . ' ' . ($pl['firstname'] ?? ''))) ?>
-            <?php if ($pl['club']): ?>(<?= e($pl['club']) ?>)<?php endif; ?>
-            <?php if ($unassigned_skills[$pl['id']] ?? 0): ?>· <?= $unassigned_skills[$pl['id']] ?><?php endif; ?>
-          </option>
+          <label class="add-entry-item d-flex align-items-center gap-2 px-2 py-1 border-bottom mb-0 user-select-none" style="cursor:pointer">
+            <input type="checkbox" name="player_ids[]" value="<?= $pl['id'] ?>" class="form-check-input mt-0 flex-shrink-0">
+            <span class="small">
+              <?= e(trim($pl['name'] . ' ' . ($pl['firstname'] ?? ''))) ?>
+              <?php if ($pl['club']): ?><span class="text-muted ms-1">(<?= e($pl['club']) ?>)</span><?php endif; ?>
+              <?php if ($unassigned_skills[$pl['id']] ?? 0): ?><span class="badge bg-secondary ms-1"><?= (int)$unassigned_skills[$pl['id']] ?></span><?php endif; ?>
+            </span>
+          </label>
           <?php endforeach; ?>
-        </select>
+        </div>
         <button class="btn btn-sm btn-primary w-100"><i class="bi bi-plus me-1"></i>Hinzufügen</button>
       </form>
     </div>
@@ -929,7 +956,8 @@ ob_start(); ?>
       $first_count = count($ko_rounds[0]['matches']);
       $slot_h = 115;
       $bracket_h = $first_count * $slot_h;
-      $bracket_w = count($ko_rounds) * 270;
+      $ko_col_w  = $is_team ? 405 : 270;
+      $bracket_w = count($ko_rounds) * $ko_col_w;
       $ko_use_duels = $is_team && (int)($c['team_size'] ?? 0) > 0;
     ?>
 
@@ -944,7 +972,7 @@ ob_start(); ?>
       <div style="display:flex; width:<?= $bracket_w ?>px">
         <?php $last_ri = count($ko_rounds) - 1; ?>
         <?php foreach ($ko_rounds as $ri => $round): ?>
-        <div style="width:270px; flex-shrink:0; text-align:center; font-weight:600; font-size:.8rem; padding:0 8px 4px;
+        <div style="width:<?= $ko_col_w ?>px; flex-shrink:0; text-align:center; font-weight:600; font-size:.8rem; padding:0 8px 4px;
                     color:<?= $ri === $last_ri ? '#856404' : '#6c757d' ?>">
           <?= $ri === $last_ri ? '🏆 ' : '' ?><?= e($round['name']) ?>
         </div>
@@ -954,7 +982,7 @@ ob_start(); ?>
       <?php $ko_match_num = 0; ?>
       <div id="ko-bracket-<?= $c['id'] ?>" style="display:flex; position:relative; height:<?= $bracket_h ?>px; width:<?= $bracket_w ?>px">
         <?php foreach ($ko_rounds as $ri => $round): ?>
-        <div class="ko-round" style="display:flex;flex-direction:column;justify-content:space-around;width:270px;flex-shrink:0;height:100%;padding:0 8px">
+        <div class="ko-round" style="display:flex;flex-direction:column;justify-content:space-around;width:<?= $ko_col_w ?>px;flex-shrink:0;height:100%;padding:0 8px">
           <?php foreach ($round['matches'] as $m): $ko_match_num++; ?>
           <div class="ko-match" style="border:1px solid #dee2e6;border-radius:6px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.07);overflow:<?= $ko_use_duels ? 'visible' : 'hidden' ?>">
             <div style="font-size:.65rem;color:#9e9e9e;padding:1px 6px;border-bottom:1px solid #f5f5f5;background:#fafafa">Spiel <?= $ko_match_num ?></div>
@@ -1146,9 +1174,9 @@ ob_start(); ?>
       <!-- Platz 3 – unter dem Finale ausgerichtet -->
       <div style="display:flex;width:<?= $bracket_w ?>px;margin-top:20px">
         <?php for ($i = 0; $i < count($ko_rounds) - 1; $i++): ?>
-        <div style="width:270px;flex-shrink:0"></div>
+        <div style="width:<?= $ko_col_w ?>px;flex-shrink:0"></div>
         <?php endfor; ?>
-        <div style="width:270px;flex-shrink:0;padding:0 8px">
+        <div style="width:<?= $ko_col_w ?>px;flex-shrink:0;padding:0 8px">
           <div style="text-align:center;font-weight:600;font-size:.8rem;color:#856404;padding-bottom:4px">
             🥉 Spiel um Platz 3
           </div>
@@ -1207,13 +1235,14 @@ ob_start(); ?>
 <?php $wb_num_map = []; // wird im WB-Block befüllt; hier vorbelegen für LB-Block
 
 // Helper: render one DKO match card
-function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_num = null, ?string $p1ph = null, ?string $p2ph = null, array $seedings = []): string {
+function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_num = null, ?string $p1ph = null, ?string $p2ph = null, array $seedings = [], bool $wide = false): string {
     $p1 = $m['p1name'] ?? null;
     $p2 = $m['p2name'] ?? null;
     $has_both = $m['player1_id'] && $m['player2_id'];
     $p1win = $m['played'] && $m['score1'] > $m['score2'];
     $p2win = $m['played'] && $m['score2'] > $m['score1'];
-    $o = '<div class="ko-match" style="border:1px solid #dee2e6;border-radius:6px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.07);overflow:hidden;min-width:150px">';
+    $min_w = $wide ? 225 : 150;
+    $o = '<div class="ko-match" style="border:1px solid #dee2e6;border-radius:6px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.07);overflow:hidden;min-width:' . $min_w . 'px">';
     if ($match_num !== null) {
         $o .= '<div style="font-size:.65rem;color:#9e9e9e;padding:1px 6px;border-bottom:1px solid #f5f5f5;background:#fafafa">Spiel ' . $match_num . '</div>';
     }
@@ -1269,7 +1298,8 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
   $dko_first_n = count(reset($dko_wb_arr)['matches']);
   $dko_slot_h  = 115;
   $dko_wb_h    = $dko_first_n * $dko_slot_h;
-  $dko_wb_w    = count($dko_wb_arr) * 270;
+  $dko_col_w   = $is_team ? 405 : 270;
+  $dko_wb_w    = count($dko_wb_arr) * $dko_col_w;
   // Sequentielle Spielnummern für WB (Runde 1 top→bottom, Runde 2 top→bottom, ...)
   $wb_num_map = []; $wb_n = 0;
   foreach ($dko_wb_arr as $rd) {
@@ -1291,7 +1321,7 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
       <!-- Rundenüberschriften -->
       <div style="display:flex;width:<?= $dko_wb_w ?>px">
         <?php $last_wb_ri = count($dko_wb_arr) - 1; $ri = 0; foreach ($dko_wb as $rd): ?>
-        <div style="width:270px;flex-shrink:0;text-align:center;font-weight:600;font-size:.8rem;padding:0 8px 4px;
+        <div style="width:<?= $dko_col_w ?>px;flex-shrink:0;text-align:center;font-weight:600;font-size:.8rem;padding:0 8px 4px;
                     color:<?= $ri === $last_wb_ri ? '#856404' : '#6c757d' ?>">
           <?= $ri === $last_wb_ri ? '🏆 ' : '' ?><?= e($rd['name']) ?>
         </div>
@@ -1300,9 +1330,9 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
       <!-- Bracket-Körper (exakt wie normaler KO) -->
       <div id="dko-wb-bracket-<?= $c['id'] ?>" style="display:flex;position:relative;height:<?= $dko_wb_h ?>px;width:<?= $dko_wb_w ?>px">
         <?php foreach ($dko_wb as $rd): ?>
-        <div class="ko-round" style="display:flex;flex-direction:column;justify-content:space-around;width:270px;flex-shrink:0;height:100%;padding:0 8px">
+        <div class="ko-round" style="display:flex;flex-direction:column;justify-content:space-around;width:<?= $dko_col_w ?>px;flex-shrink:0;height:100%;padding:0 8px">
           <?php foreach ($rd['matches'] as $m): ?>
-          <?= _dko_match_card($m, 'dko-wb-form', can_edit(), $wb_num_map[(int)$m['ko_round']][(int)$m['ko_position']] ?? null, null, null, $ko_seedings) ?>
+          <?= _dko_match_card($m, 'dko-wb-form', can_edit(), $wb_num_map[(int)$m['ko_round']][(int)$m['ko_position']] ?? null, null, null, $ko_seedings, $is_team) ?>
           <?php endforeach; ?>
         </div>
         <?php endforeach; ?>
@@ -1347,7 +1377,7 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
   $lb_r1_count = count(reset($lb_rd_arr)['matches']);
   $lb_slot_h   = 115;
   $lb_total_h  = max(1, $lb_r1_count) * $lb_slot_h;
-  $lb_col_w    = 220;
+  $lb_col_w    = $is_team ? 330 : 220;
   $lb_total_w  = count($lb_rd_arr) * $lb_col_w;
 ?>
 <div class="card shadow-sm mb-4">
@@ -1376,7 +1406,7 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
               $m, 'dko-lb-form', can_edit(), $lb_match_num,
               !$m['player1_id'] ? ($lb_ph[$lr][$lp][1] ?? null) : null,
               !$m['player2_id'] ? ($lb_ph[$lr][$lp][2] ?? null) : null,
-              []
+              [], $is_team
           ) ?>
           <?php endforeach; ?>
         </div>
@@ -1406,8 +1436,8 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
     </form>
     <?php endif; ?>
     <div class="d-flex gap-3 align-items-start">
-      <div style="min-width:200px;max-width:300px">
-        <?= _dko_match_card($dko_gf, 'dko-gf-form', can_edit(), null, null, null, []) ?>
+      <div style="min-width:<?= $is_team ? 300 : 200 ?>px;max-width:<?= $is_team ? 450 : 300 ?>px">
+        <?= _dko_match_card($dko_gf, 'dko-gf-form', can_edit(), null, null, null, [], $is_team) ?>
       </div>
       <div class="small text-muted align-self-center">
         <div><strong>Spieler 1:</strong> WB-Sieger (ungeschlagen)</div>
@@ -1438,6 +1468,10 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
 
 <?php
 $extra_js = <<<'JS'
+<style>
+.add-entry-item:hover { background: var(--bs-tertiary-bg); }
+.add-entry-item:has(input:checked) { background: var(--bs-primary-bg-subtle); }
+</style>
 <script>
 // ── Group Drag-and-Drop ──────────────────────────────────────────
 var grpDragEl = null, grpEditActive = false;
@@ -1668,6 +1702,21 @@ document.addEventListener('input', function(e) {
   var t1 = form.querySelector('.duel-total-1'), t2 = form.querySelector('.duel-total-2');
   if (t1) t1.textContent = s1;
   if (t2) t2.textContent = s2;
+});
+
+document.addEventListener('click', function(e) {
+  var form = e.target.closest('form');
+  if (!form) return;
+  if (e.target.closest('.add-select-all')) {
+    e.preventDefault();
+    form.querySelectorAll('.add-entry-item input[type="checkbox"]').forEach(function(cb) {
+      if (cb.closest('.add-entry-item').style.display !== 'none') cb.checked = true;
+    });
+  }
+  if (e.target.closest('.add-select-none')) {
+    e.preventDefault();
+    form.querySelectorAll('.add-entry-item input[type="checkbox"]').forEach(function(cb) { cb.checked = false; });
+  }
 });
 
 // ── Duel inline: Duplikat-Spieler verhindern ─────────────────────
