@@ -140,6 +140,7 @@ $routes = [
     ['POST',     '/competition/{id}/groups/reorder',         'competition', 'groups_reorder'],
     ['POST',     '/competition/{id}/ko/reorder',             'competition', 'ko_reorder'],
     ['POST',     '/competition/{id}/seedings/save',          'competition', 'seedings_save'],
+    ['POST',     '/group/{gid}/tiebreak',                   'competition', 'save_group_tiebreak'],
 
     // Match results
     ['POST',     '/match/{id}/result',               'match_result', 'save'],

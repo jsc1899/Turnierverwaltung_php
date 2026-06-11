@@ -267,6 +267,10 @@ body { background: #f4f6f9; }
 .place-name { font-weight: 700; font-size: 1rem; }
 .place-club { font-size: .8rem; color: #6c757d; margin-top: 2px; }
 
+/* ── Aufstiegspositionen in Gruppenrangliste ─────────────────────────────── */
+.row-advance { --bs-table-bg: #b7e4c7; }
+.row-advance:hover { --bs-table-bg: #a3d9b5; }
+
 /* ── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 576px) {
   .bracket-col { min-width: 170px; }

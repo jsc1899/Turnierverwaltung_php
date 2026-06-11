@@ -343,7 +343,7 @@ $nennung_badge = $pending_count + $change_count;
               </select>
             </div>
             <div class="col-sm-6" id="new-team-size-wrap" style="display:none">
-              <label class="form-label">Spieler pro Team <span class="text-muted small">(0 = direkte Eingabe)</span></label>
+              <label class="form-label">Spiele pro Team</label>
               <input type="number" name="team_size" class="form-control" value="0" min="0" max="20">
             </div>
             <div class="col-sm-6">

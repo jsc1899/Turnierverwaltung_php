@@ -144,7 +144,7 @@ ob_start(); ?>
         <?php endif; ?>
       </div>
       <div class="col-auto" id="field-team-size"<?= $comp_type !== 'team' ? ' style="display:none"' : '' ?>>
-        <label class="form-label">Spieler pro Team <span class="text-muted small">(0 = direkte Eingabe)</span></label>
+        <label class="form-label">Spiele pro Team</label>
         <input type="number" name="team_size" class="form-control form-control-sm" style="width:90px"
                min="0" max="20" value="<?= (int)($c['team_size'] ?? 0) ?>"<?= $c['phase'] !== 'setup' ? ' disabled' : '' ?>>
         <?php if ($c['phase'] !== 'setup'): ?>
@@ -675,10 +675,18 @@ ob_start(); ?>
   <?php endif; ?>
   <?php if (can_edit() && $c['phase'] === 'group' && $unplayed_group == 0 && (int)$c['advance_count'] > 0): ?>
   <div class="mb-3">
+    <?php if ($has_open_tie): ?>
+    <div class="d-inline-flex align-items-center gap-2" tabindex="0" data-bs-toggle="tooltip"
+         title="Bitte zuerst alle Tabellengleichstände auflösen.">
+      <button class="btn btn-primary opacity-50" disabled style="cursor:not-allowed"><i class="bi bi-trophy me-1"></i>KO-Phase auslosen</button>
+      <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i></span>
+    </div>
+    <?php else: ?>
     <form method="post" action="<?= url('competition/'.$c['id'].'/draw/ko') ?>">
       <?= csrf_field() ?>
       <button class="btn btn-primary"><i class="bi bi-trophy me-1"></i>KO-Phase auslosen</button>
     </form>
+    <?php endif; ?>
   </div>
   <?php endif; ?>
 
@@ -723,7 +731,8 @@ ob_start(); ?>
     </form>
     <?php endif; ?>
 
-    <?php foreach ($groups as $gi): $g = $gi['group']; $standings = $gi['standings']; $matches = $gi['matches']; ?>
+    <?php $show_einzel = $is_team && (int)($c['team_size'] ?? 0) >= 2; ?>
+    <?php foreach ($groups as $gi): $g = $gi['group']; $standings = $gi['standings']; $matches = $gi['matches']; $tie_ids = $gi['tie_ids'] ?? []; ?>
     <div class="card shadow-sm mb-4">
       <div class="card-header fw-semibold"><i class="bi bi-people me-1"></i><?= e($g['name']) ?></div>
       <div class="card-body p-0">
@@ -732,11 +741,11 @@ ob_start(); ?>
         <div class="table-responsive">
           <table class="table table-sm table-hover align-middle mb-0">
             <thead class="table-light">
-              <tr><th>#</th><th>Spieler</th><th class="text-center">Sp</th><th class="text-center">S</th><th class="text-center">U</th><th class="text-center">N</th><th class="text-center">V</th><th class="text-center">+/-</th><th class="text-center">Pkt</th></tr>
+              <tr><th>#</th><th>Spieler</th><th class="text-center">Sp</th><th class="text-center">S</th><th class="text-center">U</th><th class="text-center">N</th><th class="text-center" style="width:72px">V</th><th class="text-center" style="width:72px">+/-</th><?php if ($show_einzel): ?><th class="text-center" style="width:72px">V (Einzel)</th><th class="text-center" style="width:72px">+/- (Einzel)</th><?php endif; ?><th class="text-center">Pkt</th></tr>
             </thead>
             <tbody>
               <?php foreach ($standings as $i => $pl): ?>
-              <tr<?= $i < (int)$c['advance_count'] ? ' class="table-success"' : '' ?>>
+              <tr<?= $i < (int)$c['advance_count'] ? ' class="row-advance"' : '' ?>>
                 <td><strong><?= $i+1 ?></strong></td>
                 <td>
                   <?= e($pl['name']) ?>
@@ -745,6 +754,9 @@ ob_start(); ?>
                     $sv = ($t['sport'] ?? '') === 'tennis' ? number_format((float)$pl['skill'], 1) : (int)$pl['skill']; ?>
                   <span class="badge bg-secondary ms-1"><?= $sv ?></span>
                   <?php endif; ?>
+                  <?php if (is_admin() && in_array($pl['id'], $tie_ids)): ?>
+                  <span class="badge bg-warning text-dark ms-1" title="Tabellengleichstand – Positionen festlegen"><i class="bi bi-exclamation-triangle"></i></span>
+                  <?php endif; ?>
                 </td>
                 <td class="text-center"><?= $pl['played'] ?></td>
                 <td class="text-center"><?= $pl['wins'] ?></td>
@@ -752,17 +764,68 @@ ob_start(); ?>
                 <td class="text-center"><?= $pl['losses'] ?></td>
                 <td class="text-center"><?= $pl['goals_for'] ?>:<?= $pl['goals_against'] ?></td>
                 <td class="text-center"><?= $pl['goal_diff'] >= 0 ? '+' . $pl['goal_diff'] : $pl['goal_diff'] ?></td>
+                <?php if ($show_einzel): ?>
+                <td class="text-center"><?= (int)($pl['einzel_for'] ?? 0) ?>:<?= (int)($pl['einzel_against'] ?? 0) ?></td>
+                <td class="text-center"><?php $ed = (int)($pl['einzel_diff'] ?? 0); echo $ed >= 0 ? '+' . $ed : $ed; ?></td>
+                <?php endif; ?>
                 <td class="text-center"><strong><?= $pl['points'] ?></strong></td>
               </tr>
               <?php endforeach; ?>
             </tbody>
           </table>
         </div>
+        <?php if (is_admin() && $c['phase'] === 'group' && !empty($tie_ids)): ?>
+        <div class="px-3 pb-2 pt-1">
+          <button class="btn btn-outline-secondary btn-sm"
+                  data-bs-toggle="modal" data-bs-target="#losentscheid-modal-<?= $g['id'] ?>">
+            <i class="bi bi-list-ol me-1"></i>Tabellengleichstand – Positionen festlegen
+          </button>
+        </div>
+        <!-- Losentscheid-Modal -->
+        <div class="modal fade" id="losentscheid-modal-<?= $g['id'] ?>" tabindex="-1">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-list-ol me-1"></i>Tabellengleichstand – Gruppe <?= e($g['name']) ?></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <form method="post" action="<?= url('group/'.$g['id'].'/tiebreak') ?>">
+                <?= csrf_field() ?>
+                <input type="hidden" name="type" value="<?= $is_team ? 'team' : ($is_doubles ? 'double' : 'player') ?>">
+                <div class="modal-body">
+                  <p class="text-muted small mb-3">Reihenfolge per Drag-and-Drop festlegen. Gilt nur als letzter Tiebreaker — Punkte und Direktvergleich haben immer Vorrang.</p>
+                  <ul class="list-group los-sortable" id="los-list-<?= $g['id'] ?>">
+                    <?php $los_rank = 1; foreach ($standings as $i => $row): $is_tied = in_array($row['id'], $tie_ids); ?>
+                    <li class="list-group-item d-flex align-items-center gap-2<?= $is_tied ? ' los-draggable' : ' opacity-50' ?>"
+                        style="<?= $is_tied ? 'cursor:grab' : '' ?>">
+                      <?php if ($is_tied): ?>
+                      <i class="bi bi-grip-vertical text-muted flex-shrink-0"></i>
+                      <?php else: ?>
+                      <span style="width:1rem;flex-shrink:0"></span>
+                      <?php endif; ?>
+                      <span class="badge bg-light text-secondary border flex-shrink-0" style="min-width:2rem"><?= $i + 1 ?></span>
+                      <span class="flex-grow-1 small"><?= e($row['name']) ?><?php if ($row['club']): ?> <span class="text-muted">(<?= e($row['club']) ?>)</span><?php endif; ?></span>
+                      <?php if ($is_tied): ?>
+                      <input type="hidden" name="order[<?= $row['id'] ?>]" class="los-rank-input" value="<?= $los_rank++ ?>">
+                      <?php endif; ?>
+                    </li>
+                    <?php endforeach; ?>
+                  </ul>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                  <button type="submit" class="btn btn-primary"><i class="bi bi-check me-1"></i>Speichern</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+        <?php endif; ?>
         <!-- Match results -->
         <div class="p-3 border-top">
           <h6 class="text-muted mb-2">Spielergebnisse</h6>
           <?php
-          $use_duels = $is_team && (int)($c['team_size'] ?? 0) > 0;
+          $use_duels = $is_team && (int)($c['team_size'] ?? 0) > 1;
           if (can_edit() && !$use_duels): ?>
           <form id="grp-form-<?= $g['id'] ?>" method="post"
                 action="<?= url('competition/'.$c['id'].'/results/bulk') ?>">
@@ -813,6 +876,7 @@ ob_start(); ?>
                       <?php foreach ($t1members as $pl): ?>
                       <option value="<?= $pl['id'] ?>"<?= (($d['player1_id'] ?? null) == $pl['id']) ? ' selected' : '' ?>><?= e($pl['fullname']) ?></option>
                       <?php endforeach; ?>
+                      <option value="__doppel__"<?= (($d['duel_label'] ?? null) === 'Doppel') ? ' selected' : '' ?>>Doppel</option>
                     </select>
                   </td>
                   <td class="text-center py-1">
@@ -832,6 +896,7 @@ ob_start(); ?>
                       <?php foreach ($t2members as $pl): ?>
                       <option value="<?= $pl['id'] ?>"<?= (($d['player2_id'] ?? null) == $pl['id']) ? ' selected' : '' ?>><?= e($pl['fullname']) ?></option>
                       <?php endforeach; ?>
+                      <option value="__doppel__"<?= (($d['duel_label'] ?? null) === 'Doppel') ? ' selected' : '' ?>>Doppel</option>
                     </select>
                   </td>
                 </tr>
@@ -848,9 +913,9 @@ ob_start(); ?>
               <tbody>
                 <?php foreach ($duel_rows as $d): ?>
                 <tr>
-                  <td class="small text-end"><?= e($d['player1_name'] ?? '—') ?></td>
+                  <td class="small text-end"><?= ($d['duel_label'] ?? null) === 'Doppel' ? '<em>Doppel</em>' : e($d['player1_name'] ?? '—') ?></td>
                   <td class="text-center small fw-semibold"><?= $d['played'] ? $d['score1'].':'.$d['score2'] : '—:—' ?></td>
-                  <td class="small"><?= e($d['player2_name'] ?? '—') ?></td>
+                  <td class="small"><?= ($d['duel_label'] ?? null) === 'Doppel' ? '<em>Doppel</em>' : e($d['player2_name'] ?? '—') ?></td>
                 </tr>
                 <?php endforeach; ?>
               </tbody>
@@ -958,7 +1023,7 @@ ob_start(); ?>
       $bracket_h = $first_count * $slot_h;
       $ko_col_w  = $is_team ? 405 : 270;
       $bracket_w = count($ko_rounds) * $ko_col_w;
-      $ko_use_duels = $is_team && (int)($c['team_size'] ?? 0) > 0;
+      $ko_use_duels = $is_team && (int)($c['team_size'] ?? 0) > 1;
     ?>
 
     <?php if (can_edit()): ?>
@@ -1064,6 +1129,7 @@ ob_start(); ?>
                           <?php foreach ($ko_t1members as $pl): ?>
                           <option value="<?= $pl['id'] ?>"<?= (($d['player1_id'] ?? null) == $pl['id']) ? ' selected' : '' ?>><?= e($pl['fullname']) ?></option>
                           <?php endforeach; ?>
+                          <option value="__doppel__"<?= (($d['duel_label'] ?? null) === 'Doppel') ? ' selected' : '' ?>>Doppel</option>
                         </select>
                       </td>
                       <td>
@@ -1083,6 +1149,7 @@ ob_start(); ?>
                           <?php foreach ($ko_t2members as $pl): ?>
                           <option value="<?= $pl['id'] ?>"<?= (($d['player2_id'] ?? null) == $pl['id']) ? ' selected' : '' ?>><?= e($pl['fullname']) ?></option>
                           <?php endforeach; ?>
+                          <option value="__doppel__"<?= (($d['duel_label'] ?? null) === 'Doppel') ? ' selected' : '' ?>>Doppel</option>
                         </select>
                       </td>
                     </tr>
@@ -1132,9 +1199,9 @@ ob_start(); ?>
                   <tbody>
                     <?php foreach ($ko_duel_rows as $d): ?>
                     <tr>
-                      <td class="py-0 text-end"><?= e($d['player1_name'] ?? '—') ?></td>
+                      <td class="py-0 text-end"><?= ($d['duel_label'] ?? null) === 'Doppel' ? '<em>Doppel</em>' : e($d['player1_name'] ?? '—') ?></td>
                       <td class="text-center py-0 fw-semibold"><?= $d['played'] ? $d['score1'].':'.$d['score2'] : '—:—' ?></td>
-                      <td class="py-0"><?= e($d['player2_name'] ?? '—') ?></td>
+                      <td class="py-0"><?= ($d['duel_label'] ?? null) === 'Doppel' ? '<em>Doppel</em>' : e($d['player2_name'] ?? '—') ?></td>
                     </tr>
                     <?php endforeach; ?>
                   </tbody>
@@ -1185,7 +1252,7 @@ ob_start(); ?>
             <div class="d-flex align-items-center gap-1 px-2 <?= ($m['played'] && $m['score1'] > $m['score2']) ? 'bg-success-subtle fw-semibold' : '' ?>"
                  style="min-height:33px;border-bottom:1px solid #f0f0f0">
               <span class="flex-grow-1 small text-truncate" style="min-width:0"
-                    title="<?= e($m['p1name'] ?? '') ?>"><?= e($m['p1name'] ?? 'Freilos') ?></span>
+                    title="<?= e($m['p1name'] ?? '') ?>"><?= $m['p1name'] !== null ? e($m['p1name']) : '—' ?></span>
               <?php if (can_edit() && $m['player1_id'] && $m['player2_id']): ?>
               <input type="number" name="matches[<?= $m['id'] ?>][score1]" min="0" form="ko-form"
                      class="form-control form-control-sm text-center ms-auto" style="width:40px;height:24px;padding:0 2px;font-size:.8rem;flex-shrink:0"
@@ -1195,7 +1262,7 @@ ob_start(); ?>
             <div class="d-flex align-items-center gap-1 px-2 <?= ($m['played'] && $m['score2'] > $m['score1']) ? 'bg-success-subtle fw-semibold' : '' ?>"
                  style="min-height:33px">
               <span class="flex-grow-1 small text-truncate" style="min-width:0"
-                    title="<?= e($m['p2name'] ?? '') ?>"><?= e($m['p2name'] ?? 'Freilos') ?></span>
+                    title="<?= e($m['p2name'] ?? '') ?>"><?= $m['p2name'] !== null ? e($m['p2name']) : '—' ?></span>
               <?php if (can_edit() && $m['player1_id'] && $m['player2_id']): ?>
               <input type="number" name="matches[<?= $m['id'] ?>][score2]" min="0" form="ko-form"
                      class="form-control form-control-sm text-center ms-auto" style="width:40px;height:24px;padding:0 2px;font-size:.8rem;flex-shrink:0"
@@ -1468,6 +1535,7 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
 
 <?php
 $extra_js = <<<'JS'
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
 <style>
 .add-entry-item:hover { background: var(--bs-tertiary-bg); }
 .add-entry-item:has(input:checked) { background: var(--bs-primary-bg-subtle); }
@@ -1719,19 +1787,22 @@ document.addEventListener('click', function(e) {
   }
 });
 
-// ── Duel inline: Duplikat-Spieler verhindern ─────────────────────
-document.addEventListener('change', function(e) {
-  if (!e.target.classList.contains('duel-player-select')) return;
-  var form = e.target.closest('.duel-form');
-  if (!form) return;
-  var side = e.target.dataset.side;
-  var selects = Array.from(form.querySelectorAll('select.duel-player-select[data-side="' + side + '"]'));
-  var used = new Set(selects.map(function(s) { return s.value; }).filter(Boolean));
-  selects.forEach(function(sel) {
-    sel.querySelectorAll('option').forEach(function(opt) {
-      if (!opt.value) return;
-      opt.disabled = used.has(opt.value) && sel.value !== opt.value;
-    });
+
+// ── Losentscheid Drag-and-Drop ────────────────────────────────────────────────
+document.querySelectorAll('.los-sortable').forEach(function(el) {
+  new Sortable(el, {
+    animation: 150,
+    handle: '.bi-grip-vertical',
+    draggable: '.los-draggable',
+    onMove: function(evt) {
+      return evt.related.classList.contains('los-draggable');
+    },
+    onEnd: function() {
+      var rank = 1;
+      el.querySelectorAll('li.los-draggable').forEach(function(li) {
+        li.querySelector('.los-rank-input').value = rank++;
+      });
+    }
   });
 });
 </script>

@@ -162,7 +162,7 @@ function edit_double_global(array $p): void {
 }
 
 function delete_double_global(array $p): void {
-    require_edit();
+    require_admin();
     csrf_verify();
     $did = (int)$p['did'];
     $active = db_fetch(
@@ -220,7 +220,7 @@ function edit_team_global(array $p): void {
 }
 
 function delete_team_global(array $p): void {
-    require_edit();
+    require_admin();
     csrf_verify();
     $tid    = (int)$p['tid'];
     $active = db_fetch(
@@ -257,24 +257,6 @@ function remove_team_player(array $p): void {
     csrf_verify();
     $tid = (int)$p['tid'];
     $pid = (int)$p['pid'];
-    $blocked = db_fetchall(
-        "SELECT c.name, c.team_size FROM competition c
-         JOIN competition_team ct ON ct.competition_id = c.id
-         WHERE ct.team_id = ? AND c.team_size > 0",
-        [$tid]
-    );
-    if ($blocked) {
-        $current = (int)(db_fetch(
-            "SELECT COUNT(*) as n FROM team_player WHERE team_id=?", [$tid]
-        )['n'] ?? 0);
-        foreach ($blocked as $bc) {
-            if (($current - 1) < (int)$bc['team_size']) {
-                flash('danger', "Spieler kann nicht entfernt werden: Bewerb \u{201E}{$bc['name']}\u{201C} erfordert mind. {$bc['team_size']} Mitglieder.");
-                redirect('players#tab-teams');
-                return;
-            }
-        }
-    }
     $duel_used = db_fetch(
         "SELECT d.id FROM team_match_duel d
          JOIN `match` m ON m.id = d.match_id
@@ -358,7 +340,7 @@ function edit(array $p): void {
 }
 
 function delete(array $p): void {
-    require_edit();
+    require_admin();
     csrf_verify();
     $pid = (int)$p['id'];
 

@@ -154,7 +154,7 @@ ob_start(); ?>
       <ul>
         <li><strong>Name</strong> — Bezeichnung des Bewerbs (z.B. „Herren Einzel")</li>
         <li><strong>Bewerbstyp</strong> — Einzelbewerb, Doppelbewerb oder Teambewerb (kann nach dem ersten Auslosen nicht mehr geändert werden)</li>
-        <li><strong>Spieler pro Team</strong> — Nur bei Teambewerb; Anzahl der Einzel-Duelle pro Mannschaftsspiel (0 = direkte Gesamtergebnis-Eingabe; nach dem ersten Auslosen gesperrt)</li>
+        <li><strong>Spiele pro Team</strong> — Nur bei Teambewerb; Anzahl der Einzel-Duelle pro Mannschaftsspiel (0 = direkte Gesamtergebnis-Eingabe, 1 = ein Einzel ohne Spielerauswahl; ab 2 wird pro Duel eine Spielerauswahl eingeblendet; nach dem ersten Auslosen gesperrt)</li>
         <li><strong>Modus</strong> — Gruppenphase + KO, Nur KO-Runde oder Doppel-KO (nach dem ersten Auslosen gesperrt)</li>
         <li><strong>Gruppengröße</strong> — Anzahl Spieler pro Gruppe (Gruppenphase), 3–8 Spieler</li>
         <li><strong>KO-Aufstieg</strong> — Wie viele Spieler pro Gruppe in die KO-Runde aufsteigen (0 = nur Gruppenphase)</li>
@@ -263,32 +263,48 @@ ob_start(); ?>
       </ol>
       <div class="alert alert-info small">
         <i class="bi bi-info-circle me-1"></i>
-        Ein Spieler kann nicht aus einem Team entfernt werden, wenn das Team einem Bewerb mit konfigurierter Mindest-Teamgröße zugeordnet ist und das Entfernen die Mindestgröße unterschreiten würde. Ebenso ist eine Entfernung gesperrt, wenn der Spieler in einem gespeicherten Spielergebnis (Duel) des Teams eingetragen ist.
+        Ein Spieler kann nicht aus einem Team entfernt werden, wenn er in einem gespeicherten Spielergebnis (Duel) des Teams eingetragen ist.
       </div>
 
       <h5 class="mt-3">Teambewerb konfigurieren</h5>
       <p>Beim Anlegen oder in den Einstellungen eines Bewerbs den Typ <strong>Teambewerb</strong> wählen. Die wichtigste Einstellung:</p>
       <ul>
-        <li><strong>Spieler pro Team</strong> — Legt fest, wie viele Einzel-Duelle pro Mannschaftsspiel ausgetragen werden (z.B. 4 = vier Einzelspiele). Bei <strong>0</strong> wird das Gesamtergebnis direkt eingegeben (ohne Duelle). Diese Einstellung ist nach dem ersten Auslosen gesperrt.</li>
+        <li><strong>Spiele pro Team</strong> — Legt fest, wie viele Einzel-Duelle pro Mannschaftsspiel ausgetragen werden (z.B. 4 = vier Einzelspiele). Bei <strong>0</strong> wird das Gesamtergebnis direkt eingegeben (ohne Duelle); bei <strong>1</strong> gibt es ein Duel ohne Spielerauswahl. Diese Einstellung ist nach dem ersten Auslosen gesperrt.</li>
       </ul>
 
       <h5 class="mt-3">Teams einem Bewerb zuweisen</h5>
-      <p>Auf der Bewerbsseite können im Setup-Modus Teams aus dem Register hinzugefügt werden. Wenn eine Mindest-Teamgröße konfiguriert ist, wird beim Hinzufügen geprüft, ob das Team ausreichend Mitglieder hat.</p>
+      <p>Auf der Bewerbsseite können im Setup-Modus Teams aus dem Register hinzugefügt werden.</p>
 
       <h5 class="mt-3">Ergebnisse bei Teambewerben</h5>
-      <p>Wenn <em>Spieler pro Team</em> größer 0 ist, wird jedes Mannschaftsspiel in <strong>Einzel-Duelle</strong> aufgeteilt:</p>
+      <p>Wenn <em>Spiele pro Team</em> größer 0 ist, wird jedes Mannschaftsspiel in <strong>Einzel-Duelle</strong> aufgeteilt:</p>
       <ul>
         <li>Direkt unter jedem Spiel erscheint eine Eingabetabelle: links die Spielerauswahl aus Team 1 (rechtsbündig), in der Mitte das Ergebnis des Duells, rechts die Spielerauswahl aus Team 2</li>
+        <li>Ab <em>Spiele pro Team ≥ 2</em> wird pro Zeile eine Spielerauswahl eingeblendet; zusätzlich steht der Eintrag <strong>Doppel</strong> zur Verfügung — für Doppelspiele innerhalb eines Mannschaftskampfs. Doppel kann in mehreren Zeilen gleichzeitig gewählt werden.</li>
         <li>Das <strong>Gesamtergebnis</strong> (Anzahl gewonnener Duelle) wird in der Kopfzeile des Spiels angezeigt — als <code>—:—</code> solange noch nichts gespeichert ist</li>
         <li>Nach dem Speichern wird das Gesamtergebnis automatisch aus den Duel-Ergebnissen berechnet</li>
-        <li>Jeder Spieler darf pro Spiel nur einmal ausgewählt werden (Duplikat-Schutz in der Oberfläche und beim Speichern)</li>
         <li>Gäste und Viewer sehen die Einzel-Ergebnisse unterhalb der Gruppenstand-Tabelle als read-only Ansicht</li>
       </ul>
+
+      <h5 class="mt-3">Gruppenstand bei Teambewerben</h5>
+      <p>Ab <em>Spiele pro Team ≥ 2</em> werden in der Gruppenstand-Tabelle zusätzliche Spalten angezeigt:</p>
+      <ul>
+        <li><strong>V (Einzel)</strong> — Verhältnis der gewonnenen zu verlorenen Einzelduelle (gesamt)</li>
+        <li><strong>+/- (Einzel)</strong> — Differenz aus gewonnenen und verlorenen Einzelduellen</li>
+      </ul>
+      <p>Tiebreaker-Reihenfolge bei Punktegleichstand im Teambewerb mit Einzelduellen:</p>
+      <ol class="small">
+        <li>Direktvergleich (H2H): Punkte → Mannschaftsdifferenz → Mannschafts-Plus → Einzeldifferenz (H2H) → Einzel-Plus (H2H)</li>
+        <li>Gesamte Mannschaftsdifferenz</li>
+        <li>Gesamt-Einzeldifferenz</li>
+        <li>Gesamt-Mannschafts-Plus</li>
+        <li>Gesamt-Einzel-Plus</li>
+        <li>Tabellengleichstand — Positionen manuell festlegen</li>
+      </ol>
 
       <h5 class="mt-3">PDFs bei Teambewerben</h5>
       <ul>
         <li><strong>Gruppenplan-PDF</strong> — Zeigt nach jeder Gruppenstand-Tabelle die Spielpaarungen mit den eingetragenen Einzel-Spielernamen und -Ergebnissen</li>
-        <li><strong>Spielkarten-PDF</strong> — Jede Karte enthält die Teamnamen und so viele leere Zeilen wie <em>Spieler pro Team</em> angegeben — für die händische Eintragung vor Ort (3 Karten pro Seite statt 6 bei Einzelbewerben)</li>
+        <li><strong>Spielkarten-PDF</strong> — Jede Karte enthält die Teamnamen und so viele leere Zeilen wie <em>Spiele pro Team</em> angegeben — für die händische Eintragung vor Ort (3 Karten pro Seite statt 6 bei Einzelbewerben)</li>
       </ul>
     </section>
 
@@ -310,8 +326,12 @@ ob_start(); ?>
         <li>Direkter Vergleich der punktegleichen Spieler: Punkte → Differenz → Plus</li>
         <li>Gesamte Differenz aller Gruppenspiele</li>
         <li>Gesamt-Plus</li>
-        <li>Spielstärke (je nach Setzungsreihenfolge)</li>
+        <li>Tabellengleichstand — Positionen manuell festlegen</li>
       </ol>
+      <div class="alert alert-info small mt-2">
+        <i class="bi bi-info-circle me-1"></i>
+        Solange ein offener Tabellengleichstand besteht, ist die Schaltfläche <strong>KO-Phase auslosen</strong> gesperrt. Der Gleichstand muss zuerst über <strong>Tabellengleichstand – Positionen festlegen</strong> aufgelöst werden.
+      </div>
 
       <h5 id="ko" class="mt-3">KO-Runde (nach Gruppenphase)</h5>
       <p>Nach Abschluss der Gruppenphase werden die qualifizierten Teilnehmer in ein KO-Bracket ausgelost. Gruppensieger werden gegen Gruppenzweite aus anderen Gruppen gesetzt.</p>
@@ -344,13 +364,13 @@ ob_start(); ?>
       </ul>
 
       <h5 class="mt-3">Teambewerbe</h5>
-      <p>Wenn ein Teambewerb mit <em>Spieler pro Team &gt; 0</em> konfiguriert ist, wird für jedes Mannschaftsspiel eine Duel-Tabelle eingeblendet:</p>
+      <p>Wenn ein Teambewerb mit <em>Spiele pro Team &gt; 0</em> konfiguriert ist, wird für jedes Mannschaftsspiel eine Duel-Tabelle eingeblendet:</p>
       <ul>
         <li>Pro Zeile: Spielerauswahl Team 1 (links) — Ergebnis des Duells (Mitte) — Spielerauswahl Team 2 (rechts)</li>
-        <li>Die Spielerauswahl ist auf die Mitglieder des jeweiligen Teams begrenzt; jeder Spieler darf nur einmal pro Spiel erscheinen</li>
+        <li>Ab <em>Spiele pro Team ≥ 2</em> steht zusätzlich der Eintrag <strong>Doppel</strong> zur Verfügung (für Doppelspiele); Doppel kann in mehreren Zeilen gleichzeitig gewählt werden</li>
         <li>Das <strong>Gesamtergebnis</strong> (Anzahl gewonnener Duelle) ergibt sich automatisch und wird in der Kopfzeile des Spiels angezeigt</li>
         <li>Bei KO-Spielen ist die Duel-Tabelle über das <strong>Duelle</strong>-Element ausklappbar</li>
-        <li>Bei <em>Spieler pro Team = 0</em> wird nur das Gesamtergebnis direkt eingetragen (wie bei Einzelbewerben)</li>
+        <li>Bei <em>Spiele pro Team = 0</em> wird nur das Gesamtergebnis direkt eingetragen (wie bei Einzelbewerben)</li>
       </ul>
 
       <h5 class="mt-3">Spielkarten drucken</h5>

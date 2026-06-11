@@ -6,6 +6,12 @@ function _is_double_ko(int $cid): bool {
     return $c && $c['mode'] === 'double_ko';
 }
 
+function _reset_group_tiebreak(int $group_id): void {
+    db_execute("UPDATE group_player SET tiebreak_order=NULL WHERE group_id=?", [$group_id]);
+    db_execute("UPDATE group_double SET tiebreak_order=NULL WHERE group_id=?", [$group_id]);
+    db_execute("UPDATE group_team   SET tiebreak_order=NULL WHERE group_id=?", [$group_id]);
+}
+
 function _propagate_result(int $cid, array $m): void {
     if ($m['group_id'] !== null) {
         _maybe_set_done($cid);
@@ -45,6 +51,7 @@ function save(array $p): void {
     }
 
     db_execute("UPDATE `match` SET score1=?, score2=?, played=1 WHERE id=?", [$score1, $score2, $mid]);
+    if ($m['group_id'] !== null) _reset_group_tiebreak((int)$m['group_id']);
     _propagate_result((int)$m['competition_id'], $m);
     redirect('competition/' . $m['competition_id']);
 }
@@ -78,6 +85,7 @@ function save_bulk(array $p): void {
             continue;
         }
         db_execute("UPDATE `match` SET score1=?, score2=?, played=1 WHERE id=?", [$score1, $score2, $mid]);
+        if ($m['group_id'] !== null) _reset_group_tiebreak((int)$m['group_id']);
         _propagate_result($cid, $m);
     }
 
@@ -96,7 +104,9 @@ function clear_result(array $p): void {
     if (!empty($comp['team_size'])) {
         db_execute("DELETE FROM team_match_duel WHERE match_id=?", [$mid]);
     }
-    if ($m['group_id'] === null) {
+    if ($m['group_id'] !== null) {
+        _reset_group_tiebreak((int)$m['group_id']);
+    } else {
         _propagate_result((int)$m['competition_id'], $m);
     }
     redirect('competition/' . $m['competition_id']);
@@ -133,40 +143,29 @@ function save_duels(array $p): void {
     $duels      = $_POST['duels'] ?? [];
     $team_size  = (int)$m['team_size'];
 
-    $p1ids = []; $p2ids = [];
-    foreach ($duels as $d) {
-        if (!empty($d['player1_id'])) {
-            $id = (int)$d['player1_id'];
-            if (in_array($id, $p1ids)) {
-                flash('warning', 'Jeder Spieler darf nur einmal ausgewählt werden.');
-                redirect('competition/' . $m['cid']); return;
-            }
-            $p1ids[] = $id;
-        }
-        if (!empty($d['player2_id'])) {
-            $id = (int)$d['player2_id'];
-            if (in_array($id, $p2ids)) {
-                flash('warning', 'Jeder Spieler darf nur einmal ausgewählt werden.');
-                redirect('competition/' . $m['cid']); return;
-            }
-            $p2ids[] = $id;
-        }
-    }
-
     db_execute("DELETE FROM team_match_duel WHERE match_id=?", [$mid]);
 
     $s1 = 0; $s2 = 0; $played_count = 0;
     foreach ($duels as $order => $d) {
-        $p1id  = !empty($d['player1_id']) ? (int)$d['player1_id'] : null;
-        $p2id  = !empty($d['player2_id']) ? (int)$d['player2_id'] : null;
+        $p1raw = $d['player1_id'] ?? '';
+        $p2raw = $d['player2_id'] ?? '';
+        $label = null;
+        if ($p1raw === '__doppel__' || $p2raw === '__doppel__') {
+            $label = 'Doppel';
+            $p1id  = null;
+            $p2id  = null;
+        } else {
+            $p1id = !empty($p1raw) ? (int)$p1raw : null;
+            $p2id = !empty($p2raw) ? (int)$p2raw : null;
+        }
         $ds1   = ($d['score1'] ?? '') !== '' ? (int)$d['score1'] : null;
         $ds2   = ($d['score2'] ?? '') !== '' ? (int)$d['score2'] : null;
         $dplayed = ($ds1 !== null && $ds2 !== null) ? 1 : 0;
         db_insert(
             "INSERT INTO team_match_duel
-             (match_id, duel_order, player1_id, player2_id, score1, score2, played)
-             VALUES (?,?,?,?,?,?,?)",
-            [$mid, (int)$order, $p1id, $p2id, $ds1, $ds2, $dplayed]
+             (match_id, duel_order, player1_id, player2_id, score1, score2, played, duel_label)
+             VALUES (?,?,?,?,?,?,?,?)",
+            [$mid, (int)$order, $p1id, $p2id, $ds1, $ds2, $dplayed, $label]
         );
         if ($dplayed) {
             $played_count++;
@@ -181,6 +180,7 @@ function save_duels(array $p): void {
             "UPDATE `match` SET score1=?, score2=?, played=? WHERE id=?",
             [$s1, $s2, $all_played, $mid]
         );
+        if ($m['group_id'] !== null) _reset_group_tiebreak((int)$m['group_id']);
         if ($all_played) {
             _propagate_result((int)$m['competition_id'], $m);
         }

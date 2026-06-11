@@ -305,6 +305,10 @@ function init_db(): void {
         "ALTER TABLE `player` ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1",
         "ALTER TABLE `double` ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1",
         "ALTER TABLE `team`   ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1",
+        "ALTER TABLE `group_player` ADD COLUMN tiebreak_order INT NULL DEFAULT NULL",
+        "ALTER TABLE `group_double` ADD COLUMN tiebreak_order INT NULL DEFAULT NULL",
+        "ALTER TABLE `group_team`   ADD COLUMN tiebreak_order INT NULL DEFAULT NULL",
+        "ALTER TABLE `team_match_duel` ADD COLUMN duel_label VARCHAR(32) NULL DEFAULT NULL",
     ];
     foreach ($migrations as $sql) {
         try { $pdo->exec($sql); } catch (\PDOException $e) { /* Spalte/Typ bereits korrekt */ }

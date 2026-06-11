@@ -198,9 +198,9 @@ function show(array $p): void {
     $groups = [];
     if (in_array($c['phase'], ['group', 'ko', 'done'], true)) {
         $grps = db_fetchall("SELECT * FROM grp WHERE competition_id = ? ORDER BY name", [$cid]);
+        require_once __DIR__ . '/../lib/standings.php';
         foreach ($grps as $g) {
             if ($is_team) {
-                require_once __DIR__ . '/../lib/standings.php';
                 $standings = team_standings($g['id'], $c['seeding_order'] ?? 'desc');
                 $matches   = db_fetchall(
                     "SELECT m.*, COALESCE(t1.name,'') as p1name, COALESCE(t2.name,'') as p2name
@@ -216,7 +216,6 @@ function show(array $p): void {
                     return $m;
                 }, $matches);
             } elseif ($is_doubles) {
-                require_once __DIR__ . '/../lib/standings.php';
                 $standings = double_standings($g['id'], $c['seeding_order'] ?? 'desc');
                 $matches   = db_fetchall(
                     "SELECT m.*,
@@ -251,9 +250,21 @@ function show(array $p): void {
                     [$g['id']]
                 );
             }
-            $groups[] = ['group' => $g, 'standings' => $standings, 'matches' => $matches];
+            $all_played = !empty($matches)
+                && count(array_filter($matches, fn($m) => !(int)$m['played'])) === 0;
+            $tie_ids = $all_played
+                ? tied_ids_at_boundary($standings, (int)($c['advance_count'] ?? 0), $matches, 'player1_id', 'player2_id')
+                : [];
+            $groups[] = [
+                'group'     => $g,
+                'standings' => $standings,
+                'matches'   => $matches,
+                'tie_ids'   => $tie_ids,
+            ];
         }
     }
+
+    $has_open_tie = !empty(array_filter($groups, fn($gi) => !empty($gi['tie_ids'])));
 
     $unplayed_group = db_fetch(
         "SELECT COUNT(*) as n FROM `match` WHERE competition_id=? AND group_id IS NOT NULL AND played=0",
@@ -562,7 +573,7 @@ function show(array $p): void {
         'confirmed_regs' => $confirmed_regs ?? [],
         'groups' => $groups, 'ko_rounds' => $ko_rounds,
         'third_place_match' => $third_place_match,
-        'unplayed_group' => $unplayed_group, 'places' => $places,
+        'unplayed_group' => $unplayed_group, 'has_open_tie' => $has_open_tie, 'places' => $places,
         'ko_no_results' => $ko_no_results, 'group_no_results' => $group_no_results,
         'dko_wb' => $dko_wb, 'dko_lb' => $dko_lb, 'dko_gf' => $dko_gf,
         'dko_cap' => $cap ?? 0, 'dko_lb_total' => $lb_total ?? 0,
@@ -1001,6 +1012,27 @@ function draw_ko(array $p): void {
         return;
     }
 
+    require_once __DIR__ . '/../lib/standings.php';
+    $grps_check = db_fetchall("SELECT * FROM grp WHERE competition_id=? ORDER BY name", [$cid]);
+    foreach ($grps_check as $g) {
+        $st = $is_team
+            ? team_standings($g['id'])
+            : ($is_doubles ? double_standings($g['id']) : group_standings($g['id']));
+        if ($is_team) {
+            $p1c = 'team1_id'; $p2c = 'team2_id';
+        } elseif ($is_doubles) {
+            $p1c = 'double1_id'; $p2c = 'double2_id';
+        } else {
+            $p1c = 'player1_id'; $p2c = 'player2_id';
+        }
+        $grp_matches = db_fetchall("SELECT * FROM `match` WHERE group_id=? AND played=1", [$g['id']]);
+        if (!empty(tied_ids_at_boundary($st, (int)$c['advance_count'], $grp_matches, $p1c, $p2c))) {
+            flash('warning', 'Bitte zuerst alle Tabellengleichstände auflösen, bevor die KO-Phase ausgelost wird.');
+            redirect('competition/' . $cid);
+            return;
+        }
+    }
+
     $grps         = db_fetchall("SELECT * FROM grp WHERE competition_id=? ORDER BY name", [$cid]);
     $advance_count = (int)$c['advance_count'];
 
@@ -1395,6 +1427,33 @@ function seedings_save(array $p): void {
     redirect('competition/' . $cid);
 }
 
+function save_group_tiebreak(array $p): void {
+    require_admin();
+    csrf_verify();
+    $gid  = (int)$p['gid'];
+    $grp  = db_fetch("SELECT competition_id FROM grp WHERE id=?", [$gid]);
+    if (!$grp) { redirect('players'); return; }
+    $cid  = (int)$grp['competition_id'];
+    $c    = db_fetch("SELECT is_doubles, is_team FROM competition WHERE id=?", [$cid]);
+    $type = post('type', 'player');
+    $order = $_POST['order'] ?? [];
+
+    if ($type === 'team') {
+        $tbl = 'group_team';   $col = 'team_id';
+    } elseif ($type === 'double') {
+        $tbl = 'group_double'; $col = 'double_id';
+    } else {
+        $tbl = 'group_player'; $col = 'player_id';
+    }
+    foreach ($order as $eid => $rank) {
+        db_execute(
+            "UPDATE `$tbl` SET tiebreak_order=? WHERE group_id=? AND $col=?",
+            [(int)$rank, $gid, (int)$eid]
+        );
+    }
+    redirect('competition/' . $cid . '#tab-gruppen');
+}
+
 // ── Internal helpers ───────────────────────────────────────────────────────────
 
 function add_team(array $p): void {
@@ -1402,10 +1461,9 @@ function add_team(array $p): void {
     csrf_verify();
     $cid  = (int)$p['id'];
     $tids = $_POST['team_ids'] ?? [];
-    $c    = db_fetch("SELECT max_players, is_team, team_size FROM competition WHERE id=?", [$cid]);
+    $c    = db_fetch("SELECT max_players, is_team FROM competition WHERE id=?", [$cid]);
     if (!$c || !$c['is_team']) { redirect('competition/' . $cid); return; }
     $max     = (int)($c['max_players'] ?? 0);
-    $ts      = (int)($c['team_size'] ?? 0);
     $skipped = 0;
     foreach ((array)$tids as $tid_str) {
         $tid = (int)$tid_str;
@@ -1413,16 +1471,6 @@ function add_team(array $p): void {
         if ($max > 0) {
             $count = (int)db_fetch("SELECT COUNT(*) as n FROM competition_team WHERE competition_id=?", [$cid])['n'];
             if ($count >= $max) { $skipped++; continue; }
-        }
-        if ($ts > 0) {
-            $member_count = (int)(db_fetch(
-                "SELECT COUNT(*) as n FROM team_player WHERE team_id=?", [$tid]
-            )['n'] ?? 0);
-            if ($member_count < $ts) {
-                $skipped++;
-                flash('warning', "Team hat nur $member_count Mitglieder — Bewerb erfordert mindestens $ts.");
-                continue;
-            }
         }
         $t = db_fetch("SELECT skill FROM `team` WHERE id=?", [$tid]);
         if (!$t) continue;
