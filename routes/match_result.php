@@ -6,6 +6,11 @@ function _is_double_ko(int $cid): bool {
     return $c && $c['mode'] === 'double_ko';
 }
 
+function _group_phase_locked(int $cid): bool {
+    $c = db_fetch("SELECT phase FROM competition WHERE id=?", [$cid]);
+    return $c && in_array($c['phase'], ['ko', 'done'], true);
+}
+
 function _reset_group_tiebreak(int $group_id): void {
     db_execute("UPDATE group_player SET tiebreak_order=NULL WHERE group_id=?", [$group_id]);
     db_execute("UPDATE group_double SET tiebreak_order=NULL WHERE group_id=?", [$group_id]);
@@ -38,6 +43,12 @@ function save(array $p): void {
 
     $m = db_fetch("SELECT * FROM `match` WHERE id=?", [$mid]);
     if (!$m) { redirect(''); return; }
+
+    if ($m['group_id'] !== null && _group_phase_locked((int)$m['competition_id'])) {
+        flash('danger', 'Gruppenspielergebnisse können nach dem KO-Auslosen nicht mehr geändert werden.');
+        redirect('competition/' . $m['competition_id']);
+        return;
+    }
 
     if ($score1 === null || $score2 === null || $score1 < 0 || $score2 < 0) {
         flash('danger', 'Ungültiges Ergebnis.');
@@ -80,6 +91,10 @@ function save_bulk(array $p): void {
         }
         $m = db_fetch("SELECT * FROM `match` WHERE id=?", [$mid]);
         if (!$m || (int)$m['competition_id'] !== $cid) continue;
+        if ($m['group_id'] !== null && _group_phase_locked($cid)) {
+            $errors[] = "Gruppenspiele können nach dem KO-Auslosen nicht mehr geändert werden.";
+            continue;
+        }
         if ($m['group_id'] === null && $score1 === $score2) {
             $errors[] = "Unentschieden im KO-Bewerb nicht erlaubt.";
             continue;
@@ -99,6 +114,13 @@ function clear_result(array $p): void {
     $mid = (int)$p['id'];
     $m   = db_fetch("SELECT * FROM `match` WHERE id=?", [$mid]);
     if (!$m) { redirect(''); return; }
+
+    if ($m['group_id'] !== null && _group_phase_locked((int)$m['competition_id'])) {
+        flash('danger', 'Gruppenspielergebnisse können nach dem KO-Auslosen nicht mehr geändert werden.');
+        redirect('competition/' . $m['competition_id']);
+        return;
+    }
+
     db_execute("UPDATE `match` SET score1=NULL, score2=NULL, played=0, tiebreak_winner=0 WHERE id=?", [$mid]);
     $comp = db_fetch("SELECT team_size FROM competition WHERE id=?", [(int)$m['competition_id']]);
     if (!empty($comp['team_size'])) {
@@ -139,6 +161,12 @@ function save_duels(array $p): void {
         [$mid]
     );
     if (!$m || !(int)$m['team_size']) { redirect(''); return; }
+
+    if ($m['group_id'] !== null && _group_phase_locked((int)$m['cid'])) {
+        flash('danger', 'Gruppenspielergebnisse können nach dem KO-Auslosen nicht mehr geändert werden.');
+        redirect('competition/' . $m['cid']);
+        return;
+    }
 
     $duels      = $_POST['duels'] ?? [];
     $team_size  = (int)$m['team_size'];

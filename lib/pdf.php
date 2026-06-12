@@ -3,6 +3,15 @@ require_once __DIR__ . '/../lib/standings.php';
 
 // ── mPDF-Fabrik mit korrektem Temp-Verzeichnis ────────────────────────────────
 
+function csv_safe(mixed $v): mixed {
+    if (!is_string($v)) return $v;
+    return preg_match('/^[=+\-@\t\r]/', $v) ? "'" . $v : $v;
+}
+
+function csv_row(array $cells): array {
+    return array_map('csv_safe', $cells);
+}
+
 function mpdf(array $opts = []): \Mpdf\Mpdf {
     $tempDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'mpdf_tmp';
     if (!is_dir($tempDir)) mkdir($tempDir, 0777, true);
@@ -808,12 +817,12 @@ function generate_players_registry_csv(): void {
             "SELECT sport, skill FROM player_skill WHERE player_id=?", [$pl['id']]
         );
         $sk_map = array_column($skills, 'skill', 'sport');
-        fputcsv($out, [
+        fputcsv($out, csv_row([
             $pl['name'], $pl['firstname'] ?? '', $pl['gender'] ?? '',
             $pl['club'] ?? '', $pl['pass_nr'] ?? '', $pl['email'] ?? '',
             $sk_map['tischtennis'] ?? '', $sk_map['tennis'] ?? '',
             $sk_map['fussball'] ?? '',   $sk_map['cornhole'] ?? '',
-        ], ';');
+        ]), ';');
     }
     fclose($out);
     exit;
@@ -915,7 +924,7 @@ function generate_doubles_registry_csv(): void {
             $v = $d['skills'][$sport] ?? 0;
             $row[] = $v > 0 ? $v : '';
         }
-        fputcsv($out, $row, ';');
+        fputcsv($out, csv_row($row), ';');
     }
     fclose($out);
     exit;
@@ -991,10 +1000,10 @@ function generate_teams_registry_csv(): void {
     fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
     fputcsv($out, ['Team', 'Spielstärke Team', 'Nachname', 'Vorname', 'Verein'], ';');
     foreach ($rows as $row) {
-        fputcsv($out, [
+        fputcsv($out, csv_row([
             $row['tname'], $row['team_skill'] ?? '',
             $row['pname'] ?? '', $row['firstname'] ?? '', $row['club'] ?? '',
-        ], ';');
+        ]), ';');
     }
     fclose($out);
     exit;
@@ -1079,11 +1088,11 @@ function generate_tournament_players_csv(int $tid): void {
     fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
     fputcsv($out, ['Nachname','Vorname','Geschlecht','Verein','Pass-Nr.','E-Mail','Bewerbe'], ';');
     foreach ($players as $pl) {
-        fputcsv($out, [
+        fputcsv($out, csv_row([
             $pl['name'], $pl['firstname'] ?? '', $pl['gender'] ?? '',
             $pl['club'] ?? '', $pl['pass_nr'] ?? '', $pl['email'] ?? '',
             $pl['competitions'] ?? '',
-        ], ';');
+        ]), ';');
     }
     fclose($out);
     exit;
@@ -1131,11 +1140,11 @@ function generate_registrations_csv(int $tid): void {
                    'Spielstärke','Bewerbe','Status','Datum'], ';');
     foreach ($regs as $r) {
         $sl = match($r['status']) { 'confirmed'=>'bestätigt','rejected'=>'abgelehnt',default=>'ausstehend' };
-        fputcsv($out, [
+        fputcsv($out, csv_row([
             $r['lastname'], $r['firstname'], $r['club'] ?? '', $r['gender'] ?? '',
             $r['pass_nr'] ?? '', $r['email'] ?? '', $r['skill'] ?? 0,
             $r['comps'] ?? '', $sl, substr($r['created_at'] ?? '', 0, 16),
-        ], ';');
+        ]), ';');
     }
 
     // Abschnitt 2: Bewerbsänderungen
@@ -1147,10 +1156,10 @@ function generate_registrations_csv(int $tid): void {
             $sl = match($cr['status']) { 'confirmed'=>'bestätigt','rejected'=>'abgelehnt',default=>'ausstehend' };
             $tl = $cr['request_type'] === 'withdraw' ? 'Rückzug' : 'Änderung';
             $ch = $cr['request_type'] === 'withdraw' ? 'gesamte Nennung' : ($cr['changes'] ?? '');
-            fputcsv($out, [
+            fputcsv($out, csv_row([
                 $cr['lastname'], $cr['firstname'], $cr['club'] ?? '', $cr['email'] ?? '',
                 $cr['pass_nr'] ?? '', $tl, $ch, $sl, substr($cr['created_at'] ?? '', 0, 16),
-            ], ';');
+            ]), ';');
         }
     }
 
@@ -1298,10 +1307,10 @@ function generate_competition_players_csv(int $cid): void {
         );
         fputcsv($out, ['Team', 'Spielstärke Team', 'Nachname', 'Vorname', 'Verein'], ';');
         foreach ($rows as $row) {
-            fputcsv($out, [
+            fputcsv($out, csv_row([
                 $row['tname'], $row['team_skill'] ?? '',
                 $row['pname'] ?? '', $row['firstname'] ?? '', $row['club'] ?? '',
-            ], ';');
+            ]), ';');
         }
 
     } elseif (!empty($c['is_doubles'])) {
@@ -1320,11 +1329,11 @@ function generate_competition_players_csv(int $cid): void {
         fputcsv($out, ['Spieler 1 Nachname','Spieler 1 Vorname','Spieler 1 Verein',
                        'Spieler 2 Nachname','Spieler 2 Vorname','Spieler 2 Verein','Spielstärke'], ';');
         foreach ($doubles as $d) {
-            fputcsv($out, [
+            fputcsv($out, csv_row([
                 $d['p1name'], $d['p1firstname'] ?? '', $d['p1club'] ?? '',
                 $d['p2name'], $d['p2firstname'] ?? '', $d['p2club'] ?? '',
                 $d['skill'] ?? '',
-            ], ';');
+            ]), ';');
         }
 
     } else {
@@ -1338,11 +1347,11 @@ function generate_competition_players_csv(int $cid): void {
         );
         fputcsv($out, ['Nachname','Vorname','Geschlecht','Verein','Pass-Nr.','E-Mail','Spielstärke'], ';');
         foreach ($players as $pl) {
-            fputcsv($out, [
+            fputcsv($out, csv_row([
                 $pl['name'], $pl['firstname'] ?? '', $pl['gender'] ?? '',
                 $pl['club'] ?? '', $pl['pass_nr'] ?? '', $pl['email'] ?? '',
                 $pl['skill'] ?? '',
-            ], ';');
+            ]), ';');
         }
     }
 

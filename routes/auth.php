@@ -54,12 +54,11 @@ function register(array $p): void {
             flash('danger', 'Passwort muss mindestens 8 Zeichen haben.');
         } elseif ($pw !== $pw2) {
             flash('danger', 'Passwörter stimmen nicht überein.');
-        } elseif (db_fetch("SELECT id FROM user WHERE email = ?", [$email])) {
-            flash('danger', 'Diese E-Mail ist bereits registriert.');
-        } elseif (db_fetch("SELECT id FROM user WHERE username = ?", [$username])) {
-            flash('danger', 'Dieser Benutzername ist bereits vergeben.');
+        } elseif (db_fetch("SELECT id FROM user WHERE email = ?", [$email])
+               || db_fetch("SELECT id FROM user WHERE username = ?", [$username])) {
+            flash('danger', 'Registrierung konnte nicht abgeschlossen werden. Bitte Angaben prüfen.');
         } else {
-            $hash  = password_hash($pw, PASSWORD_BCRYPT);
+            $hash  = password_hash($pw, PASSWORD_ARGON2ID);
             $role  = ($email === ADMIN_EMAIL) ? 'admin' : 'viewer';
             $confirmed = ($email === ADMIN_EMAIL) ? 1 : 0;
             db_insert(
@@ -144,7 +143,7 @@ function reset_password(array $p): void {
         } elseif ($pw !== $pw2) {
             flash('danger', 'Passwörter stimmen nicht überein.');
         } else {
-            $hash = password_hash($pw, PASSWORD_BCRYPT);
+            $hash = password_hash($pw, PASSWORD_ARGON2ID);
             db_execute("UPDATE user SET password_hash = ? WHERE email = ?", [$hash, $email]);
             flash('success', 'Passwort erfolgreich geändert. Du kannst dich jetzt anmelden.');
             redirect('login');

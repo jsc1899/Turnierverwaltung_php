@@ -26,6 +26,11 @@ session_start();
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
 header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; img-src 'self' data: blob:");
+header('Referrer-Policy: strict-origin-when-cross-origin');
+header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
+if (str_starts_with(APP_URL, 'https://')) {
+    header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+}
 
 // DB initialisieren
 init_db();
@@ -44,7 +49,12 @@ $uri = '/' . trim(parse_url($uri, PHP_URL_PATH), '/');
 
 // Uploads direkt ausliefern — MIME aus Extension-Whitelist, nicht vom Client
 if (str_starts_with($uri, '/uploads/')) {
+    $real = realpath(__DIR__ . $uri);
+    $base = realpath(__DIR__ . '/uploads');
     $file = __DIR__ . $uri;
+    if ($real === false || $base === false || !str_starts_with($real, $base . DIRECTORY_SEPARATOR)) {
+        http_response_code(404); exit;
+    }
     if (is_file($file)) {
         $ext  = strtolower(pathinfo($file, PATHINFO_EXTENSION));
         $safe_mimes = [

@@ -826,7 +826,8 @@ ob_start(); ?>
           <h6 class="text-muted mb-2">Spielergebnisse</h6>
           <?php
           $use_duels = $is_team && (int)($c['team_size'] ?? 0) > 1;
-          if (can_edit() && !$use_duels): ?>
+          $grp_editable = can_edit() && $c['phase'] === 'group';
+          if ($grp_editable && !$use_duels): ?>
           <form id="grp-form-<?= $g['id'] ?>" method="post"
                 action="<?= url('competition/'.$c['id'].'/results/bulk') ?>">
             <?= csrf_field() ?>
@@ -851,7 +852,7 @@ ob_start(); ?>
                 <?= $m['played'] ? (int)$m['score1'].':'.(int)$m['score2'] : '—:—' ?>
               </span>
               <span class="text-truncate fw-semibold" style="min-width:0;flex:1"><?= e($m['p2name']) ?></span>
-              <?php if ($m['played'] && can_edit()): ?>
+              <?php if ($m['played'] && $grp_editable): ?>
               <form method="post" action="<?= url('match/'.$m['id'].'/result/clear') ?>" class="flex-shrink-0 ms-1"
                     data-confirm="Ergebnis wirklich löschen?">
                 <?= csrf_field() ?>
@@ -861,7 +862,7 @@ ob_start(); ?>
               </form>
               <?php endif; ?>
             </div>
-            <?php if (can_edit()): ?>
+            <?php if ($grp_editable): ?>
             <form class="duel-form" method="post" action="<?= url('match/'.$m['id'].'/duels') ?>">
               <?= csrf_field() ?>
               <table class="table table-sm align-middle mb-0" style="table-layout:fixed;font-size:.82rem">
@@ -923,7 +924,7 @@ ob_start(); ?>
             <?php endif; ?>
           </div>
           <?php else: ?>
-          <?php if (can_edit()): ?>
+          <?php if ($grp_editable): ?>
           <div class="mb-2" style="display:grid;grid-template-columns:1fr 56px 1.2rem 56px 1fr 30px;align-items:center;column-gap:4px">
             <span class="text-end small text-truncate"><?= e($m['p1name']) ?></span>
             <input type="number" name="matches[<?= $m['id'] ?>][score1]" min="0"
@@ -956,7 +957,7 @@ ob_start(); ?>
           </div>
           <?php endif; ?>
           <?php endif; endforeach; ?>
-          <?php if (can_edit() && !$use_duels): ?>
+          <?php if ($grp_editable && !$use_duels): ?>
           <button form="grp-form-<?= $g['id'] ?>" type="submit"
                   class="btn btn-primary btn-sm mt-2 w-100">
             <i class="bi bi-save me-1"></i>Alle speichern

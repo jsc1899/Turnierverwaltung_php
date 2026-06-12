@@ -58,6 +58,6 @@ function make_manage_email_token(string $email): string {
 }
 
 function verify_manage_email_token(string $token): ?string {
-    $payload = verify_token($token, 'reg-manage-email', 3600); // 60 Minuten
+    $payload = verify_token($token, 'reg-manage-email', 7 * 24 * 3600); // 7 Tage
     return is_string($payload) ? $payload : null;
 }
