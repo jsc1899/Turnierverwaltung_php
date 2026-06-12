@@ -173,16 +173,17 @@ ob_start(); ?>
         <?php endif; ?>
       </div>
       <?php if (!in_array($c['mode'], ['ko_only', 'double_ko'])): ?>
-      <?php if ($c['phase'] === 'setup'): ?>
       <div class="col-auto">
         <label class="form-label">Gruppengröße</label>
-        <select name="group_size" class="form-select form-select-sm">
+        <select name="group_size" class="form-select form-select-sm"<?= $c['phase'] !== 'setup' ? ' disabled' : '' ?>>
           <?php foreach ([3,4,5,6,7,8] as $s): ?>
           <option value="<?= $s ?>"<?= (int)$c['group_size'] === $s ? ' selected' : '' ?>><?= $s ?> Teilnehmer</option>
           <?php endforeach; ?>
         </select>
+        <?php if ($c['phase'] !== 'setup'): ?>
+        <input type="hidden" name="group_size" value="<?= (int)$c['group_size'] ?>">
+        <?php endif; ?>
       </div>
-      <?php endif; ?>
       <div class="col-auto">
         <label class="form-label">KO-Aufstieg</label>
         <select name="advance_count" id="advance_count" class="form-select form-select-sm"

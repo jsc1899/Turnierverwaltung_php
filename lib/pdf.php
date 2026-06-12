@@ -153,10 +153,19 @@ function generate_aushang_pdf(int $tid): void {
 function generate_groups_pdf(int $cid): void {
     $c = db_fetch("SELECT * FROM competition WHERE id=?", [$cid]);
     if (!$c) { http_response_code(404); exit; }
-    $t         = db_fetch("SELECT name FROM tournament WHERE id=?", [$c['tournament_id']]);
-    $grps      = db_fetchall("SELECT * FROM grp WHERE competition_id=? ORDER BY name", [$cid]);
-    $is_team   = !empty($c['is_team']);
-    $team_size = (int)($c['team_size'] ?? 0);
+    $t          = db_fetch("SELECT name FROM tournament WHERE id=?", [$c['tournament_id']]);
+    $grps       = db_fetchall("SELECT * FROM grp WHERE competition_id=? ORDER BY name", [$cid]);
+    $is_team    = !empty($c['is_team']);
+    $is_doubles = !$is_team && !empty($c['is_doubles']);
+    $team_size  = (int)($c['team_size'] ?? 0);
+    $score_mode = $c['score_mode'] ?? 'match';
+    $sets_mode_active = in_array($score_mode, ['sets', 'sets_grp']);
+    $show_einzel = ($is_team && $team_size >= 2) || $sets_mode_active;
+    $grp_score_mode = $sets_mode_active ? 'sets' : 'match';
+    $col_v   = $sets_mode_active ? 'V (Sätze)'    : 'V';
+    $col_pm  = $sets_mode_active ? '+/- (Sätze)'  : '+/-';
+    $col_ve  = $sets_mode_active ? 'V (Punkte)'   : 'V (Einzel)';
+    $col_pme = $sets_mode_active ? '+/- (Punkte)' : '+/- (Einzel)';
 
     $html = pdf_css();
     if ($is_team && $team_size > 0) {
@@ -178,24 +187,42 @@ function generate_groups_pdf(int $cid): void {
 
     foreach ($grps as $g) {
         $html .= '<h3>' . e($g['name']) . '</h3>';
-        $st = $is_team
-            ? team_standings($g['id'], $c['seeding_order'] ?? 'desc')
-            : group_standings($g['id'], $c['seeding_order'] ?? 'desc');
-        $html .= '<table><tr><th>#</th><th>Spieler</th><th>Verein</th>'
-               . '<th>Sp</th><th>S</th><th>U</th><th>N</th>'
-               . '<th>Erg.</th><th>Diff</th><th>Pkt</th></tr>';
+        if ($is_team) {
+            $st = team_standings($g['id'], $c['seeding_order'] ?? 'desc', $grp_score_mode);
+        } elseif ($is_doubles) {
+            $st = double_standings($g['id'], $c['seeding_order'] ?? 'desc', $grp_score_mode);
+        } else {
+            $st = group_standings($g['id'], $c['seeding_order'] ?? 'desc', $grp_score_mode);
+        }
+        $nc = 'style="width:5%;text-align:center"';  // schmale Zahlenspalte
+        $vc = 'style="width:8%;text-align:center"';  // V / +/- Spalte
+        $html .= '<table>'
+               . '<tr>'
+               . '<th style="width:3%">#</th>'
+               . '<th style="width:25%">Spieler</th>'
+               . ($is_team ? '' : '<th style="width:16%">Verein</th>')
+               . "<th $nc>Sp</th><th $nc>S</th><th $nc>U</th><th $nc>N</th>"
+               . "<th $vc>" . $col_pm . '</th>';
+        if ($show_einzel) {
+            $html .= "<th $vc>" . $col_pme . '</th>';
+        }
+        $html .= "<th $nc>Pkt</th></tr>";
         foreach ($st as $i => $pl) {
             $odd = $i % 2 === 1 ? ' class="odd"' : '';
-            $html .= "<tr$odd><td>" . ($i+1)
-                . '</td><td>' . e($pl['name'])
-                . '</td><td>' . e($pl['club'])
-                . '</td><td>' . $pl['played']
-                . '</td><td>' . $pl['wins']
-                . '</td><td>' . $pl['draws']
-                . '</td><td>' . $pl['losses']
-                . '</td><td>' . $pl['goals_for'] . ':' . $pl['goals_against']
-                . '</td><td>' . ($pl['goal_diff'] >= 0 ? '+' : '') . $pl['goal_diff']
-                . '</td><td><strong>' . $pl['points'] . '</strong></td></tr>';
+            $html .= "<tr$odd>"
+                . '<td style="text-align:center">' . ($i+1) . '</td>'
+                . '<td>' . e($pl['name']) . '</td>'
+                . ($is_team ? '' : '<td>' . e($pl['club']) . '</td>')
+                . '<td style="text-align:center">' . $pl['played'] . '</td>'
+                . '<td style="text-align:center">' . $pl['wins'] . '</td>'
+                . '<td style="text-align:center">' . $pl['draws'] . '</td>'
+                . '<td style="text-align:center">' . $pl['losses'] . '</td>'
+                . '<td style="text-align:center">' . ($pl['goal_diff'] >= 0 ? '+' : '') . $pl['goal_diff'] . '</td>';
+            if ($show_einzel) {
+                $ed = (int)($pl['einzel_diff'] ?? 0);
+                $html .= '<td style="text-align:center">' . ($ed >= 0 ? '+' : '') . $ed . '</td>';
+            }
+            $html .= '<td style="text-align:center"><strong>' . $pl['points'] . '</strong></td></tr>';
         }
         $html .= '</table>';
 
@@ -248,6 +275,89 @@ function generate_groups_pdf(int $cid): void {
                     }
                     $html .= '</table></div>';
                 }
+            }
+        } else {
+            // Spielergebnisse für Einzel, Doppel und Team ohne Duelle
+            if ($is_doubles) {
+                $gmatches = db_fetchall(
+                    "SELECT m.*,
+                     COALESCE(CONCAT(p1a.name,' / ',p1b.name),'') as p1name,
+                     COALESCE(CONCAT(p2a.name,' / ',p2b.name),'') as p2name
+                     FROM `match` m
+                     LEFT JOIN `double` d1 ON d1.id = m.double1_id
+                     LEFT JOIN `double` d2 ON d2.id = m.double2_id
+                     LEFT JOIN player p1a ON p1a.id = d1.player1_id
+                     LEFT JOIN player p1b ON p1b.id = d1.player2_id
+                     LEFT JOIN player p2a ON p2a.id = d2.player1_id
+                     LEFT JOIN player p2b ON p2b.id = d2.player2_id
+                     WHERE m.group_id = ?
+                     ORDER BY m.match_order, m.id",
+                    [$g['id']]
+                );
+            } elseif ($is_team) {
+                $gmatches = db_fetchall(
+                    "SELECT m.*, t1.name as p1name, t2.name as p2name
+                     FROM `match` m
+                     JOIN `team` t1 ON t1.id = m.team1_id
+                     JOIN `team` t2 ON t2.id = m.team2_id
+                     WHERE m.group_id = ?
+                     ORDER BY m.match_order, m.id",
+                    [$g['id']]
+                );
+            } else {
+                $gmatches = db_fetchall(
+                    "SELECT m.*,
+                     TRIM(CONCAT(p1.name,IF(COALESCE(p1.firstname,'')!='',CONCAT(' ',p1.firstname),''))) as p1name,
+                     TRIM(CONCAT(p2.name,IF(COALESCE(p2.firstname,'')!='',CONCAT(' ',p2.firstname),''))) as p2name
+                     FROM `match` m
+                     LEFT JOIN player p1 ON p1.id = m.player1_id
+                     LEFT JOIN player p2 ON p2.id = m.player2_id
+                     WHERE m.group_id = ?
+                     ORDER BY m.match_order, m.id",
+                    [$g['id']]
+                );
+            }
+            $grp_sets = [];
+            if ($sets_mode_active && $gmatches) {
+                foreach (db_fetchall(
+                    "SELECT ms.match_id, ms.score1, ms.score2
+                     FROM match_set ms
+                     JOIN `match` m ON m.id = ms.match_id
+                     WHERE m.group_id = ?
+                     ORDER BY ms.match_id, ms.set_order",
+                    [$g['id']]
+                ) as $s) {
+                    $grp_sets[$s['match_id']][] = $s;
+                }
+            }
+            if ($gmatches) {
+                $score_col_lbl = $sets_mode_active ? 'Sätze' : 'Ergebnis';
+                $html .= '<h4 style="font-size:9pt;color:#374151;margin:3mm 0 2mm">Spielergebnisse</h4>';
+                $html .= '<table style="font-size:8.5pt">'
+                       . '<tr>'
+                       . '<th style="width:44%;text-align:right">Spieler 1</th>'
+                       . '<th style="width:14%;text-align:center">' . $score_col_lbl . '</th>'
+                       . '<th style="width:44%">Spieler 2</th>'
+                       . '</tr>';
+                foreach ($gmatches as $i => $gm) {
+                    $odd = $i % 2 === 1 ? ' class="odd"' : '';
+                    $sc  = $gm['played'] ? $gm['score1'] . ' : ' . $gm['score2'] : '— : —';
+                    $w1  = ($gm['played'] && $gm['score1'] > $gm['score2']) ? ' class="winner"' : '';
+                    $w2  = ($gm['played'] && $gm['score2'] > $gm['score1']) ? ' class="winner"' : '';
+                    $html .= "<tr$odd>"
+                           . "<td style='text-align:right'$w1>" . e($gm['p1name']) . '</td>'
+                           . "<td style='text-align:center'>$sc</td>"
+                           . "<td$w2>" . e($gm['p2name']) . '</td>'
+                           . '</tr>';
+                    if ($sets_mode_active && $gm['played'] && !empty($grp_sets[$gm['id']])) {
+                        $sets_str = implode('&nbsp;&nbsp;', array_map(
+                            fn($sr) => $sr['score1'] . ':' . $sr['score2'],
+                            $grp_sets[$gm['id']]
+                        ));
+                        $html .= "<tr><td colspan='3' style='text-align:center;font-size:7.5pt;color:#6b7280;padding:0.3mm 2mm'>Punkte: $sets_str</td></tr>";
+                    }
+                }
+                $html .= '</table>';
             }
         }
     }
@@ -306,6 +416,10 @@ function generate_ko_pdf(int $cid): void {
             [$cid]
         );
     }
+    $score_mode   = $c['score_mode'] ?? 'match';
+    $sets_mode_ko = ($score_mode === 'sets');
+    $score_label  = $sets_mode_ko ? 'Sätze' : 'Ergebnis';
+
     $round_names = [
         2=>'Finale', 4=>'Halbfinale', 8=>'Viertelfinale',
         16=>'Achtelfinale', 32=>'Runde der 32', 64=>'Runde der 64', 3=>'Platz 3',
@@ -314,13 +428,27 @@ function generate_ko_pdf(int $cid): void {
     foreach ($matches as $m) { $rounds[(int)$m['ko_round']][] = $m; }
     krsort($rounds);
 
+    $match_sets = [];
+    if ($sets_mode_ko) {
+        foreach (db_fetchall(
+            "SELECT ms.match_id, ms.score1, ms.score2
+             FROM match_set ms
+             JOIN `match` m ON m.id = ms.match_id
+             WHERE m.competition_id = ? AND m.group_id IS NULL
+             ORDER BY ms.match_id, ms.set_order",
+            [$cid]
+        ) as $s) {
+            $match_sets[$s['match_id']][] = $s;
+        }
+    }
+
     $html  = pdf_css();
     $html .= '<h2 style="margin-top:0">' . e($c['name']) . ' — KO-Phase</h2>';
     if ($t) $html .= '<div class="meta">' . e($t['name']) . '</div>';
 
     foreach ($rounds as $r => $rmatches) {
         $html .= '<h3>' . ($round_names[$r] ?? "Runde $r") . '</h3>';
-        $html .= '<table><tr><th>Spieler 1</th><th style="width:20mm;text-align:center">Ergebnis</th><th>Spieler 2</th></tr>';
+        $html .= '<table><tr><th>Spieler 1</th><th style="width:20mm;text-align:center">' . $score_label . '</th><th>Spieler 2</th></tr>';
         foreach ($rmatches as $i => $m) {
             $odd = $i % 2 === 1 ? ' class="odd"' : '';
             $s   = $m['played'] ? $m['score1'] . ' : ' . $m['score2'] : '— : —';
@@ -329,6 +457,10 @@ function generate_ko_pdf(int $cid): void {
             $p1  = e($m['p1name'] ?: 'Freilos');
             $p2  = e($m['p2name'] ?: 'Freilos');
             $html .= "<tr$odd><td$c1>$p1</td><td style='text-align:center'>$s</td><td$c2>$p2</td></tr>";
+            if ($sets_mode_ko && !empty($match_sets[$m['id']])) {
+                $sets_str = implode('&nbsp;&nbsp;', array_map(fn($sr) => $sr['score1'].':'.$sr['score2'], $match_sets[$m['id']]));
+                $html .= "<tr><td colspan='3' style='text-align:center;font-size:8pt;color:#6b7280;padding:0.5mm 2mm'>Punkte: $sets_str</td></tr>";
+            }
         }
         $html .= '</table>';
     }
@@ -403,11 +535,29 @@ function _generate_dko_bracket_pdf(array $c, ?array $t): void {
     }
     ksort($wb_rounds); ksort($lb_rounds);
 
+    $score_mode   = $c['score_mode'] ?? 'match';
+    $sets_mode_ko = ($score_mode === 'sets');
+    $score_label  = $sets_mode_ko ? 'Sätze' : 'Ergebnis';
+
+    $match_sets = [];
+    if ($sets_mode_ko) {
+        foreach (db_fetchall(
+            "SELECT ms.match_id, ms.score1, ms.score2
+             FROM match_set ms
+             JOIN `match` m ON m.id = ms.match_id
+             WHERE m.competition_id = ? AND m.group_id IS NULL
+             ORDER BY ms.match_id, ms.set_order",
+            [$cid]
+        ) as $s) {
+            $match_sets[$s['match_id']][] = $s;
+        }
+    }
+
     $html  = pdf_css();
     $html .= '<h2 style="margin-top:0">' . e($c['name']) . ' — Doppel-KO</h2>';
     if ($t) $html .= '<div class="meta">' . e($t['name']) . '</div>';
 
-    $row_html = function(array $m, int $i) use (&$html): void {
+    $row_html = function(array $m, int $i) use (&$html, $sets_mode_ko, $match_sets): void {
         $odd = $i % 2 === 1 ? ' class="odd"' : '';
         $s   = $m['played'] ? $m['score1'] . ' : ' . $m['score2'] : '— : —';
         $c1  = ($m['played'] && $m['score1'] > $m['score2']) ? ' class="winner"' : '';
@@ -415,8 +565,12 @@ function _generate_dko_bracket_pdf(array $c, ?array $t): void {
         $html .= "<tr$odd><td$c1>" . e($m['p1name'] ?: '—') . "</td>"
                . "<td style='text-align:center'>$s</td>"
                . "<td$c2>" . e($m['p2name'] ?: '—') . "</td></tr>";
+        if ($sets_mode_ko && !empty($match_sets[$m['id']])) {
+            $sets_str = implode('&nbsp;&nbsp;', array_map(fn($sr) => $sr['score1'].':'.$sr['score2'], $match_sets[$m['id']]));
+            $html .= "<tr><td colspan='3' style='text-align:center;font-size:8pt;color:#6b7280;padding:0.5mm 2mm'>Punkte: $sets_str</td></tr>";
+        }
     };
-    $tbl_open  = '<table><tr><th>Spieler 1</th><th style="width:20mm;text-align:center">Ergebnis</th><th>Spieler 2</th></tr>';
+    $tbl_open  = '<table><tr><th>Spieler 1</th><th style="width:20mm;text-align:center">' . $score_label . '</th><th>Spieler 2</th></tr>';
     $tbl_close = '</table>';
 
     if ($wb_rounds) {
@@ -557,10 +711,11 @@ function generate_match_cards_pdf(int $cid): void {
         );
     }
 
-    $team_size = (int)($c['team_size'] ?? 0);
-    // Karten pro Seite: bei Teambewerb mit Duellen 3, sonst 6
-    $cards_per_page = ($is_team && $team_size > 0) ? 3 : 6;
-    $card_min_h     = ($is_team && $team_size > 0) ? (18 + $team_size * 8) . 'mm' : '46mm';
+    $team_size  = (int)($c['team_size'] ?? 0);
+    $score_mode = $c['score_mode'] ?? 'match';
+    // Karten pro Seite: bei Teambewerb mit Duellen 3, Satzmodus 3, sonst 6
+    $cards_per_page = ($is_team && $team_size > 0) ? 3 : (in_array($score_mode, ['sets', 'sets_grp']) ? 3 : 6);
+    $card_min_h     = ($is_team && $team_size > 0) ? (18 + $team_size * 8) . 'mm' : (in_array($score_mode, ['sets', 'sets_grp']) ? '72mm' : '46mm');
 
     $html = pdf_css() . '<style>
         .card { border: 0.8pt solid #d1d5db; border-radius: 2mm; padding: 3mm 5mm;
@@ -635,14 +790,29 @@ function generate_match_cards_pdf(int $cid): void {
             }
             $html .= '</table>';
         } else {
-            // Einzel / Doppel: bisherige Darstellung
+            // Einzel / Doppel
+            $is_grp_match = !empty($m['group_name']);
+            $use_sets_card = ($score_mode === 'sets') || ($score_mode === 'sets_grp' && $is_grp_match);
+            $result_label  = $use_sets_card ? 'Sätze' : 'Ergebnis';
             $html .= '<table class="players">'
-                . '<tr><th style="width:44%">Spieler 1</th><th style="width:12%;text-align:center">Ergebnis</th><th style="width:44%">Spieler 2</th></tr>'
+                . '<tr><th style="width:44%">Spieler 1</th><th style="width:12%;text-align:center">' . $result_label . '</th><th style="width:44%">Spieler 2</th></tr>'
                 . '<tr>'
                 . '<td>' . e($m['p1name'] ?? '') . ($m['p1club'] ? '<br><span style="font-size:8pt;color:#6b7280">' . e($m['p1club']) . '</span>' : '') . '</td>'
                 . '<td style="text-align:center;font-size:14pt;letter-spacing:2mm">&nbsp;:&nbsp;</td>'
                 . '<td>' . e($m['p2name'] ?? '') . ($m['p2club'] ? '<br><span style="font-size:8pt;color:#6b7280">' . e($m['p2club']) . '</span>' : '') . '</td>'
                 . '</tr></table>';
+            if ($use_sets_card) {
+                $html .= '<table style="width:55%;margin:1mm auto;border-collapse:collapse;font-size:8.5pt">';
+                for ($si = 1; $si <= 5; $si++) {
+                    $html .= '<tr>'
+                           . '<td style="text-align:right;color:#6b7280;padding:0.6mm 2mm;border:none;white-space:nowrap">Satz ' . $si . '</td>'
+                           . '<td style="border:0.3pt solid #d1d5db;width:13mm;height:5.5mm"></td>'
+                           . '<td style="text-align:center;border:none;padding:0.3mm 1.5mm">:</td>'
+                           . '<td style="border:0.3pt solid #d1d5db;width:13mm;height:5.5mm"></td>'
+                           . '</tr>';
+                }
+                $html .= '</table>';
+            }
         }
 
         // Unterschriften
