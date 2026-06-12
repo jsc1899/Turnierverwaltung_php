@@ -157,6 +157,7 @@ $routes = [
     ['POST',     '/match/{id}/result/clear',          'match_result', 'clear_result'],
     ['POST',     '/match/{id}/advance/{slot}',        'match_result', 'force_advance_ko'],
     ['POST',     '/match/{id}/duels',                'match_result', 'save_duels'],
+    ['POST',     '/match/{id}/sets',                 'match_result', 'save_sets'],
     ['POST',     '/ko-match/{id}/result',             'match_result', 'save_ko'],
     ['POST',     '/competition/{id}/results/bulk',    'match_result', 'save_bulk'],
 

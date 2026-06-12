@@ -26,6 +26,7 @@ function new_competition(array $p): void {
     $max_players        = max(0, (int)post('max_players', 0));
     $seeding_order      = post('seeding_order') === 'asc' ? 'asc' : 'desc';
     $team_size          = $is_team ? max(0, min(20, (int)post('team_size', 0))) : 0;
+    $score_mode         = in_array(post('score_mode'), ['sets', 'sets_grp']) ? post('score_mode') : 'match';
 
     if (!$name) {
         flash('danger', 'Name erforderlich.');
@@ -35,10 +36,10 @@ function new_competition(array $p): void {
     db_insert(
         "INSERT INTO competition
          (tournament_id, name, group_size, advance_count, mode, is_doubles, is_team,
-          third_place, show_seeding, show_skill, registrations_open, max_players, seeding_order, team_size)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+          third_place, show_seeding, show_skill, registrations_open, max_players, seeding_order, team_size, score_mode)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         [$p['tid'], $name, $group_size, $advance_count, $mode, $is_doubles, $is_team,
-         $third_place, $show_seeding, $show_skill, $registrations_open, $max_players, $seeding_order, $team_size]
+         $third_place, $show_seeding, $show_skill, $registrations_open, $max_players, $seeding_order, $team_size, $score_mode]
     );
     redirect('tournament/' . $p['tid']);
 }
@@ -104,7 +105,22 @@ function show(array $p): void {
                 $existing_duels[$duel['match_id']][] = $duel;
             }
         }
-    } elseif ($is_doubles) {
+    }
+
+    // Bestehende Satzergebnisse laden (wenn score_mode='sets' oder 'sets_grp')
+    $existing_sets = [];
+    if (in_array($c['score_mode'] ?? 'match', ['sets', 'sets_grp'])) {
+        foreach (db_fetchall(
+            "SELECT s.* FROM match_set s
+             JOIN `match` m ON m.id = s.match_id
+             WHERE m.competition_id = ? ORDER BY s.match_id, s.set_order",
+            [$cid]
+        ) as $s) {
+            $existing_sets[$s['match_id']][] = $s;
+        }
+    }
+
+    if ($is_doubles) {
         $assigned_doubles = db_fetchall(
             "SELECT d.id, d.name, d.player1_id, d.player2_id,
              TRIM(CONCAT(COALESCE(p1.firstname,''), IF(COALESCE(p1.firstname,'')!='', ' ',''), p1.name)) as p1name,
@@ -199,9 +215,10 @@ function show(array $p): void {
     if (in_array($c['phase'], ['group', 'ko', 'done'], true)) {
         $grps = db_fetchall("SELECT * FROM grp WHERE competition_id = ? ORDER BY name", [$cid]);
         require_once __DIR__ . '/../lib/standings.php';
+        $grp_score_mode = in_array($c['score_mode'] ?? 'match', ['sets', 'sets_grp']) ? 'sets' : 'match';
         foreach ($grps as $g) {
             if ($is_team) {
-                $standings = team_standings($g['id'], $c['seeding_order'] ?? 'desc');
+                $standings = team_standings($g['id'], $c['seeding_order'] ?? 'desc', $grp_score_mode);
                 $matches   = db_fetchall(
                     "SELECT m.*, COALESCE(t1.name,'') as p1name, COALESCE(t2.name,'') as p2name
                      FROM `match` m
@@ -216,7 +233,7 @@ function show(array $p): void {
                     return $m;
                 }, $matches);
             } elseif ($is_doubles) {
-                $standings = double_standings($g['id'], $c['seeding_order'] ?? 'desc');
+                $standings = double_standings($g['id'], $c['seeding_order'] ?? 'desc', $grp_score_mode);
                 $matches   = db_fetchall(
                     "SELECT m.*,
                      COALESCE(CONCAT(dp1a.name,' / ',dp1b.name),'') as p1name,
@@ -238,7 +255,7 @@ function show(array $p): void {
                     return $m;
                 }, $matches);
             } else {
-                $standings = group_standings($g['id'], $c['seeding_order'] ?? 'desc');
+                $standings = group_standings($g['id'], $c['seeding_order'] ?? 'desc', $grp_score_mode);
                 $matches   = db_fetchall(
                     "SELECT m.*,
                      TRIM(CONCAT(p1.name, IF(COALESCE(p1.firstname,'') != '', CONCAT(' ', p1.firstname), ''))) as p1name,
@@ -570,6 +587,7 @@ function show(array $p): void {
         'unassigned_teams' => $unassigned_teams,
         'team_members' => $team_members ?? [],
         'existing_duels' => $existing_duels ?? [],
+        'existing_sets' => $existing_sets,
         'confirmed_regs' => $confirmed_regs ?? [],
         'groups' => $groups, 'ko_rounds' => $ko_rounds,
         'third_place_match' => $third_place_match,
@@ -617,6 +635,7 @@ function settings(array $p): void {
     $show_skill        = post('show_skill')   ? 1 : 0;
     $seeding_order     = post('seeding_order') === 'asc' ? 'asc' : 'desc';
     $team_size         = max(0, (int)post('team_size', 0));
+    $score_mode        = in_array(post('score_mode'), ['sets', 'sets_grp']) ? post('score_mode') : 'match';
 
     $c = db_fetch("SELECT phase, mode, is_doubles, is_team FROM competition WHERE id=?", [$cid]);
     if (!$c) { redirect('competition/' . $cid); return; }
@@ -651,14 +670,14 @@ function settings(array $p): void {
     }
 
     if (in_array($c['mode'], ['ko_only', 'double_ko'], true)) {
-        db_execute("UPDATE competition SET third_place=?, registrations_open=?, max_players=?, show_seeding=?, show_skill=?, seeding_order=?, team_size=? WHERE id=?",
-            [$third_place, $registrations_open, $max_players, $show_seeding, $show_skill, $seeding_order, $team_size, $cid]);
+        db_execute("UPDATE competition SET third_place=?, registrations_open=?, max_players=?, show_seeding=?, show_skill=?, seeding_order=?, team_size=?, score_mode=? WHERE id=?",
+            [$third_place, $registrations_open, $max_players, $show_seeding, $show_skill, $seeding_order, $team_size, $score_mode, $cid]);
     } elseif ($c && $c['phase'] === 'setup') {
-        db_execute("UPDATE competition SET group_size=?, advance_count=?, third_place=?, registrations_open=?, max_players=?, show_skill=?, seeding_order=?, team_size=? WHERE id=?",
-            [$group_size, $advance_count, $third_place, $registrations_open, $max_players, $show_skill, $seeding_order, $team_size, $cid]);
+        db_execute("UPDATE competition SET group_size=?, advance_count=?, third_place=?, registrations_open=?, max_players=?, show_skill=?, seeding_order=?, team_size=?, score_mode=? WHERE id=?",
+            [$group_size, $advance_count, $third_place, $registrations_open, $max_players, $show_skill, $seeding_order, $team_size, $score_mode, $cid]);
     } else {
-        db_execute("UPDATE competition SET advance_count=?, third_place=?, registrations_open=?, max_players=?, show_skill=?, seeding_order=?, team_size=? WHERE id=?",
-            [$advance_count, $third_place, $registrations_open, $max_players, $show_skill, $seeding_order, $team_size, $cid]);
+        db_execute("UPDATE competition SET advance_count=?, third_place=?, registrations_open=?, max_players=?, show_skill=?, seeding_order=?, team_size=?, score_mode=? WHERE id=?",
+            [$advance_count, $third_place, $registrations_open, $max_players, $show_skill, $seeding_order, $team_size, $score_mode, $cid]);
     }
     flash('success', 'Einstellungen gespeichert.');
     redirect('competition/' . $cid);

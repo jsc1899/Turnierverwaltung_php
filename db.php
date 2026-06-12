@@ -273,6 +273,15 @@ function init_db(): void {
             FOREIGN KEY (player1_id) REFERENCES player(id)   ON DELETE SET NULL,
             FOREIGN KEY (player2_id) REFERENCES player(id)   ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+        CREATE TABLE IF NOT EXISTS `match_set` (
+            id        INT AUTO_INCREMENT PRIMARY KEY,
+            match_id  INT NOT NULL,
+            set_order INT NOT NULL DEFAULT 0,
+            score1    INT NULL DEFAULT NULL,
+            score2    INT NULL DEFAULT NULL,
+            FOREIGN KEY (match_id) REFERENCES `match`(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ");
 
     // Migrations für bestehende Datenbanken (try-catch: Spalte existiert ggf. schon)
@@ -309,6 +318,7 @@ function init_db(): void {
         "ALTER TABLE `group_double` ADD COLUMN tiebreak_order INT NULL DEFAULT NULL",
         "ALTER TABLE `group_team`   ADD COLUMN tiebreak_order INT NULL DEFAULT NULL",
         "ALTER TABLE `team_match_duel` ADD COLUMN duel_label VARCHAR(32) NULL DEFAULT NULL",
+        "ALTER TABLE competition ADD COLUMN score_mode VARCHAR(10) NOT NULL DEFAULT 'match'",
     ];
     foreach ($migrations as $sql) {
         try { $pdo->exec($sql); } catch (\PDOException $e) { /* Spalte/Typ bereits korrekt */ }

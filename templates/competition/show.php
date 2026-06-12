@@ -151,6 +151,16 @@ ob_start(); ?>
         <input type="hidden" name="team_size" value="<?= (int)($c['team_size'] ?? 0) ?>">
         <?php endif; ?>
       </div>
+      <?php if (!$is_team): ?>
+      <div class="col-auto">
+        <label class="form-label">Ergebniserfassung</label>
+        <select name="score_mode" class="form-select form-select-sm">
+          <option value="match"   <?= ($c['score_mode'] ?? 'match') === 'match'    ? ' selected' : '' ?>>Spielergebnis</option>
+          <option value="sets"    <?= ($c['score_mode'] ?? 'match') === 'sets'     ? ' selected' : '' ?>>Satzergebnisse</option>
+          <option value="sets_grp"<?= ($c['score_mode'] ?? 'match') === 'sets_grp' ? ' selected' : '' ?>>Gruppe Sätze, KO Spielergebnis</option>
+        </select>
+      </div>
+      <?php endif; ?>
       <div class="col-auto">
         <label class="form-label">Spielmodus</label>
         <select name="mode" class="form-select form-select-sm"<?= $c['phase'] !== 'setup' ? ' disabled' : '' ?>>
@@ -731,7 +741,10 @@ ob_start(); ?>
     </form>
     <?php endif; ?>
 
-    <?php $show_einzel = $is_team && (int)($c['team_size'] ?? 0) >= 2; ?>
+    <?php
+    $sets_mode_active = in_array($c['score_mode'] ?? 'match', ['sets', 'sets_grp']);
+    $show_einzel = ($is_team && (int)($c['team_size'] ?? 0) >= 2) || $sets_mode_active;
+    ?>
     <?php foreach ($groups as $gi): $g = $gi['group']; $standings = $gi['standings']; $matches = $gi['matches']; $tie_ids = $gi['tie_ids'] ?? []; ?>
     <div class="card shadow-sm mb-4">
       <div class="card-header fw-semibold"><i class="bi bi-people me-1"></i><?= e($g['name']) ?></div>
@@ -741,7 +754,7 @@ ob_start(); ?>
         <div class="table-responsive">
           <table class="table table-sm table-hover align-middle mb-0">
             <thead class="table-light">
-              <tr><th>#</th><th>Spieler</th><th class="text-center">Sp</th><th class="text-center">S</th><th class="text-center">U</th><th class="text-center">N</th><th class="text-center" style="width:72px">V</th><th class="text-center" style="width:72px">+/-</th><?php if ($show_einzel): ?><th class="text-center" style="width:72px">V (Einzel)</th><th class="text-center" style="width:72px">+/- (Einzel)</th><?php endif; ?><th class="text-center">Pkt</th></tr>
+              <tr><th>#</th><th>Spieler</th><th class="text-center">Sp</th><th class="text-center">S</th><th class="text-center">U</th><th class="text-center">N</th><th class="text-center" style="width:72px"><?= $sets_mode_active ? 'V (Sätze)' : 'V' ?></th><th class="text-center" style="width:72px"><?= $sets_mode_active ? '+/- (Sätze)' : '+/-' ?></th><?php if ($show_einzel): ?><th class="text-center" style="width:72px"><?= $sets_mode_active ? 'V (Punkte)' : 'V (Einzel)' ?></th><th class="text-center" style="width:72px"><?= $sets_mode_active ? '+/- (Punkte)' : '+/- (Einzel)' ?></th><?php endif; ?><th class="text-center">Pkt</th></tr>
             </thead>
             <tbody>
               <?php foreach ($standings as $i => $pl): ?>
@@ -826,8 +839,9 @@ ob_start(); ?>
           <h6 class="text-muted mb-2">Spielergebnisse</h6>
           <?php
           $use_duels = $is_team && (int)($c['team_size'] ?? 0) > 1;
+          $use_sets  = in_array($c['score_mode'] ?? 'match', ['sets', 'sets_grp']);
           $grp_editable = can_edit() && $c['phase'] === 'group';
-          if ($grp_editable && !$use_duels): ?>
+          if ($grp_editable && !$use_duels && !$use_sets): ?>
           <form id="grp-form-<?= $g['id'] ?>" method="post"
                 action="<?= url('competition/'.$c['id'].'/results/bulk') ?>">
             <?= csrf_field() ?>
@@ -923,6 +937,66 @@ ob_start(); ?>
             </table>
             <?php endif; ?>
           </div>
+          <?php elseif ($use_sets): ?>
+          <?php $set_rows_grp = $existing_sets[$m['id']] ?? []; ?>
+          <div class="mb-3 border rounded overflow-hidden">
+            <div class="d-flex align-items-center px-2 py-2 bg-light border-bottom">
+              <span class="text-truncate fw-semibold" style="min-width:0;flex:1;text-align:right"><?= e($m['p1name']) ?></span>
+              <span class="fw-bold fs-6 text-center flex-shrink-0 sets-total-<?= $m['id'] ?>" style="width:110px">
+                <?= $m['played'] ? (int)$m['score1'].':'.(int)$m['score2'] : '—:—' ?>
+              </span>
+              <span class="text-truncate fw-semibold" style="min-width:0;flex:1"><?= e($m['p2name']) ?></span>
+              <?php if ($m['played'] && $grp_editable): ?>
+              <form method="post" action="<?= url('match/'.$m['id'].'/result/clear') ?>" class="flex-shrink-0 ms-1"
+                    data-confirm="Ergebnis wirklich löschen?">
+                <?= csrf_field() ?>
+                <button class="btn btn-sm btn-outline-danger p-0" style="width:26px;height:26px" title="Ergebnis löschen">
+                  <i class="bi bi-x-circle"></i>
+                </button>
+              </form>
+              <?php endif; ?>
+            </div>
+            <?php if ($grp_editable): ?>
+            <form class="sets-form" method="post" action="<?= url('match/'.$m['id'].'/sets') ?>"
+                  data-mid="<?= $m['id'] ?>">
+              <?= csrf_field() ?>
+              <div class="d-flex flex-wrap align-items-center justify-content-center px-2 py-2" style="gap:40px" id="sets-container-<?= $m['id'] ?>">
+              <?php
+                $sc = max(count($set_rows_grp), 1);
+                for ($si = 0; $si < $sc; $si++):
+                  $sr = $set_rows_grp[$si] ?? [];
+              ?>
+                <div class="sets-pair d-flex align-items-center gap-1">
+                  <input type="number" name="sets[<?= $si ?>][score1]" min="0"
+                         class="form-control form-control-sm text-center sets-score" style="width:46px"
+                         value="<?= isset($sr['score1']) ? $sr['score1'] : '' ?>">
+                  <span class="text-muted small">:</span>
+                  <input type="number" name="sets[<?= $si ?>][score2]" min="0"
+                         class="form-control form-control-sm text-center sets-score" style="width:46px"
+                         value="<?= isset($sr['score2']) ? $sr['score2'] : '' ?>">
+                </div>
+              <?php endfor; ?>
+              </div>
+              <div class="px-2 py-1 d-flex justify-content-center align-items-center gap-2 border-top">
+                <button type="button" class="btn btn-outline-secondary btn-sm sets-add-btn"
+                        data-mid="<?= $m['id'] ?>">
+                  <i class="bi bi-plus-circle me-1"></i>Satz
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm sets-remove-btn"
+                        data-mid="<?= $m['id'] ?>">
+                  <i class="bi bi-dash-circle"></i>
+                </button>
+                <button type="submit" class="btn btn-primary btn-sm">Speichern</button>
+              </div>
+            </form>
+            <?php elseif (!empty($set_rows_grp)): ?>
+            <div class="d-flex flex-wrap gap-2 px-2 py-2">
+              <?php foreach ($set_rows_grp as $sr): ?>
+              <span class="small fw-semibold"><?= (int)$sr['score1'] ?>:<?= (int)$sr['score2'] ?></span>
+              <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
+          </div>
           <?php else: ?>
           <?php if ($grp_editable): ?>
           <div class="mb-2" style="display:grid;grid-template-columns:1fr 56px 1.2rem 56px 1fr 30px;align-items:center;column-gap:4px">
@@ -957,7 +1031,7 @@ ob_start(); ?>
           </div>
           <?php endif; ?>
           <?php endif; endforeach; ?>
-          <?php if ($grp_editable && !$use_duels): ?>
+          <?php if ($grp_editable && !$use_duels && !$use_sets): ?>
           <button form="grp-form-<?= $g['id'] ?>" type="submit"
                   class="btn btn-primary btn-sm mt-2 w-100">
             <i class="bi bi-save me-1"></i>Alle speichern
@@ -1025,6 +1099,7 @@ ob_start(); ?>
       $ko_col_w  = $is_team ? 405 : 270;
       $bracket_w = count($ko_rounds) * $ko_col_w;
       $ko_use_duels = $is_team && (int)($c['team_size'] ?? 0) > 1;
+      $ko_use_sets  = ($c['score_mode'] ?? 'match') === 'sets';
     ?>
 
     <?php if (can_edit()): ?>
@@ -1050,7 +1125,7 @@ ob_start(); ?>
         <?php foreach ($ko_rounds as $ri => $round): ?>
         <div class="ko-round" style="display:flex;flex-direction:column;justify-content:space-around;width:<?= $ko_col_w ?>px;flex-shrink:0;height:100%;padding:0 8px">
           <?php foreach ($round['matches'] as $m): $ko_match_num++; ?>
-          <div class="ko-match" style="border:1px solid #dee2e6;border-radius:6px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.07);overflow:<?= $ko_use_duels ? 'visible' : 'hidden' ?>">
+          <div class="ko-match" style="border:1px solid #dee2e6;border-radius:6px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.07);overflow:<?= ($ko_use_duels || $ko_use_sets) ? 'visible' : 'hidden' ?>">
             <div style="font-size:.65rem;color:#9e9e9e;padding:1px 6px;border-bottom:1px solid #f5f5f5;background:#fafafa">Spiel <?= $ko_match_num ?></div>
             <!-- Spieler 1 -->
             <?php $isFirstRound = ($ri === 0); ?>
@@ -1069,7 +1144,7 @@ ob_start(); ?>
                     <?php endif; ?>>
                 <?= $m['player1_id'] ? e($m['p1name']) : '<span class="text-muted fst-italic">—</span>' ?>
               </span>
-              <?php if (!$ko_use_duels && can_edit() && $m['player1_id'] && $m['player2_id']): ?>
+              <?php if (!$ko_use_duels && !$ko_use_sets && can_edit() && $m['player1_id'] && $m['player2_id']): ?>
               <input type="number" name="matches[<?= $m['id'] ?>][score1]" min="0"
                      form="ko-form"
                      class="form-control form-control-sm text-center ms-auto" style="width:40px;height:24px;padding:0 2px;font-size:.8rem;flex-shrink:0"
@@ -1094,7 +1169,7 @@ ob_start(); ?>
                     <?php endif; ?>>
                 <?= $m['player2_id'] ? e($m['p2name']) : '<span class="text-muted fst-italic">—</span>' ?>
               </span>
-              <?php if (!$ko_use_duels && can_edit() && $m['player1_id'] && $m['player2_id']): ?>
+              <?php if (!$ko_use_duels && !$ko_use_sets && can_edit() && $m['player1_id'] && $m['player2_id']): ?>
               <input type="number" name="matches[<?= $m['id'] ?>][score2]" min="0"
                      form="ko-form"
                      class="form-control form-control-sm text-center ms-auto" style="width:40px;height:24px;padding:0 2px;font-size:.8rem;flex-shrink:0"
@@ -1210,6 +1285,66 @@ ob_start(); ?>
                 <?php endif; ?>
               </details>
             </div>
+            <?php elseif ($ko_use_sets && $m['player1_id'] && $m['player2_id']): ?>
+            <?php $ko_set_rows = $existing_sets[$m['id']] ?? []; ?>
+            <div style="border-top:1px solid #f0f0f0;padding:3px 6px">
+              <details>
+                <summary style="font-size:.72rem;cursor:pointer;color:#0d6efd;user-select:none;list-style:none;padding:2px 0">
+                  &#9656; <?= $m['played'] ? $m['score1'].':'.$m['score2'].' (Sätze)' : 'Sätze' ?>
+                </summary>
+                <?php if (can_edit()): ?>
+                <form class="sets-form" method="post" action="<?= url('match/'.$m['id'].'/sets') ?>"
+                      style="margin-top:4px" data-mid="<?= $m['id'] ?>">
+                  <?= csrf_field() ?>
+                  <div class="d-flex flex-wrap align-items-center justify-content-center" style="gap:40px" id="sets-container-<?= $m['id'] ?>">
+                  <?php
+                    $ko_sc = max(count($ko_set_rows), 1);
+                    for ($si = 0; $si < $ko_sc; $si++):
+                      $sr = $ko_set_rows[$si] ?? [];
+                  ?>
+                    <div class="sets-pair d-flex align-items-center gap-1">
+                      <input type="number" name="sets[<?= $si ?>][score1]" min="0"
+                             class="form-control form-control-sm text-center sets-score"
+                             style="width:32px;height:22px;font-size:.7rem;padding:0 2px"
+                             value="<?= isset($sr['score1']) ? (int)$sr['score1'] : '' ?>">
+                      <span style="font-size:.7rem">:</span>
+                      <input type="number" name="sets[<?= $si ?>][score2]" min="0"
+                             class="form-control form-control-sm text-center sets-score"
+                             style="width:32px;height:22px;font-size:.7rem;padding:0 2px"
+                             value="<?= isset($sr['score2']) ? (int)$sr['score2'] : '' ?>">
+                    </div>
+                  <?php endfor; ?>
+                  </div>
+                  <div class="d-flex justify-content-center align-items-center gap-1 mt-1 mb-1">
+                    <button type="button" class="sets-add-btn btn btn-outline-secondary btn-sm py-0 px-1"
+                            style="font-size:.7rem" data-mid="<?= $m['id'] ?>">
+                      <i class="bi bi-plus"></i>
+                    </button>
+                    <button type="button" class="sets-remove-btn btn btn-outline-secondary btn-sm py-0 px-1"
+                            style="font-size:.7rem" data-mid="<?= $m['id'] ?>">
+                      <i class="bi bi-dash"></i>
+                    </button>
+                    <button type="submit" class="btn btn-primary btn-sm py-0 px-2" style="font-size:.72rem">Speichern</button>
+                    <?php if ($m['played']): ?>
+                    <form method="post" action="<?= url('match/'.$m['id'].'/result/clear') ?>" style="display:inline"
+                          data-confirm="Ergebnis wirklich löschen?">
+                      <?= csrf_field() ?>
+                      <button class="btn btn-link text-danger p-0" style="font-size:.7rem;line-height:1.4" title="Ergebnis löschen">
+                        <i class="bi bi-x-circle"></i>
+                      </button>
+                    </form>
+                    <?php endif; ?>
+                  </div>
+                </form>
+                <?php elseif (!empty($ko_set_rows)): ?>
+                <div class="d-flex flex-wrap gap-1 mt-1" style="font-size:.72rem">
+                  <?php foreach ($ko_set_rows as $sr): ?>
+                  <span class="fw-semibold"><?= (int)$sr['score1'] ?>:<?= (int)$sr['score2'] ?></span>
+                  <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
+              </details>
+            </div>
             <?php elseif (can_edit() && $m['played'] && $m['player1_id'] && $m['player2_id']): ?>
             <div style="border-top:1px solid #f0f0f0;padding:0 4px 1px;text-align:right">
               <form method="post" action="<?= url('match/'.$m['id'].'/result/clear') ?>" style="display:inline"
@@ -1230,7 +1365,7 @@ ob_start(); ?>
              width="<?= $bracket_w ?>" height="<?= $bracket_h ?>"></svg>
       </div>
       <!-- Speichern-Button -->
-      <?php if (can_edit()): ?>
+      <?php if (can_edit() && !$ko_use_sets): ?>
       <div class="mt-2">
         <button form="ko-form" type="submit" class="btn btn-primary btn-sm">
           <i class="bi bi-save me-1"></i>Ergebnisse speichern
@@ -1249,12 +1384,12 @@ ob_start(); ?>
             🥉 Spiel um Platz 3
           </div>
           <?php foreach ($third_place_match['matches'] as $m): ?>
-          <div class="ko-match" style="border:1px solid #ffc107;border-radius:6px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.07);overflow:hidden">
+          <div class="ko-match" style="border:1px solid #ffc107;border-radius:6px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.07);overflow:<?= $ko_use_sets ? 'visible' : 'hidden' ?>">
             <div class="d-flex align-items-center gap-1 px-2 <?= ($m['played'] && $m['score1'] > $m['score2']) ? 'bg-success-subtle fw-semibold' : '' ?>"
                  style="min-height:33px;border-bottom:1px solid #f0f0f0">
               <span class="flex-grow-1 small text-truncate" style="min-width:0"
                     title="<?= e($m['p1name'] ?? '') ?>"><?= $m['p1name'] !== null ? e($m['p1name']) : '—' ?></span>
-              <?php if (can_edit() && $m['player1_id'] && $m['player2_id']): ?>
+              <?php if (!$ko_use_sets && can_edit() && $m['player1_id'] && $m['player2_id']): ?>
               <input type="number" name="matches[<?= $m['id'] ?>][score1]" min="0" form="ko-form"
                      class="form-control form-control-sm text-center ms-auto" style="width:40px;height:24px;padding:0 2px;font-size:.8rem;flex-shrink:0"
                      value="<?= $m['played'] ? $m['score1'] : '' ?>">
@@ -1264,13 +1399,73 @@ ob_start(); ?>
                  style="min-height:33px">
               <span class="flex-grow-1 small text-truncate" style="min-width:0"
                     title="<?= e($m['p2name'] ?? '') ?>"><?= $m['p2name'] !== null ? e($m['p2name']) : '—' ?></span>
-              <?php if (can_edit() && $m['player1_id'] && $m['player2_id']): ?>
+              <?php if (!$ko_use_sets && can_edit() && $m['player1_id'] && $m['player2_id']): ?>
               <input type="number" name="matches[<?= $m['id'] ?>][score2]" min="0" form="ko-form"
                      class="form-control form-control-sm text-center ms-auto" style="width:40px;height:24px;padding:0 2px;font-size:.8rem;flex-shrink:0"
                      value="<?= $m['played'] ? $m['score2'] : '' ?>">
               <?php elseif ($m['played']): ?><span class="fw-bold small ms-auto" style="flex-shrink:0"><?= $m['score2'] ?></span><?php endif; ?>
             </div>
-            <?php if (can_edit() && $m['played'] && $m['player1_id'] && $m['player2_id']): ?>
+            <?php if ($ko_use_sets && $m['player1_id'] && $m['player2_id']): ?>
+            <?php $ko_set_rows = $existing_sets[$m['id']] ?? []; ?>
+            <div style="border-top:1px solid #f0f0f0;padding:3px 6px">
+              <details>
+                <summary style="font-size:.72rem;cursor:pointer;color:#0d6efd;user-select:none;list-style:none;padding:2px 0">
+                  &#9656; <?= $m['played'] ? $m['score1'].':'.$m['score2'].' (Sätze)' : 'Sätze' ?>
+                </summary>
+                <?php if (can_edit()): ?>
+                <form class="sets-form" method="post" action="<?= url('match/'.$m['id'].'/sets') ?>"
+                      style="margin-top:4px" data-mid="<?= $m['id'] ?>">
+                  <?= csrf_field() ?>
+                  <div class="d-flex flex-wrap align-items-center justify-content-center" style="gap:40px" id="sets-container-<?= $m['id'] ?>">
+                  <?php
+                    $ko_sc = max(count($ko_set_rows), 1);
+                    for ($si = 0; $si < $ko_sc; $si++):
+                      $sr = $ko_set_rows[$si] ?? [];
+                  ?>
+                    <div class="sets-pair d-flex align-items-center gap-1">
+                      <input type="number" name="sets[<?= $si ?>][score1]" min="0"
+                             class="form-control form-control-sm text-center sets-score"
+                             style="width:32px;height:22px;font-size:.7rem;padding:0 2px"
+                             value="<?= isset($sr['score1']) ? (int)$sr['score1'] : '' ?>">
+                      <span style="font-size:.7rem">:</span>
+                      <input type="number" name="sets[<?= $si ?>][score2]" min="0"
+                             class="form-control form-control-sm text-center sets-score"
+                             style="width:32px;height:22px;font-size:.7rem;padding:0 2px"
+                             value="<?= isset($sr['score2']) ? (int)$sr['score2'] : '' ?>">
+                    </div>
+                  <?php endfor; ?>
+                  </div>
+                  <div class="d-flex justify-content-center align-items-center gap-1 mt-1 mb-1">
+                    <button type="button" class="sets-add-btn btn btn-outline-secondary btn-sm py-0 px-1"
+                            style="font-size:.7rem" data-mid="<?= $m['id'] ?>">
+                      <i class="bi bi-plus"></i>
+                    </button>
+                    <button type="button" class="sets-remove-btn btn btn-outline-secondary btn-sm py-0 px-1"
+                            style="font-size:.7rem" data-mid="<?= $m['id'] ?>">
+                      <i class="bi bi-dash"></i>
+                    </button>
+                    <button type="submit" class="btn btn-primary btn-sm py-0 px-2" style="font-size:.72rem">Speichern</button>
+                    <?php if ($m['played']): ?>
+                    <form method="post" action="<?= url('match/'.$m['id'].'/result/clear') ?>" style="display:inline"
+                          data-confirm="Ergebnis wirklich löschen?">
+                      <?= csrf_field() ?>
+                      <button class="btn btn-link text-danger p-0" style="font-size:.7rem;line-height:1.4" title="Ergebnis löschen">
+                        <i class="bi bi-x-circle"></i>
+                      </button>
+                    </form>
+                    <?php endif; ?>
+                  </div>
+                </form>
+                <?php elseif (!empty($ko_set_rows)): ?>
+                <div class="d-flex flex-wrap gap-1 mt-1" style="font-size:.72rem">
+                  <?php foreach ($ko_set_rows as $sr): ?>
+                  <span class="fw-semibold"><?= (int)$sr['score1'] ?>:<?= (int)$sr['score2'] ?></span>
+                  <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
+              </details>
+            </div>
+            <?php elseif (can_edit() && $m['played'] && $m['player1_id'] && $m['player2_id']): ?>
             <div style="border-top:1px solid #f0f0f0;padding:0 4px 1px;text-align:right">
               <form method="post" action="<?= url('match/'.$m['id'].'/result/clear') ?>" style="display:inline"
                     data-confirm="Ergebnis wirklich löschen?">
@@ -1788,6 +1983,58 @@ document.addEventListener('click', function(e) {
   }
 });
 
+
+// ── Sätze: + / - Button ──────────────────────────────────────────
+document.addEventListener('click', function(e) {
+  var rem = e.target.closest('.sets-remove-btn');
+  if (rem) {
+    e.preventDefault();
+    var container = document.getElementById('sets-container-' + rem.dataset.mid);
+    if (!container) return;
+    var pairs = container.querySelectorAll('.sets-pair');
+    if (pairs.length > 1) pairs[pairs.length - 1].remove();
+    return;
+  }
+  var btn = e.target.closest('.sets-add-btn');
+  if (!btn) return;
+  e.preventDefault();
+  var mid = btn.dataset.mid;
+  var container = document.getElementById('sets-container-' + mid);
+  if (!container) return;
+  var idx = container.querySelectorAll('.sets-pair').length;
+  var isSmall = container.querySelector('input') && container.querySelector('input').style.width === '32px';
+  var w = isSmall ? '32px' : '46px';
+  var h = isSmall ? ';height:22px;font-size:.7rem;padding:0 2px' : '';
+  var pair = document.createElement('div');
+  pair.className = 'sets-pair d-flex align-items-center gap-1';
+  pair.innerHTML =
+    '<input type="number" name="sets[' + idx + '][score1]" min="0"' +
+    ' class="form-control form-control-sm text-center sets-score"' +
+    ' style="width:' + w + h + '">' +
+    '<span style="font-size:.7rem">:</span>' +
+    '<input type="number" name="sets[' + idx + '][score2]" min="0"' +
+    ' class="form-control form-control-sm text-center sets-score"' +
+    ' style="width:' + w + h + '">';
+  container.appendChild(pair);
+  pair.querySelector('input').focus();
+});
+
+// ── Sätze: Live-Gesamtergebnis ────────────────────────────────────
+document.addEventListener('input', function(e) {
+  if (!e.target.classList.contains('sets-score')) return;
+  var form = e.target.closest('.sets-form');
+  if (!form) return;
+  var mid = form.dataset.mid;
+  var s1 = 0, s2 = 0;
+  form.querySelectorAll('.sets-pair').forEach(function(pair) {
+    var inp = pair.querySelectorAll('.sets-score');
+    if (inp.length < 2) return;
+    var v1 = parseInt(inp[0].value), v2 = parseInt(inp[1].value);
+    if (!isNaN(v1) && !isNaN(v2)) { if (v1 > v2) s1++; else if (v2 > v1) s2++; }
+  });
+  var tot = document.querySelector('.sets-total-' + mid);
+  if (tot) tot.textContent = s1 + ':' + s2;
+});
 
 // ── Losentscheid Drag-and-Drop ────────────────────────────────────────────────
 document.querySelectorAll('.los-sortable').forEach(function(el) {

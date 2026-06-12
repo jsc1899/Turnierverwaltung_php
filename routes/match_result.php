@@ -122,9 +122,12 @@ function clear_result(array $p): void {
     }
 
     db_execute("UPDATE `match` SET score1=NULL, score2=NULL, played=0, tiebreak_winner=0 WHERE id=?", [$mid]);
-    $comp = db_fetch("SELECT team_size FROM competition WHERE id=?", [(int)$m['competition_id']]);
+    $comp = db_fetch("SELECT team_size, score_mode FROM competition WHERE id=?", [(int)$m['competition_id']]);
     if (!empty($comp['team_size'])) {
         db_execute("DELETE FROM team_match_duel WHERE match_id=?", [$mid]);
+    }
+    if (($comp['score_mode'] ?? 'match') === 'sets') {
+        db_execute("DELETE FROM match_set WHERE match_id=?", [$mid]);
     }
     if ($m['group_id'] !== null) {
         _reset_group_tiebreak((int)$m['group_id']);
@@ -212,6 +215,55 @@ function save_duels(array $p): void {
         if ($all_played) {
             _propagate_result((int)$m['competition_id'], $m);
         }
+    }
+    redirect('competition/' . $m['competition_id']);
+}
+
+function save_sets(array $p): void {
+    require_edit();
+    csrf_verify();
+    $mid = (int)$p['id'];
+    $m   = db_fetch(
+        "SELECT m.*, c.score_mode, c.id as cid FROM `match` m
+         JOIN competition c ON c.id = m.competition_id WHERE m.id = ?",
+        [$mid]
+    );
+    $sm = $m['score_mode'] ?? 'match';
+    $use_sets = $sm === 'sets' || ($sm === 'sets_grp' && $m['group_id'] !== null);
+    if (!$m || !$use_sets) { redirect(''); return; }
+
+    if ($m['group_id'] !== null && _group_phase_locked((int)$m['cid'])) {
+        flash('danger', 'Gruppenspielergebnisse können nach dem KO-Auslosen nicht mehr geändert werden.');
+        redirect('competition/' . $m['cid']);
+        return;
+    }
+
+    $sets = $_POST['sets'] ?? [];
+    db_execute("DELETE FROM match_set WHERE match_id = ?", [$mid]);
+
+    $s1 = 0; $s2 = 0; $played_count = 0;
+    foreach ($sets as $order => $s) {
+        $ss1 = ($s['score1'] ?? '') !== '' ? (int)$s['score1'] : null;
+        $ss2 = ($s['score2'] ?? '') !== '' ? (int)$s['score2'] : null;
+        if ($ss1 === null || $ss2 === null) continue;
+        db_insert(
+            "INSERT INTO match_set (match_id, set_order, score1, score2) VALUES (?,?,?,?)",
+            [$mid, (int)$order, $ss1, $ss2]
+        );
+        $played_count++;
+        if ($ss1 > $ss2) $s1++;
+        elseif ($ss2 > $ss1) $s2++;
+    }
+
+    if ($played_count > 0) {
+        db_execute(
+            "UPDATE `match` SET score1=?, score2=?, played=1 WHERE id=?",
+            [$s1, $s2, $mid]
+        );
+        if ($m['group_id'] !== null) _reset_group_tiebreak((int)$m['group_id']);
+        _propagate_result((int)$m['competition_id'], $m);
+    } else {
+        db_execute("UPDATE `match` SET score1=NULL, score2=NULL, played=0 WHERE id=?", [$mid]);
     }
     redirect('competition/' . $m['competition_id']);
 }

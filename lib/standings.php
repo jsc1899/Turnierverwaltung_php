@@ -140,7 +140,7 @@ function _apply_h2h_tiebreaker(array $standings, array $matches, string $p1_col,
     return $final;
 }
 
-function group_standings(int $group_id, string $seeding_order = 'desc'): array {
+function group_standings(int $group_id, string $seeding_order = 'desc', string $score_mode = 'match'): array {
     $players = db_fetchall(
         "SELECT p.id, TRIM(CONCAT(p.name, IF(p.firstname != '', CONCAT(' ', p.firstname), ''))) as name,
          p.club, COALESCE(cp.skill, p.skill, 0) as skill, gp.tiebreak_order
@@ -161,6 +161,7 @@ function group_standings(int $group_id, string $seeding_order = 'desc'): array {
             'tiebreak_order' => $p['tiebreak_order'],
             'played' => 0, 'wins' => 0, 'draws' => 0, 'losses' => 0,
             'goals_for' => 0, 'goals_against' => 0, 'points' => 0,
+            'einzel_for' => 0, 'einzel_against' => 0, 'einzel_diff' => 0,
         ];
     }
 
@@ -183,15 +184,33 @@ function group_standings(int $group_id, string $seeding_order = 'desc'): array {
         }
     }
 
+    if ($score_mode === 'sets') {
+        $set_rows = db_fetchall(
+            "SELECT m.player1_id, m.player2_id, s.score1, s.score2
+             FROM match_set s JOIN `match` m ON m.id = s.match_id
+             WHERE m.group_id = ?",
+            [$group_id]
+        );
+        foreach ($set_rows as $s) {
+            $p1 = $s['player1_id']; $p2 = $s['player2_id'];
+            if (!isset($stats[$p1]) || !isset($stats[$p2])) continue;
+            $stats[$p1]['einzel_for']     += (int)$s['score1'];
+            $stats[$p1]['einzel_against'] += (int)$s['score2'];
+            $stats[$p2]['einzel_for']     += (int)$s['score2'];
+            $stats[$p2]['einzel_against'] += (int)$s['score1'];
+        }
+    }
+
     $result = array_values($stats);
     foreach ($result as &$r) {
-        $r['goal_diff'] = $r['goals_for'] - $r['goals_against'];
+        $r['goal_diff']   = $r['goals_for'] - $r['goals_against'];
+        $r['einzel_diff'] = $r['einzel_for'] - $r['einzel_against'];
     }
     usort($result, fn($a, $b) => $b['points'] - $a['points']);
     return _apply_h2h_tiebreaker($result, $matches, 'player1_id', 'player2_id');
 }
 
-function team_standings(int $group_id, string $seeding_order = 'desc'): array {
+function team_standings(int $group_id, string $seeding_order = 'desc', string $score_mode = 'match'): array {
     $teams = db_fetchall(
         "SELECT t.id, t.name, '' as club, COALESCE(ct.skill, 0) as skill, gt.tiebreak_order
          FROM `team` t
@@ -259,7 +278,7 @@ function team_standings(int $group_id, string $seeding_order = 'desc'): array {
     return _apply_h2h_tiebreaker($result, $matches, 'team1_id', 'team2_id', $duels);
 }
 
-function double_standings(int $group_id, string $seeding_order = 'desc'): array {
+function double_standings(int $group_id, string $seeding_order = 'desc', string $score_mode = 'match'): array {
     $doubles = db_fetchall(
         "SELECT d.id,
          TRIM(CONCAT(
@@ -300,6 +319,7 @@ function double_standings(int $group_id, string $seeding_order = 'desc'): array 
             'tiebreak_order' => $d['tiebreak_order'],
             'played' => 0, 'wins' => 0, 'draws' => 0, 'losses' => 0,
             'goals_for' => 0, 'goals_against' => 0, 'points' => 0,
+            'einzel_for' => 0, 'einzel_against' => 0, 'einzel_diff' => 0,
         ];
     }
 
@@ -322,9 +342,27 @@ function double_standings(int $group_id, string $seeding_order = 'desc'): array 
         }
     }
 
+    if ($score_mode === 'sets') {
+        $set_rows = db_fetchall(
+            "SELECT m.double1_id, m.double2_id, s.score1, s.score2
+             FROM match_set s JOIN `match` m ON m.id = s.match_id
+             WHERE m.group_id = ?",
+            [$group_id]
+        );
+        foreach ($set_rows as $s) {
+            $d1 = $s['double1_id']; $d2 = $s['double2_id'];
+            if (!isset($stats[$d1]) || !isset($stats[$d2])) continue;
+            $stats[$d1]['einzel_for']     += (int)$s['score1'];
+            $stats[$d1]['einzel_against'] += (int)$s['score2'];
+            $stats[$d2]['einzel_for']     += (int)$s['score2'];
+            $stats[$d2]['einzel_against'] += (int)$s['score1'];
+        }
+    }
+
     $result = array_values($stats);
     foreach ($result as &$r) {
-        $r['goal_diff'] = $r['goals_for'] - $r['goals_against'];
+        $r['goal_diff']   = $r['goals_for'] - $r['goals_against'];
+        $r['einzel_diff'] = $r['einzel_for'] - $r['einzel_against'];
     }
     usort($result, fn($a, $b) => $b['points'] - $a['points']);
     return _apply_h2h_tiebreaker($result, $matches, 'double1_id', 'double2_id');
