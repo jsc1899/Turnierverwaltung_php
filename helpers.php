@@ -202,25 +202,34 @@ function require_competition_open(int $cid): void {
 // ── Git-Version ────────────────────────────────────────────────────────────────
 
 function get_git_version(): array {
+    $hash = null; $ts = null; $repo = null;
+
     $git_dir = __DIR__ . '/.git';
-    $log = $git_dir . '/logs/HEAD';
-    if (!file_exists($log)) return [];
-    $lines = file($log, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    $last  = end($lines);
-    if (!$last) return [];
-    // Format: <old> <new-full-hash> <author> <email> <unix-ts> <tz>\t<message>
-    if (!preg_match('/^\S+ ([0-9a-f]{40}) .+? (\d+) [+-]\d+\t/', $last, $m)) return [];
-    $label = substr($m[1], 0, 7) . ' · ' . date('d.m.Y H:i', (int)$m[2]);
-    $url   = null;
-    $cfg   = @file_get_contents($git_dir . '/config');
-    if ($cfg && preg_match('/url\s*=\s*(.+)/m', $cfg, $cm)) {
-        $remote = trim($cm[1]);
-        $remote = preg_replace('/^git@github\.com:(.+?)(?:\.git)?$/', 'https://github.com/$1', $remote);
-        $remote = rtrim(preg_replace('/\.git$/', '', $remote), '/');
-        if (str_starts_with($remote, 'https://github.com/')) {
-            $url = $remote . '/commit/' . $m[1];
+    $log     = $git_dir . '/logs/HEAD';
+    if (file_exists($log)) {
+        $lines = file($log, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        $last  = end($lines);
+        if ($last && preg_match('/^\S+ ([0-9a-f]{40}) .+? (\d+) [+-]\d+\t/', $last, $m)) {
+            $hash = $m[1];
+            $ts   = (int)$m[2];
         }
+        $cfg = @file_get_contents($git_dir . '/config');
+        if ($cfg && preg_match('/url\s*=\s*(.+)/m', $cfg, $cm)) {
+            $r = trim($cm[1]);
+            $r = preg_replace('/^git@github\.com:(.+?)(?:\.git)?$/', 'https://github.com/$1', $r);
+            $repo = rtrim(preg_replace('/\.git$/', '', $r), '/');
+        }
+    } elseif (file_exists(__DIR__ . '/VERSION')) {
+        $lines = file(__DIR__ . '/VERSION', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        $hash  = $lines[0] ?? null;
+        $ts    = isset($lines[1]) ? (int)$lines[1] : null;
+        $repo  = $lines[2] ?? null;
     }
+
+    if (!$hash || !$ts) return [];
+    $label = substr($hash, 0, 7) . ' · ' . date('d.m.Y H:i', $ts);
+    $url   = ($repo && str_starts_with($repo, 'https://github.com/'))
+             ? $repo . '/commit/' . $hash : null;
     return ['label' => $label, 'url' => $url];
 }
 
