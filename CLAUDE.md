@@ -22,14 +22,14 @@ Start-Process "C:\Program Files\MariaDB 12.3\bin\mysqld.exe" -WindowStyle Hidden
 
 **PHP Built-in Server starten** (router.php erforderlich — behandelt Token-URLs mit Punkten):
 ```powershell
-php -S localhost:8080 -t "C:\Users\juerg\Claude\Turnierverwaltung_PHP" "C:\Users\juerg\Claude\Turnierverwaltung_PHP\router.php"
+php -S localhost:8080 -t "C:\Users\juerg\claude\Turnier" "C:\Users\juerg\claude\Turnier\router.php"
 ```
 
 App läuft auf **http://localhost:8080**. Das Datenbankschema wird beim ersten Request automatisch via `init_db()` in `db.php` angelegt.
 
 **Abhängigkeiten** (bereits installiert):
 ```powershell
-cd "C:\Users\juerg\Claude\Turnierverwaltung_PHP"
+cd "C:\Users\juerg\claude\Turnier"
 php composer.phar install
 ```
 

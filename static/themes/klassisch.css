@@ -1,0 +1,72 @@
+/* ── Klassisch-Theme: Warme Erdfarben ────────────────────────────────────── */
+
+:root {
+  --bs-primary: #5c4a1e;
+  --bs-primary-rgb: 92, 74, 30;
+  --bs-link-color: #5c4a1e;
+  --bs-link-color-rgb: 92, 74, 30;
+  --bs-link-hover-color: #7a6330;
+}
+
+body {
+  background: #f5f0e8 !important;
+  font-family: 'Lato', system-ui, sans-serif;
+}
+
+h1, h2, h3, h4, h5 { font-family: 'Merriweather', Georgia, serif; }
+
+/* Navbar */
+.navbar.bg-primary { background: #5c4a1e !important; }
+
+/* Buttons */
+.btn-primary {
+  --bs-btn-bg: #5c4a1e;
+  --bs-btn-border-color: #5c4a1e;
+  --bs-btn-hover-bg: #7a6330;
+  --bs-btn-hover-border-color: #7a6330;
+  --bs-btn-active-bg: #3d3012;
+}
+.btn-outline-primary {
+  --bs-btn-color: #5c4a1e;
+  --bs-btn-border-color: #5c4a1e;
+  --bs-btn-hover-bg: #5c4a1e;
+  --bs-btn-hover-border-color: #5c4a1e;
+}
+
+/* Cards */
+.card {
+  border-radius: 8px !important;
+  border: 1px solid #d4c4a0 !important;
+  box-shadow: 0 1px 4px rgba(92,74,30,.08);
+  background: #faf6ef;
+}
+.card-header {
+  border-radius: 8px 8px 0 0 !important;
+  background: #ede4d4;
+  border-bottom: 1px solid #d4c4a0;
+}
+
+/* Badges */
+.badge.bg-primary { background: #5c4a1e !important; }
+
+/* Nav tabs */
+.nav-tabs .nav-link.active { color: #5c4a1e; border-bottom-color: #5c4a1e; }
+
+/* Bracket overrides */
+.bracket-col-header { background: #ede4d4; color: #5c4a1e; }
+.bracket-match { background: #faf6ef; border-color: #d4c4a0; }
+.bracket-match::after { background: #a08050; }
+.bracket-player.winner { background: #d4c4a0; color: #3a2d10; }
+.bracket-score { color: #8b6914; }
+
+.group-drag-card { background: #faf6ef; border-color: #d4c4a0; }
+.group-drag-header { background: #ede4d4; color: #5c4a1e; }
+.drag-player-item { background: #faf6ef; border-color: #d4c4a0; }
+.drag-player-item.sortable-chosen { background: #ede4d4; border-color: #5c4a1e; }
+.ko-drag-row { background: #faf6ef; border-color: #d4c4a0; }
+.ko-drag-row.sortable-chosen { background: #ede4d4; border-color: #5c4a1e; }
+
+.match-row:hover { background: #ede4d4; }
+
+.row-advance       { --bs-table-bg: #d4c4a0; }
+.row-advance:hover { --bs-table-bg: #c8b48e; }

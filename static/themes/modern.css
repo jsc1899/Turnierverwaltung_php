@@ -1,0 +1,73 @@
+/* ── Modern-Theme: Indigo ─────────────────────────────────────────────────── */
+
+:root {
+  --bs-primary: #4f46e5;
+  --bs-primary-rgb: 79, 70, 229;
+  --bs-link-color: #4f46e5;
+  --bs-link-color-rgb: 79, 70, 229;
+  --bs-link-hover-color: #3730a3;
+}
+
+body {
+  background: #f5f3ff !important;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* Navbar */
+.navbar.bg-primary {
+  background: #4f46e5 !important;
+  box-shadow: 0 1px 12px rgba(79,70,229,.3);
+}
+
+/* Buttons */
+.btn-primary {
+  --bs-btn-bg: #4f46e5;
+  --bs-btn-border-color: #4f46e5;
+  --bs-btn-hover-bg: #4338ca;
+  --bs-btn-hover-border-color: #4338ca;
+  --bs-btn-active-bg: #3730a3;
+}
+.btn-outline-primary {
+  --bs-btn-color: #4f46e5;
+  --bs-btn-border-color: #4f46e5;
+  --bs-btn-hover-bg: #4f46e5;
+  --bs-btn-hover-border-color: #4f46e5;
+}
+
+/* Cards */
+.card {
+  border-radius: 10px !important;
+  border: 1px solid #e0e7ff !important;
+  box-shadow: 0 1px 4px rgba(79,70,229,.07);
+  background: #fff;
+}
+.card-header {
+  border-radius: 10px 10px 0 0 !important;
+  background: #f5f3ff;
+  border-bottom: 1px solid #e0e7ff;
+}
+
+/* Badges */
+.badge.bg-primary { background: #4f46e5 !important; }
+
+/* Nav tabs */
+.nav-tabs .nav-link.active { color: #4f46e5; border-bottom-color: #4f46e5; }
+
+/* Bracket overrides */
+.bracket-col-header { background: #e0e7ff; color: #4338ca; }
+.bracket-match { background: #fff; border-color: #e0e7ff; }
+.bracket-match::after { background: #a5b4fc; }
+.bracket-player.winner { background: #ede9fe; color: #4338ca; }
+.bracket-score { color: #4f46e5; }
+
+.group-drag-card { background: #fff; border-color: #e0e7ff; }
+.group-drag-header { background: #e0e7ff; color: #4338ca; }
+.drag-player-item { background: #f5f3ff; border-color: #e0e7ff; }
+.drag-player-item.sortable-chosen { background: #ede9fe; border-color: #4f46e5; }
+.ko-drag-row { background: #f5f3ff; border-color: #e0e7ff; }
+.ko-drag-row.sortable-chosen { background: #ede9fe; border-color: #4f46e5; }
+
+.match-row:hover { background: #f5f3ff; }
+
+.row-advance       { --bs-table-bg: #ede9fe; }
+.row-advance:hover { --bs-table-bg: #ddd6fe; }

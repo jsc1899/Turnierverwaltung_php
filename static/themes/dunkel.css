@@ -1,0 +1,98 @@
+/* ── Dunkel-Theme: Bootstrap Dark Mode ───────────────────────────────────── */
+
+/* style.css-Overrides: hardcodierte Farben durch BS-Dark-Variablen ersetzen */
+body { background: var(--bs-body-bg) !important; }
+
+.bracket-col-header {
+  background: var(--bs-tertiary-bg);
+  color: var(--bs-secondary-color);
+}
+
+.bracket-match {
+  background: var(--bs-body-bg);
+  border-color: var(--bs-border-color);
+}
+
+.bracket-match::after { background: var(--bs-border-color); }
+
+.bracket-player { border-bottom-color: var(--bs-border-color); }
+
+.bracket-player.winner {
+  background: rgba(25, 135, 84, .25);
+  color: #75d9a0;
+  font-weight: 700;
+}
+
+.bracket-player.loser {
+  background: var(--bs-tertiary-bg);
+  color: var(--bs-secondary-color);
+}
+
+.score-badge {
+  background: var(--bs-secondary-bg);
+  color: var(--bs-body-color);
+}
+
+.match-row:hover { background: rgba(255,255,255,.05); }
+.match-played    { background: var(--bs-tertiary-bg); }
+
+.group-drag-card {
+  background: var(--bs-body-bg);
+  border-color: var(--bs-border-color);
+}
+
+.group-drag-header {
+  background: var(--bs-tertiary-bg);
+  color: var(--bs-body-color);
+}
+
+.drag-player-item {
+  background: var(--bs-secondary-bg);
+  border-color: var(--bs-border-color);
+  color: var(--bs-body-color);
+}
+
+.drag-player-item.sortable-chosen {
+  background: rgba(var(--bs-primary-rgb), .2);
+  border-color: var(--bs-primary);
+}
+
+.ko-drag-row {
+  background: var(--bs-secondary-bg);
+  border-color: var(--bs-border-color);
+  color: var(--bs-body-color);
+}
+
+.ko-drag-row.sortable-chosen {
+  background: rgba(var(--bs-primary-rgb), .2);
+  border-color: var(--bs-primary);
+}
+
+.third-place-standalone { border-top-color: var(--bs-border-color); }
+
+.third-place-standalone-header {
+  background: var(--bs-tertiary-bg);
+  color: var(--bs-secondary-color);
+}
+
+.bracket-edit-row {
+  background: var(--bs-tertiary-bg);
+  border-top-color: var(--bs-border-color);
+}
+
+.bracket-form {
+  background: var(--bs-secondary-bg);
+  border-top-color: var(--bs-border-color);
+}
+
+.place-card {
+  background: var(--bs-body-bg);
+  border-color: var(--bs-border-color);
+}
+
+.place-card.place-1 { border-color: #ffc107; background: rgba(255,193,7,.1); }
+.place-card.place-2 { border-color: var(--bs-border-color); background: var(--bs-secondary-bg); }
+.place-card.place-3 { border-color: #cd7f32; background: rgba(205,127,50,.1); }
+
+.row-advance       { --bs-table-bg: rgba(25, 135, 84, .2); }
+.row-advance:hover { --bs-table-bg: rgba(25, 135, 84, .3); }

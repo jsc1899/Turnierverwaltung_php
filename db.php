@@ -37,6 +37,16 @@ function db_execute(string $sql, array $params = []): int {
     return db_query($sql, $params)->rowCount();
 }
 
+function get_setting(string $key, string $default = ''): string {
+    $row = db_fetch('SELECT value FROM settings WHERE `key` = ?', [$key]);
+    return $row ? $row['value'] : $default;
+}
+
+function set_setting(string $key, string $value): void {
+    db_execute('INSERT INTO settings (`key`, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = ?',
+        [$key, $value, $value]);
+}
+
 function init_db(): void {
     $pdo = get_db();
     $pdo->exec("
@@ -339,6 +349,13 @@ function init_db(): void {
         try { $pdo->exec("ALTER TABLE `double` DROP KEY `uq_double_pair`"); } catch (\PDOException $e) {}
         try { $pdo->exec("ALTER TABLE `double` ADD UNIQUE KEY `uq_double_pair` (`player1_id`, `player2_id`)"); } catch (\PDOException $e) {}
     }
+
+    // Settings-Tabelle
+    try { $pdo->exec("CREATE TABLE IF NOT EXISTS `settings` (
+        `key` VARCHAR(100) NOT NULL,
+        `value` TEXT NOT NULL,
+        PRIMARY KEY (`key`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"); } catch (\PDOException $e) {}
 
     // Admin-Rolle sicherstellen
     db_execute("UPDATE user SET role = 'admin' WHERE email = ?", [ADMIN_EMAIL]);

@@ -1,5 +1,6 @@
+<?php $active_theme = get_setting('theme', 'default'); ?>
 <!doctype html>
-<html lang="de">
+<html lang="de"<?= $active_theme === 'dunkel' ? ' data-bs-theme="dark"' : '' ?>>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,7 +8,21 @@
   <title><?= e($page_title ?? 'Turnierverwaltung') ?></title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <?php if ($active_theme === 'elegant'): ?>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <?php elseif ($active_theme === 'modern'): ?>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <?php elseif ($active_theme === 'klassisch'): ?>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Lato:wght@400;600&display=swap" rel="stylesheet">
+  <?php endif; ?>
   <link rel="stylesheet" href="<?= url('static/style.css') ?>">
+  <link rel="stylesheet" href="<?= url('static/themes/' . $active_theme . '.css') ?>">
   <link rel="icon" type="image/x-icon" href="<?= url('static/favicon.ico') ?>">
 </head>
 <body>
@@ -38,9 +53,6 @@
       <ul class="navbar-nav">
         <?php $u = current_user(); ?>
         <li class="nav-item"><a class="nav-link" href="<?= url('hilfe') ?>"><i class="bi bi-question-circle me-1"></i>Hilfe</a></li>
-        <?php if (is_admin()): ?>
-        <li class="nav-item"><a class="nav-link" href="<?= url('admin/users') ?>"><i class="bi bi-shield-lock me-1"></i>Benutzer</a></li>
-        <?php endif; ?>
         <?php if ($u): ?>
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
@@ -48,6 +60,11 @@
           </a>
           <ul class="dropdown-menu dropdown-menu-end">
             <li><span class="dropdown-item-text text-muted small"><?= e($u['email']) ?></span></li>
+            <?php if (is_admin()): ?>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="<?= url('admin/users') ?>"><i class="bi bi-shield-lock me-1"></i>Benutzer</a></li>
+            <li><a class="dropdown-item" href="<?= url('admin/design') ?>"><i class="bi bi-palette me-1"></i>Design</a></li>
+            <?php endif; ?>
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item" href="<?= url('logout') ?>"><i class="bi bi-box-arrow-right me-1"></i>Abmelden</a></li>
           </ul>

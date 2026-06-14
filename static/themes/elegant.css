@@ -1,0 +1,100 @@
+/* ── Elegant-Theme: Vereinsmodern (Waldgrün + Amber) ─────────────────────── */
+
+:root {
+  --bs-primary: #1b3c2d;
+  --bs-primary-rgb: 27, 60, 45;
+  --bs-link-color: #1b3c2d;
+  --bs-link-color-rgb: 27, 60, 45;
+  --bs-link-hover-color: #2d6045;
+  --bs-body-bg: #faf8f4;
+}
+
+body {
+  background: #f0ece2 !important;
+  font-family: 'DM Sans', system-ui, sans-serif;
+}
+
+h1, h2, h3, h4, h5, .navbar-brand { font-family: 'Playfair Display', Georgia, serif; }
+
+/* Navbar */
+.navbar.bg-primary { background: #1b3c2d !important; }
+
+/* Buttons */
+.btn-primary {
+  --bs-btn-bg: #1b3c2d;
+  --bs-btn-border-color: #1b3c2d;
+  --bs-btn-hover-bg: #2d6045;
+  --bs-btn-hover-border-color: #2d6045;
+  --bs-btn-active-bg: #0f2019;
+  --bs-btn-active-border-color: #0f2019;
+}
+.btn-outline-primary {
+  --bs-btn-color: #1b3c2d;
+  --bs-btn-border-color: #1b3c2d;
+  --bs-btn-hover-bg: #1b3c2d;
+  --bs-btn-hover-border-color: #1b3c2d;
+  --bs-btn-active-bg: #0f2019;
+}
+.btn-success {
+  --bs-btn-bg: #bf7c22;
+  --bs-btn-border-color: #bf7c22;
+  --bs-btn-hover-bg: #d4923c;
+  --bs-btn-hover-border-color: #d4923c;
+  --bs-btn-color: #fff;
+  --bs-btn-hover-color: #fff;
+}
+
+/* Cards */
+.card {
+  border-radius: 14px !important;
+  box-shadow: 0 2px 8px rgba(27,60,45,.08);
+  border: 1px solid rgba(27,60,45,.12) !important;
+  background: #faf8f4;
+}
+.card-header {
+  border-radius: 14px 14px 0 0 !important;
+  background: rgba(27,60,45,.07);
+  border-bottom: 1px solid rgba(27,60,45,.1);
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 600;
+}
+
+/* Tables */
+.table thead th {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  font-size: .8rem;
+  color: #5c6e61;
+}
+
+/* Badges */
+.badge.bg-primary { background: #1b3c2d !important; }
+
+/* Nav tabs */
+.nav-tabs .nav-link.active {
+  color: #1b3c2d;
+  border-bottom-color: #1b3c2d;
+  font-weight: 600;
+}
+
+/* Bracket overrides */
+.bracket-col-header { background: rgba(27,60,45,.1); color: #2d6045; }
+.bracket-match { background: #faf8f4; border-color: rgba(27,60,45,.15); }
+.bracket-match::after { background: #4a8a68; }
+.bracket-player.winner { background: rgba(27,60,45,.13); color: #1b3c2d; }
+.bracket-score { color: #bf7c22; }
+
+.group-drag-card { background: #faf8f4; border-color: rgba(27,60,45,.15); }
+.group-drag-header { background: rgba(27,60,45,.1); color: #2d6045; }
+.drag-player-item { background: #faf8f4; border-color: rgba(27,60,45,.15); }
+.drag-player-item.sortable-chosen { background: rgba(27,60,45,.1); border-color: #1b3c2d; }
+.ko-drag-row { background: #faf8f4; border-color: rgba(27,60,45,.15); }
+.ko-drag-row.sortable-chosen { background: rgba(27,60,45,.1); border-color: #1b3c2d; }
+
+.match-row:hover { background: rgba(27,60,45,.06); }
+
+.place-card.place-1 { border-color: #bf7c22; background: #fef9ef; }
+
+.row-advance       { --bs-table-bg: rgba(27,60,45,.14); }
+.row-advance:hover { --bs-table-bg: rgba(27,60,45,.21); }

@@ -25,7 +25,7 @@ session_start();
 // Security-Header
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
-header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; img-src 'self' data: blob:");
+header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; img-src 'self' data: blob:");
 header('Referrer-Policy: strict-origin-when-cross-origin');
 header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
 if (str_starts_with(APP_URL, 'https://')) {
@@ -207,6 +207,8 @@ $routes = [
     ['GET',  '/admin/users',              'admin', 'users'],
     ['POST', '/admin/user/{id}/role',     'admin', 'set_role'],
     ['POST', '/admin/user/{id}/delete',   'admin', 'delete_user'],
+    ['GET',  '/admin/design',             'admin', 'design'],
+    ['POST', '/admin/design',             'admin', 'save_design'],
 ];
 
 // ── Routing ───────────────────────────────────────────────────────────────────
