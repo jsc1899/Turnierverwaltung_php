@@ -178,6 +178,27 @@ function double_name(int $did): string {
     return $d['name'] ?: ($d['p1name'] . ' / ' . $d['p2name']);
 }
 
+// ── Turnier-Sperren ────────────────────────────────────────────────────────────
+
+function require_tournament_open(int $tid): void {
+    $t = db_fetch("SELECT is_done FROM tournament WHERE id = ?", [$tid]);
+    if ($t && (int)$t['is_done'] === 1) {
+        flash('danger', 'Dieses Turnier ist beendet – Änderungen sind nicht mehr möglich.');
+        redirect('tournament/' . $tid);
+    }
+}
+
+function require_competition_open(int $cid): void {
+    $row = db_fetch(
+        "SELECT t.is_done FROM competition c JOIN tournament t ON t.id = c.tournament_id WHERE c.id = ?",
+        [$cid]
+    );
+    if ($row && (int)$row['is_done'] === 1) {
+        flash('danger', 'Dieses Turnier ist beendet – Änderungen sind nicht mehr möglich.');
+        redirect('competition/' . $cid);
+    }
+}
+
 // ── Render ─────────────────────────────────────────────────────────────────────
 
 function render(string $template, array $vars = []): void {

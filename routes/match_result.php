@@ -43,6 +43,7 @@ function save(array $p): void {
 
     $m = db_fetch("SELECT * FROM `match` WHERE id=?", [$mid]);
     if (!$m) { redirect(''); return; }
+    require_competition_open((int)$m['competition_id']);
 
     if ($m['group_id'] !== null && _group_phase_locked((int)$m['competition_id'])) {
         flash('danger', 'Gruppenspielergebnisse können nach dem KO-Auslosen nicht mehr geändert werden.');
@@ -75,6 +76,7 @@ function save_bulk(array $p): void {
     require_edit();
     csrf_verify();
     $cid     = (int)$p['id'];
+    require_competition_open($cid);
     $matches = $_POST['matches'] ?? [];
     $errors  = [];
 
@@ -114,6 +116,7 @@ function clear_result(array $p): void {
     $mid = (int)$p['id'];
     $m   = db_fetch("SELECT * FROM `match` WHERE id=?", [$mid]);
     if (!$m) { redirect(''); return; }
+    require_competition_open((int)$m['competition_id']);
 
     if ($m['group_id'] !== null && _group_phase_locked((int)$m['competition_id'])) {
         flash('danger', 'Gruppenspielergebnisse können nach dem KO-Auslosen nicht mehr geändert werden.');
@@ -147,6 +150,7 @@ function force_advance_ko(array $p): void {
     if (!$m || !$m['played'] || (int)$m['score1'] !== (int)$m['score2']) {
         redirect('competition/' . ($m['competition_id'] ?? '')); return;
     }
+    require_competition_open((int)$m['competition_id']);
     db_execute("UPDATE `match` SET tiebreak_winner=? WHERE id=?", [$slot, $mid]);
     require_once __DIR__ . '/../lib/ko_bracket.php';
     $m['tiebreak_winner'] = $slot;
@@ -164,6 +168,7 @@ function save_duels(array $p): void {
         [$mid]
     );
     if (!$m || !(int)$m['team_size']) { redirect(''); return; }
+    require_competition_open((int)$m['cid']);
 
     if ($m['group_id'] !== null && _group_phase_locked((int)$m['cid'])) {
         flash('danger', 'Gruppenspielergebnisse können nach dem KO-Auslosen nicht mehr geändert werden.');
@@ -231,6 +236,7 @@ function save_sets(array $p): void {
     $sm = $m['score_mode'] ?? 'match';
     $use_sets = $sm === 'sets' || ($sm === 'sets_grp' && $m['group_id'] !== null);
     if (!$m || !$use_sets) { redirect(''); return; }
+    require_competition_open((int)$m['cid']);
 
     if ($m['group_id'] !== null && _group_phase_locked((int)$m['cid'])) {
         flash('danger', 'Gruppenspielergebnisse können nach dem KO-Auslosen nicht mehr geändert werden.');

@@ -12,6 +12,7 @@ function _get_player_skill(int $pid, string $sport): float {
 function new_competition(array $p): void {
     require_edit();
     csrf_verify();
+    require_tournament_open((int)$p['tid']);
     $name          = trim(post('name'));
     $group_size    = max(3, min(8, (int)post('group_size', 4)));
     $advance_count = max(0, min(2, (int)post('advance_count', 1)));
@@ -603,6 +604,7 @@ function settings(array $p): void {
     require_edit();
     csrf_verify();
     $cid = (int)$p['id'];
+    require_competition_open($cid);
 
     // Sub-actions via hidden fields
     if (post('mark_done')) {
@@ -686,6 +688,7 @@ function settings(array $p): void {
 function delete(array $p): void {
     require_edit();
     csrf_verify();
+    require_competition_open((int)$p['id']);
     $c = db_fetch("SELECT tournament_id FROM competition WHERE id=?", [(int)$p['id']]);
     $tid = $c ? $c['tournament_id'] : null;
     db_execute("DELETE FROM competition WHERE id=?", [(int)$p['id']]);
@@ -696,6 +699,7 @@ function add_player(array $p): void {
     require_edit();
     csrf_verify();
     $cid  = (int)$p['id'];
+    require_competition_open($cid);
     $pids = $_POST['player_ids'] ?? [];
     $c    = db_fetch("SELECT tournament_id, max_players FROM competition WHERE id=?", [$cid]);
     $sport = '';
@@ -727,6 +731,7 @@ function add_player(array $p): void {
 function remove_player(array $p): void {
     require_edit();
     csrf_verify();
+    require_competition_open((int)$p['id']);
     db_execute("DELETE FROM competition_player WHERE competition_id=? AND player_id=?",
         [(int)$p['id'], (int)$p['pid']]);
     redirect('competition/' . $p['id'] . '#tab-players');
@@ -736,6 +741,7 @@ function remove_all_players(array $p): void {
     require_edit();
     csrf_verify();
     $cid = (int)$p['id'];
+    require_competition_open($cid);
     $c = db_fetch("SELECT phase FROM competition WHERE id=?", [$cid]);
     if (!$c || $c['phase'] !== 'setup') { redirect('competition/' . $cid); return; }
     db_execute("DELETE FROM competition_player WHERE competition_id=?", [$cid]);
@@ -747,6 +753,7 @@ function add_double(array $p): void {
     require_edit();
     csrf_verify();
     $cid  = (int)$p['id'];
+    require_competition_open($cid);
     $dids = $_POST['double_ids'] ?? [];
     $c    = db_fetch("SELECT max_players, is_doubles, tournament_id FROM competition WHERE id=?", [$cid]);
     if (!$c || !$c['is_doubles']) { redirect('competition/' . $cid); return; }
@@ -793,6 +800,7 @@ function pair_double_from_reg(array $p): void {
     require_edit();
     csrf_verify();
     $cid = (int)$p['id'];
+    require_competition_open($cid);
     $p1  = (int)post('player1_id');
     $p2  = (int)post('player2_id');
     if (!$p1 || !$p2 || $p1 === $p2) {
@@ -849,6 +857,7 @@ function pair_double_from_reg(array $p): void {
 function remove_double(array $p): void {
     require_edit();
     csrf_verify();
+    require_competition_open((int)$p['id']);
     db_execute("DELETE FROM competition_double WHERE competition_id=? AND double_id=?",
         [(int)$p['id'], (int)$p['did']]);
     redirect('competition/' . $p['id'] . '#tab-players');
@@ -858,6 +867,7 @@ function remove_all_doubles(array $p): void {
     require_edit();
     csrf_verify();
     $cid = (int)$p['id'];
+    require_competition_open($cid);
     $c = db_fetch("SELECT phase FROM competition WHERE id=?", [$cid]);
     if (!$c || $c['phase'] !== 'setup') { redirect('competition/' . $cid); return; }
     db_execute("DELETE FROM competition_double WHERE competition_id=?", [$cid]);
@@ -869,6 +879,7 @@ function update_player_skill(array $p): void {
     require_edit();
     csrf_verify();
     $cid   = (int)$p['id'];
+    require_competition_open($cid);
     $pid   = (int)$p['pid'];
     $skill = max(0, (float)post('skill', 0));
     db_execute(
@@ -882,6 +893,7 @@ function update_double_skill(array $p): void {
     require_edit();
     csrf_verify();
     $cid   = (int)$p['id'];
+    require_competition_open($cid);
     $did   = (int)$p['did'];
     $skill = max(0, (float)post('skill', 0));
     db_execute(
@@ -895,6 +907,7 @@ function draw_groups(array $p): void {
     require_edit();
     csrf_verify();
     $cid = (int)$p['id'];
+    require_competition_open($cid);
     $c   = db_fetch("SELECT * FROM competition WHERE id=?", [$cid]);
     $is_team    = !empty($c['is_team']);
     $is_doubles = !$is_team && !empty($c['is_doubles']);
@@ -1017,6 +1030,7 @@ function draw_ko(array $p): void {
     require_edit();
     csrf_verify();
     $cid = (int)$p['id'];
+    require_competition_open($cid);
     $c   = db_fetch("SELECT * FROM competition WHERE id=?", [$cid]);
     $is_team    = !empty($c['is_team']);
     $is_doubles = !$is_team && !empty($c['is_doubles']);
@@ -1120,6 +1134,7 @@ function draw_ko_direct(array $p): void {
     require_edit();
     csrf_verify();
     $cid = (int)$p['id'];
+    require_competition_open($cid);
     $c   = db_fetch("SELECT * FROM competition WHERE id=?", [$cid]);
     $is_team    = !empty($c['is_team']);
     $is_doubles = !$is_team && !empty($c['is_doubles']);
@@ -1195,6 +1210,7 @@ function reset_groups(array $p): void {
     require_edit();
     csrf_verify();
     $cid = (int)$p['id'];
+    require_competition_open($cid);
     db_execute("DELETE FROM `match` WHERE competition_id=?", [$cid]);
     db_execute("DELETE FROM grp WHERE competition_id=?", [$cid]);
     db_execute("UPDATE competition SET phase='setup', registrations_open=1 WHERE id=?", [$cid]);
@@ -1206,6 +1222,7 @@ function reset_ko(array $p): void {
     require_edit();
     csrf_verify();
     $cid = (int)$p['id'];
+    require_competition_open($cid);
     db_execute("DELETE FROM `match` WHERE competition_id=? AND group_id IS NULL", [$cid]);
     $has_groups = db_fetch("SELECT COUNT(*) as n FROM grp WHERE competition_id=?", [$cid])['n'];
     db_execute("UPDATE competition SET phase=? WHERE id=?",
@@ -1218,6 +1235,7 @@ function groups_reorder(array $p): void {
     require_edit();
     csrf_verify();
     $cid = (int)$p['id'];
+    require_competition_open($cid);
     $c   = db_fetch("SELECT is_doubles, is_team FROM competition WHERE id=?", [$cid]);
     $is_team    = $c && !empty($c['is_team']);
     $is_doubles = $c && !$is_team && !empty($c['is_doubles']);
@@ -1331,6 +1349,7 @@ function ko_reorder(array $p): void {
     require_edit();
     csrf_verify();
     $cid = (int)$p['id'];
+    require_competition_open($cid);
     $c   = db_fetch("SELECT third_place, is_doubles, is_team FROM competition WHERE id=?", [$cid]);
     $is_team    = $c && !empty($c['is_team']);
     $is_doubles = $c && !$is_team && !empty($c['is_doubles']);
@@ -1381,6 +1400,7 @@ function seedings_save(array $p): void {
     require_edit();
     csrf_verify();
     $cid   = (int)$p['id'];
+    require_competition_open($cid);
     $c     = db_fetch("SELECT third_place, is_doubles, is_team FROM competition WHERE id=?", [$cid]);
     $is_team    = $c && !empty($c['is_team']);
     $is_doubles = $c && !$is_team && !empty($c['is_doubles']);
@@ -1453,6 +1473,7 @@ function save_group_tiebreak(array $p): void {
     $grp  = db_fetch("SELECT competition_id FROM grp WHERE id=?", [$gid]);
     if (!$grp) { redirect('players'); return; }
     $cid  = (int)$grp['competition_id'];
+    require_competition_open($cid);
     $c    = db_fetch("SELECT is_doubles, is_team FROM competition WHERE id=?", [$cid]);
     $type = post('type', 'player');
     $order = $_POST['order'] ?? [];
@@ -1479,6 +1500,7 @@ function add_team(array $p): void {
     require_edit();
     csrf_verify();
     $cid  = (int)$p['id'];
+    require_competition_open($cid);
     $tids = $_POST['team_ids'] ?? [];
     $c    = db_fetch("SELECT max_players, is_team FROM competition WHERE id=?", [$cid]);
     if (!$c || !$c['is_team']) { redirect('competition/' . $cid); return; }
@@ -1505,6 +1527,7 @@ function add_team(array $p): void {
 function remove_team(array $p): void {
     require_edit();
     csrf_verify();
+    require_competition_open((int)$p['id']);
     db_execute("DELETE FROM competition_team WHERE competition_id=? AND team_id=?",
         [(int)$p['id'], (int)$p['tid']]);
     redirect('competition/' . $p['id'] . '#tab-players');
@@ -1514,6 +1537,7 @@ function remove_all_teams(array $p): void {
     require_edit();
     csrf_verify();
     $cid = (int)$p['id'];
+    require_competition_open($cid);
     $c = db_fetch("SELECT phase FROM competition WHERE id=?", [$cid]);
     if (!$c || $c['phase'] !== 'setup') { redirect('competition/' . $cid); return; }
     db_execute("DELETE FROM competition_team WHERE competition_id=?", [$cid]);
@@ -1525,6 +1549,7 @@ function update_team_skill(array $p): void {
     require_edit();
     csrf_verify();
     $cid   = (int)$p['id'];
+    require_competition_open($cid);
     $tid   = (int)$p['tid'];
     $skill = max(0, (float)post('skill', 0));
     db_execute(
