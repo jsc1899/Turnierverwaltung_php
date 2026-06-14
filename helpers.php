@@ -202,8 +202,7 @@ function require_competition_open(int $cid): void {
 // ── Git-Version ────────────────────────────────────────────────────────────────
 
 function get_git_version(): string {
-    $git_dir = __DIR__ . '/.git';
-    $log     = $git_dir . '/logs/HEAD';
+    $log = __DIR__ . '/.git/logs/HEAD';
     if (file_exists($log)) {
         $lines = file($log, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
         $last  = end($lines);
@@ -211,12 +210,8 @@ function get_git_version(): string {
             return date('d.m.Y H:i', (int)$m[1]);
         }
     }
-    $ver = __DIR__ . '/VERSION';
-    if (file_exists($ver)) {
-        $content = trim((string)file_get_contents($ver));
-        if ($content !== '') return $content;
-    }
-    return '';
+    $mtime = @filemtime(__DIR__ . '/index.php');
+    return $mtime ? date('d.m.Y H:i', $mtime) : '';
 }
 
 // ── Render ─────────────────────────────────────────────────────────────────────
