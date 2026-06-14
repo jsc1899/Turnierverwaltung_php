@@ -201,15 +201,27 @@ function require_competition_open(int $cid): void {
 
 // ── Git-Version ────────────────────────────────────────────────────────────────
 
-function get_git_version(): string {
-    $log = __DIR__ . '/.git/logs/HEAD';
-    if (!file_exists($log)) return '';
+function get_git_version(): array {
+    $git_dir = __DIR__ . '/.git';
+    $log = $git_dir . '/logs/HEAD';
+    if (!file_exists($log)) return [];
     $lines = file($log, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     $last  = end($lines);
-    if (!$last) return '';
-    // Format: <old> <new> <author> <email> <unix-ts> <tz>\t<message>
-    if (!preg_match('/^\S+ (\w{7})\w* .+? (\d+) [+-]\d+\t/', $last, $m)) return '';
-    return $m[1] . ' · ' . date('d.m.Y H:i', (int)$m[2]);
+    if (!$last) return [];
+    // Format: <old> <new-full-hash> <author> <email> <unix-ts> <tz>\t<message>
+    if (!preg_match('/^\S+ ([0-9a-f]{40}) .+? (\d+) [+-]\d+\t/', $last, $m)) return [];
+    $label = substr($m[1], 0, 7) . ' · ' . date('d.m.Y H:i', (int)$m[2]);
+    $url   = null;
+    $cfg   = @file_get_contents($git_dir . '/config');
+    if ($cfg && preg_match('/url\s*=\s*(.+)/m', $cfg, $cm)) {
+        $remote = trim($cm[1]);
+        $remote = preg_replace('/^git@github\.com:(.+?)(?:\.git)?$/', 'https://github.com/$1', $remote);
+        $remote = rtrim(preg_replace('/\.git$/', '', $remote), '/');
+        if (str_starts_with($remote, 'https://github.com/')) {
+            $url = $remote . '/commit/' . $m[1];
+        }
+    }
+    return ['label' => $label, 'url' => $url];
 }
 
 // ── Render ─────────────────────────────────────────────────────────────────────

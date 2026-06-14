@@ -66,7 +66,15 @@
             <li><a class="dropdown-item" href="<?= url('admin/design') ?>"><i class="bi bi-palette me-1"></i>Design</a></li>
             <?php $ver = get_git_version(); if ($ver): ?>
             <li><hr class="dropdown-divider"></li>
-            <li><span class="dropdown-item-text text-muted small"><i class="bi bi-tag me-1"></i><?= e($ver) ?></span></li>
+            <li>
+              <?php if ($ver['url']): ?>
+              <a class="dropdown-item small text-muted" href="<?= e($ver['url']) ?>" target="_blank" rel="noopener">
+                <i class="bi bi-tag me-1"></i>Version: <?= e($ver['label']) ?>
+              </a>
+              <?php else: ?>
+              <span class="dropdown-item-text text-muted small"><i class="bi bi-tag me-1"></i>Version: <?= e($ver['label']) ?></span>
+              <?php endif; ?>
+            </li>
             <?php endif; ?>
             <?php endif; ?>
             <li><hr class="dropdown-divider"></li>
