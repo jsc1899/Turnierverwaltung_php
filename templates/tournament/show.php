@@ -1,6 +1,7 @@
 <?php
 $sport_icons  = ['tischtennis'=>'🏓','tennis'=>'🎾','fussball'=>'⚽','cornhole'=>'🫘'];
 $sport_labels = ['tischtennis'=>'Tischtennis','tennis'=>'Tennis','fussball'=>'Fußball','cornhole'=>'Cornhole'];
+$locked = (int)($t['is_done'] ?? 0) === 1;
 ob_start(); ?>
 <nav aria-label="breadcrumb" class="mb-3">
   <ol class="breadcrumb">
@@ -108,7 +109,7 @@ $nennung_badge = $pending_count + $change_count;
   <!-- ── Tab: Bewerbe ──────────────────────────────────────────────────────── -->
   <div class="tab-pane fade show active p-3" id="tab-competitions" role="tabpanel">
     <div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
-      <?php if (can_edit()): ?>
+      <?php if (can_edit() && !$locked): ?>
       <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newCompetitionModal">
         <i class="bi bi-plus-circle me-1"></i>Neuer Bewerb
       </button>
@@ -126,7 +127,7 @@ $nennung_badge = $pending_count + $change_count;
       <?php endif; ?>
     </div>
     <?php if ($comp_info): ?>
-    <?php if (can_edit()): ?>
+    <?php if (can_edit() && !$locked): ?>
     <div class="d-flex align-items-center gap-2 mb-2">
       <button id="comp-sort-toggle" class="btn btn-outline-secondary btn-sm">
         <i class="bi bi-arrows-move me-1"></i>Reihenfolge ändern
@@ -138,7 +139,7 @@ $nennung_badge = $pending_count + $change_count;
       <?php foreach ($comp_info as $ci): $c = $ci['comp']; ?>
       <div class="col-md-6" data-id="<?= $c['id'] ?>">
         <div class="card shadow-sm h-100">
-          <?php if (can_edit()): ?>
+          <?php if (can_edit() && !$locked): ?>
           <div class="drag-handle d-flex justify-content-center align-items-center py-1 bg-light border-bottom"
                style="cursor:grab;border-radius:calc(var(--bs-card-border-radius) - 1px) calc(var(--bs-card-border-radius) - 1px) 0 0;user-select:none">
             <i class="bi bi-grip-horizontal text-muted"></i>
@@ -183,7 +184,7 @@ $nennung_badge = $pending_count + $change_count;
               <a href="<?= url('competition/' . $c['id']) ?>" class="btn btn-primary btn-sm flex-grow-1">
                 <i class="bi bi-arrow-right-circle me-1"></i>Öffnen
               </a>
-              <?php if (can_edit()): ?>
+              <?php if (can_edit() && !$locked): ?>
               <form method="post" action="<?= url('competition/' . $c['id'] . '/delete') ?>"
                     data-confirm="Bewerb wirklich löschen?">
                 <?= csrf_field() ?>

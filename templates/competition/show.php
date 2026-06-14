@@ -1,7 +1,7 @@
 <?php
 $phase_labels = ['setup'=>'Einrichtung','group'=>'Gruppenphase','ko'=>'KO-Phase','done'=>'Beendet'];
 $phase_colors = ['setup'=>'bg-secondary','group'=>'bg-warning text-dark','ko'=>'bg-info text-dark','done'=>'bg-success'];
-
+$locked = $t && (int)($t['is_done'] ?? 0) === 1;
 
 ob_start(); ?>
 <nav aria-label="breadcrumb" class="mb-3">
@@ -30,7 +30,7 @@ ob_start(); ?>
   </span>
   <?php endif; ?>
 
-  <?php if (can_edit()): ?>
+  <?php if ((can_edit() && !$locked)): ?>
   <div class="ms-auto d-flex gap-2 flex-wrap">
     <?php if (in_array($c['phase'], ['group','ko'], true)): ?>
     <form method="post" action="<?= url('competition/'.$c['id'].'/settings') ?>?action=done">
@@ -106,7 +106,7 @@ ob_start(); ?>
       <?php if ($c['max_players']): ?><span class="text-muted small">/ <?= (int)$c['max_players'] ?></span><?php endif; ?>
     </button>
   </li>
-  <?php if (can_edit()): ?>
+  <?php if ((can_edit() && !$locked)): ?>
   <li class="nav-item" role="presentation">
     <button class="nav-link" id="tab-settings-btn"
             data-bs-toggle="tab" data-bs-target="#tab-settings" type="button" role="tab">
@@ -117,7 +117,7 @@ ob_start(); ?>
 </ul>
 <div class="tab-content border border-top-0 rounded-bottom mb-4">
 
-  <?php if (can_edit()): ?>
+  <?php if ((can_edit() && !$locked)): ?>
   <!-- Tab: Einstellungen -->
   <div class="tab-pane fade p-3" id="tab-settings" role="tabpanel">
     <?php
@@ -259,7 +259,7 @@ ob_start(); ?>
     <div class="mb-2 d-flex align-items-center gap-2">
       <input type="search" class="form-control form-control-sm table-filter" style="max-width:220px"
              placeholder="Filtern…" data-target="tbl-comp-doubles" aria-label="Doppel filtern">
-      <?php if ($c['phase'] === 'setup' && can_edit()): ?>
+      <?php if ($c['phase'] === 'setup' && (can_edit() && !$locked)): ?>
       <form method="post" action="<?= url('competition/'.$c['id'].'/doubles/remove-all') ?>"
             data-confirm="Alle Doppel aus dem Bewerb entfernen?">
         <?= csrf_field() ?>
@@ -274,7 +274,7 @@ ob_start(); ?>
         <thead class="table-light">
           <tr>
             <th>Doppel</th><th>Spieler 1</th><th>Spieler 2</th><th class="text-center">Spielstärke</th><th>Angemeldet</th>
-            <?php if ($c['phase'] === 'setup' && can_edit()): ?><th class="no-sort"></th><?php endif; ?>
+            <?php if ($c['phase'] === 'setup' && (can_edit() && !$locked)): ?><th class="no-sort"></th><?php endif; ?>
           </tr>
         </thead>
         <tbody>
@@ -289,7 +289,7 @@ ob_start(); ?>
               $d_reg   = (float)($d['registry_skill'] ?? 0);
               $d_diff  = in_array($t['sport'] ?? '', ['tischtennis', 'tennis']) && abs($d_comp - $d_reg) > 0.049;
             ?>
-            <?php if (can_edit()): ?>
+            <?php if ((can_edit() && !$locked)): ?>
             <div class="d-inline-flex flex-column align-items-center gap-1">
               <form method="post" action="<?= url('competition/'.$c['id'].'/double/'.$d['id'].'/skill') ?>"
                     class="d-inline-flex align-items-center gap-1">
@@ -321,7 +321,7 @@ ob_start(); ?>
             <?php endif; ?>
           </td>
           <td class="small text-muted" data-sort="<?= e($d['reg_date']) ?>"><?= e(fmtdate($d['reg_date'])) ?></td>
-          <?php if ($c['phase'] === 'setup' && can_edit()): ?>
+          <?php if ($c['phase'] === 'setup' && (can_edit() && !$locked)): ?>
           <td>
             <form method="post" action="<?= url('competition/'.$c['id'].'/double/'.$d['id'].'/remove') ?>"
                   data-confirm="Doppel aus dem Bewerb entfernen?">
@@ -339,7 +339,7 @@ ob_start(); ?>
     <p class="text-muted small">Noch keine Doppel eingetragen.</p>
     <?php endif; ?>
 
-    <?php if ($c['phase'] === 'setup' && !empty($confirmed_regs) && can_edit()): ?>
+    <?php if ($c['phase'] === 'setup' && !empty($confirmed_regs) && (can_edit() && !$locked)): ?>
     <div class="mt-3 pt-3 border-top">
       <h6 class="mb-2"><i class="bi bi-person-check me-1"></i>Bestätigte Nennungen <span class="text-muted small fw-normal">(noch ohne Partner)</span></h6>
       <?php $pairable = array_filter($confirmed_regs, fn($r) => !empty($r['player_id'])); ?>
@@ -385,7 +385,7 @@ ob_start(); ?>
     </div>
     <?php endif; ?>
 
-    <?php if ($c['phase'] === 'setup' && can_edit()): ?>
+    <?php if ($c['phase'] === 'setup' && (can_edit() && !$locked)): ?>
     <?php if ($unassigned_doubles): ?>
     <div class="mt-3 pt-3 border-top">
       <h6 class="mb-2"><i class="bi bi-plus-circle me-1 text-primary"></i>Doppel hinzufügen</h6>
@@ -434,7 +434,7 @@ ob_start(); ?>
     <div class="mb-2 d-flex align-items-center gap-2">
       <input type="search" class="form-control form-control-sm table-filter" style="max-width:220px"
              placeholder="Filtern…" data-target="tbl-comp-teams" aria-label="Teams filtern">
-      <?php if ($c['phase'] === 'setup' && can_edit()): ?>
+      <?php if ($c['phase'] === 'setup' && (can_edit() && !$locked)): ?>
       <form method="post" action="<?= url('competition/'.$c['id'].'/teams/remove-all') ?>"
             data-confirm="Alle Teams aus dem Bewerb entfernen?">
         <?= csrf_field() ?>
@@ -449,7 +449,7 @@ ob_start(); ?>
         <thead class="table-light">
           <tr>
             <th>Teamname</th><th>Mitglieder</th><th class="text-center">Spielstärke</th><th>Angemeldet</th>
-            <?php if ($c['phase'] === 'setup' && can_edit()): ?><th class="no-sort"></th><?php endif; ?>
+            <?php if ($c['phase'] === 'setup' && (can_edit() && !$locked)): ?><th class="no-sort"></th><?php endif; ?>
           </tr>
         </thead>
         <tbody>
@@ -462,7 +462,7 @@ ob_start(); ?>
             <?php else: ?><span class="text-muted">—</span><?php endif; ?>
           </td>
           <td class="text-center" data-sort="<?= (float)$team['skill'] ?>">
-            <?php if (can_edit()): ?>
+            <?php if ((can_edit() && !$locked)): ?>
             <form method="post" action="<?= url('competition/'.$c['id'].'/team/'.$team['id'].'/skill') ?>"
                   class="d-inline-flex align-items-center gap-1">
               <?= csrf_field() ?>
@@ -479,7 +479,7 @@ ob_start(); ?>
           <td class="small text-muted" data-sort="<?= e($team['reg_date'] ?? '') ?>">
             <?= $team['reg_date'] ? date('d.m.Y', strtotime($team['reg_date'])) : '—' ?>
           </td>
-          <?php if ($c['phase'] === 'setup' && can_edit()): ?>
+          <?php if ($c['phase'] === 'setup' && (can_edit() && !$locked)): ?>
           <td>
             <form method="post" action="<?= url('competition/'.$c['id'].'/team/'.$team['id'].'/remove') ?>"
                   data-confirm="Team aus dem Bewerb entfernen?">
@@ -497,7 +497,7 @@ ob_start(); ?>
     <p class="text-muted small">Noch keine Teams eingetragen.</p>
     <?php endif; ?>
 
-    <?php if ($c['phase'] === 'setup' && can_edit()): ?>
+    <?php if ($c['phase'] === 'setup' && (can_edit() && !$locked)): ?>
     <?php if ($unassigned_teams): ?>
     <div class="mt-3 pt-3 border-top">
       <h6 class="mb-2"><i class="bi bi-plus-circle me-1 text-primary"></i>Teams hinzufügen</h6>
@@ -547,7 +547,7 @@ ob_start(); ?>
     <div class="mb-2 d-flex align-items-center gap-2">
       <input type="search" class="form-control form-control-sm table-filter" style="max-width:220px"
              placeholder="Filtern…" data-target="tbl-comp-players" aria-label="Spieler filtern">
-      <?php if ($c['phase'] === 'setup' && can_edit() && $assigned): ?>
+      <?php if ($c['phase'] === 'setup' && (can_edit() && !$locked) && $assigned): ?>
       <form method="post" action="<?= url('competition/'.$c['id'].'/players/remove-all') ?>"
             data-confirm="Alle Spieler aus dem Bewerb entfernen?">
         <?= csrf_field() ?>
@@ -562,7 +562,7 @@ ob_start(); ?>
         <thead class="table-light">
           <tr>
             <th>Name</th><th>Verein</th><th>Angemeldet</th><th class="text-center">Spielstärke</th>
-            <?php if ($c['phase'] === 'setup' && can_edit()): ?><th class="no-sort"></th><?php endif; ?>
+            <?php if ($c['phase'] === 'setup' && (can_edit() && !$locked)): ?><th class="no-sort"></th><?php endif; ?>
           </tr>
         </thead>
         <tbody>
@@ -580,7 +580,7 @@ ob_start(); ?>
               $comp_skill  = (float)($pl['skill'] ?? 0);
               $skill_diff  = in_array($t['sport'] ?? '', ['tischtennis', 'tennis']) && abs($comp_skill - $reg_skill) > 0.049;
             ?>
-            <?php if (can_edit()): ?>
+            <?php if ((can_edit() && !$locked)): ?>
             <div class="d-inline-flex flex-column align-items-center gap-1">
               <form method="post" action="<?= url('competition/'.$c['id'].'/player/'.$pl['id'].'/skill') ?>"
                     class="d-inline-flex align-items-center gap-1">
@@ -613,7 +613,7 @@ ob_start(); ?>
             <?php endif; ?>
             <?php endif; ?>
           </td>
-          <?php if ($c['phase'] === 'setup' && can_edit()): ?>
+          <?php if ($c['phase'] === 'setup' && (can_edit() && !$locked)): ?>
           <td>
             <form method="post" action="<?= url('competition/'.$c['id'].'/player/'.$pl['id'].'/remove') ?>"
                   data-confirm="Spieler aus dem Bewerb entfernen?">
@@ -627,7 +627,7 @@ ob_start(); ?>
         </tbody>
       </table>
     </div>
-    <?php if ($c['phase'] === 'setup' && can_edit() && $unassigned): ?>
+    <?php if ($c['phase'] === 'setup' && (can_edit() && !$locked) && $unassigned): ?>
     <div class="mt-3 pt-3 border-top">
       <h6 class="mb-2"><i class="bi bi-plus-circle me-1 text-primary"></i>Spieler hinzufügen</h6>
       <form method="post" action="<?= url('competition/'.$c['id'].'/player/add') ?>">
@@ -657,7 +657,7 @@ ob_start(); ?>
 
   <!-- Tab: Bewerb (active, last in DOM) -->
   <div class="tab-pane fade show active p-3" id="tab-competition" role="tabpanel">
-  <?php if (can_edit() && $c['phase'] === 'setup'): ?>
+  <?php if ((can_edit() && !$locked) && $c['phase'] === 'setup'): ?>
   <?php $draw_count = $is_team ? count($assigned_teams) : ($is_doubles ? count($assigned_doubles) : count($assigned)); ?>
   <?php if (!in_array($c['mode'], ['ko_only','double_ko']) && $draw_count >= 3): ?>
   <div class="mb-3">
@@ -684,7 +684,7 @@ ob_start(); ?>
   </div>
   <?php endif; ?>
   <?php endif; ?>
-  <?php if (can_edit() && $c['phase'] === 'group' && $unplayed_group == 0 && (int)$c['advance_count'] > 0): ?>
+  <?php if ((can_edit() && !$locked) && $c['phase'] === 'group' && $unplayed_group == 0 && (int)$c['advance_count'] > 0): ?>
   <div class="mb-3">
     <?php if ($has_open_tie): ?>
     <div class="d-inline-flex align-items-center gap-2" tabindex="0" data-bs-toggle="tooltip"
@@ -719,7 +719,7 @@ ob_start(); ?>
       </a>
     </div>
 
-    <?php if (can_edit() && ($group_no_results ?? false)): ?>
+    <?php if ((can_edit() && !$locked) && ($group_no_results ?? false)): ?>
     <div class="d-flex align-items-center mb-3">
       <button type="button" id="grp-edit-btn" onclick="toggleGrpEdit()"
               class="btn btn-outline-secondary btn-sm ms-auto">
@@ -841,7 +841,7 @@ ob_start(); ?>
           <?php
           $use_duels = $is_team && (int)($c['team_size'] ?? 0) > 1;
           $use_sets  = in_array($c['score_mode'] ?? 'match', ['sets', 'sets_grp']);
-          $grp_editable = can_edit() && $c['phase'] === 'group';
+          $grp_editable = (can_edit() && !$locked) && $c['phase'] === 'group';
           if ($grp_editable && !$use_duels && !$use_sets): ?>
           <form id="grp-form-<?= $g['id'] ?>" method="post"
                 action="<?= url('competition/'.$c['id'].'/results/bulk') ?>">
@@ -1040,7 +1040,7 @@ ob_start(); ?>
           <?php endif; ?>
         </div>
         </div><!-- /.grp-normal-view -->
-        <?php if (can_edit() && ($group_no_results ?? false)): ?>
+        <?php if ((can_edit() && !$locked) && ($group_no_results ?? false)): ?>
         <div class="grp-edit-panel p-2" data-gid="<?= $g['id'] ?>"
              style="display:none; min-height:80px; border:2px dashed #dee2e6; border-radius:4px; transition:background .1s">
           <?php foreach ($standings as $pl): ?>
@@ -1069,14 +1069,14 @@ ob_start(); ?>
       <a href="<?= url('competition/'.$c['id'].'/pdf/match-cards') ?>" class="btn btn-outline-secondary btn-sm" target="_blank">
         <i class="bi bi-card-text me-1"></i>Match-Cards
       </a>
-      <?php if (can_edit() && $ko_no_results): ?>
+      <?php if ((can_edit() && !$locked) && $ko_no_results): ?>
       <button type="button" id="ko-edit-btn" onclick="toggleKoEdit()"
               class="btn btn-outline-secondary btn-sm ms-auto">
         <i class="bi bi-arrows-move me-1"></i>Umstellen
       </button>
       <?php endif; ?>
     </div>
-    <?php if (can_edit() && $ko_no_results): ?>
+    <?php if ((can_edit() && !$locked) && $ko_no_results): ?>
     <div id="ko-edit-toolbar" style="display:none"
          class="align-items-center gap-2 mb-3 p-2 rounded border border-warning-subtle bg-warning-subtle">
       <i class="bi bi-info-circle text-warning-emphasis"></i>
@@ -1103,7 +1103,7 @@ ob_start(); ?>
       $ko_use_sets  = ($c['score_mode'] ?? 'match') === 'sets';
     ?>
 
-    <?php if (can_edit()): ?>
+    <?php if ((can_edit() && !$locked)): ?>
     <form id="ko-form" method="post" action="<?= url('competition/'.$c['id'].'/results/bulk') ?>">
       <?= csrf_field() ?>
     </form>
@@ -1135,17 +1135,17 @@ ob_start(); ?>
               <?php if (!empty($ko_seedings)): ?>
               <small class="ko-seed-badge text-muted" style="font-size:.6rem;white-space:nowrap;flex-shrink:0;min-width:34px"><?= ($m['player1_id'] && ($s = $ko_seedings[$m['player1_id']] ?? null)) ? '(' . e($s) . ')' : '' ?></small>
               <?php endif; ?>
-              <span class="flex-grow-1 small text-truncate<?= ($ko_no_results && can_edit() && $isFirstRound) ? ' ko-slot' : '' ?>"
+              <span class="flex-grow-1 small text-truncate<?= ($ko_no_results && (can_edit() && !$locked) && $isFirstRound) ? ' ko-slot' : '' ?>"
                     style="min-width:0"
                     data-pid="<?= (int)($m['player1_id'] ?? 0) ?>"
                     data-name="<?= e($m['p1name'] ?? '') ?>"
                     title="<?= e($m['p1name'] ?? '') ?>"
-                    <?php if ($ko_no_results && can_edit() && $isFirstRound): ?>
+                    <?php if ($ko_no_results && (can_edit() && !$locked) && $isFirstRound): ?>
                     ondragstart="koSlotDragStart(event)" ondragend="koSlotDragEnd(event)"
                     <?php endif; ?>>
                 <?= $m['player1_id'] ? e($m['p1name']) : '<span class="text-muted fst-italic">—</span>' ?>
               </span>
-              <?php if (!$ko_use_duels && !$ko_use_sets && can_edit() && $m['player1_id'] && $m['player2_id']): ?>
+              <?php if (!$ko_use_duels && !$ko_use_sets && (can_edit() && !$locked) && $m['player1_id'] && $m['player2_id']): ?>
               <input type="number" name="matches[<?= $m['id'] ?>][score1]" min="0"
                      form="ko-form"
                      class="form-control form-control-sm text-center ms-auto" style="width:40px;height:24px;padding:0 2px;font-size:.8rem;flex-shrink:0"
@@ -1160,17 +1160,17 @@ ob_start(); ?>
               <?php if (!empty($ko_seedings)): ?>
               <small class="ko-seed-badge text-muted" style="font-size:.6rem;white-space:nowrap;flex-shrink:0;min-width:34px"><?= ($m['player2_id'] && ($s = $ko_seedings[$m['player2_id']] ?? null)) ? '(' . e($s) . ')' : '' ?></small>
               <?php endif; ?>
-              <span class="flex-grow-1 small text-truncate<?= ($ko_no_results && can_edit() && $isFirstRound) ? ' ko-slot' : '' ?>"
+              <span class="flex-grow-1 small text-truncate<?= ($ko_no_results && (can_edit() && !$locked) && $isFirstRound) ? ' ko-slot' : '' ?>"
                     style="min-width:0"
                     data-pid="<?= (int)($m['player2_id'] ?? 0) ?>"
                     data-name="<?= e($m['p2name'] ?? '') ?>"
                     title="<?= e($m['p2name'] ?? '') ?>"
-                    <?php if ($ko_no_results && can_edit() && $isFirstRound): ?>
+                    <?php if ($ko_no_results && (can_edit() && !$locked) && $isFirstRound): ?>
                     ondragstart="koSlotDragStart(event)" ondragend="koSlotDragEnd(event)"
                     <?php endif; ?>>
                 <?= $m['player2_id'] ? e($m['p2name']) : '<span class="text-muted fst-italic">—</span>' ?>
               </span>
-              <?php if (!$ko_use_duels && !$ko_use_sets && can_edit() && $m['player1_id'] && $m['player2_id']): ?>
+              <?php if (!$ko_use_duels && !$ko_use_sets && (can_edit() && !$locked) && $m['player1_id'] && $m['player2_id']): ?>
               <input type="number" name="matches[<?= $m['id'] ?>][score2]" min="0"
                      form="ko-form"
                      class="form-control form-control-sm text-center ms-auto" style="width:40px;height:24px;padding:0 2px;font-size:.8rem;flex-shrink:0"
@@ -1191,7 +1191,7 @@ ob_start(); ?>
                 <summary style="font-size:.72rem;cursor:pointer;color:#0d6efd;user-select:none;list-style:none;padding:2px 0">
                   &#9656; <?= $m['played'] ? $m['score1'].':'.$m['score2'].' (Duelle)' : 'Duelle' ?>
                 </summary>
-                <?php if (can_edit()): ?>
+                <?php if ((can_edit() && !$locked)): ?>
                 <form class="duel-form" method="post" action="<?= url('match/'.$m['id'].'/duels') ?>" style="margin-top:4px">
                   <?= csrf_field() ?>
                   <table class="table table-sm align-middle mb-1" style="font-size:.72rem;table-layout:fixed">
@@ -1293,7 +1293,7 @@ ob_start(); ?>
                 <summary style="font-size:.72rem;cursor:pointer;color:#0d6efd;user-select:none;list-style:none;padding:2px 0">
                   &#9656; <?= $m['played'] ? $m['score1'].':'.$m['score2'].' (Sätze)' : 'Sätze' ?>
                 </summary>
-                <?php if (can_edit()): ?>
+                <?php if ((can_edit() && !$locked)): ?>
                 <form class="sets-form" method="post" action="<?= url('match/'.$m['id'].'/sets') ?>"
                       style="margin-top:4px" data-mid="<?= $m['id'] ?>">
                   <?= csrf_field() ?>
@@ -1346,7 +1346,7 @@ ob_start(); ?>
                 <?php endif; ?>
               </details>
             </div>
-            <?php elseif (can_edit() && $m['played'] && $m['player1_id'] && $m['player2_id']): ?>
+            <?php elseif ((can_edit() && !$locked) && $m['played'] && $m['player1_id'] && $m['player2_id']): ?>
             <div style="border-top:1px solid #f0f0f0;padding:0 4px 1px;text-align:right">
               <form method="post" action="<?= url('match/'.$m['id'].'/result/clear') ?>" style="display:inline"
                     data-confirm="Ergebnis wirklich löschen?">
@@ -1366,7 +1366,7 @@ ob_start(); ?>
              width="<?= $bracket_w ?>" height="<?= $bracket_h ?>"></svg>
       </div>
       <!-- Speichern-Button -->
-      <?php if (can_edit() && !$ko_use_sets): ?>
+      <?php if ((can_edit() && !$locked) && !$ko_use_sets): ?>
       <div class="mt-2">
         <button form="ko-form" type="submit" class="btn btn-primary btn-sm">
           <i class="bi bi-save me-1"></i>Ergebnisse speichern
@@ -1390,7 +1390,7 @@ ob_start(); ?>
                  style="min-height:33px;border-bottom:1px solid #f0f0f0">
               <span class="flex-grow-1 small text-truncate" style="min-width:0"
                     title="<?= e($m['p1name'] ?? '') ?>"><?= $m['p1name'] !== null ? e($m['p1name']) : '—' ?></span>
-              <?php if (!$ko_use_sets && can_edit() && $m['player1_id'] && $m['player2_id']): ?>
+              <?php if (!$ko_use_sets && (can_edit() && !$locked) && $m['player1_id'] && $m['player2_id']): ?>
               <input type="number" name="matches[<?= $m['id'] ?>][score1]" min="0" form="ko-form"
                      class="form-control form-control-sm text-center ms-auto" style="width:40px;height:24px;padding:0 2px;font-size:.8rem;flex-shrink:0"
                      value="<?= $m['played'] ? $m['score1'] : '' ?>">
@@ -1400,7 +1400,7 @@ ob_start(); ?>
                  style="min-height:33px">
               <span class="flex-grow-1 small text-truncate" style="min-width:0"
                     title="<?= e($m['p2name'] ?? '') ?>"><?= $m['p2name'] !== null ? e($m['p2name']) : '—' ?></span>
-              <?php if (!$ko_use_sets && can_edit() && $m['player1_id'] && $m['player2_id']): ?>
+              <?php if (!$ko_use_sets && (can_edit() && !$locked) && $m['player1_id'] && $m['player2_id']): ?>
               <input type="number" name="matches[<?= $m['id'] ?>][score2]" min="0" form="ko-form"
                      class="form-control form-control-sm text-center ms-auto" style="width:40px;height:24px;padding:0 2px;font-size:.8rem;flex-shrink:0"
                      value="<?= $m['played'] ? $m['score2'] : '' ?>">
@@ -1413,7 +1413,7 @@ ob_start(); ?>
                 <summary style="font-size:.72rem;cursor:pointer;color:#0d6efd;user-select:none;list-style:none;padding:2px 0">
                   &#9656; <?= $m['played'] ? $m['score1'].':'.$m['score2'].' (Sätze)' : 'Sätze' ?>
                 </summary>
-                <?php if (can_edit()): ?>
+                <?php if ((can_edit() && !$locked)): ?>
                 <form class="sets-form" method="post" action="<?= url('match/'.$m['id'].'/sets') ?>"
                       style="margin-top:4px" data-mid="<?= $m['id'] ?>">
                   <?= csrf_field() ?>
@@ -1466,7 +1466,7 @@ ob_start(); ?>
                 <?php endif; ?>
               </details>
             </div>
-            <?php elseif (can_edit() && $m['played'] && $m['player1_id'] && $m['player2_id']): ?>
+            <?php elseif ((can_edit() && !$locked) && $m['played'] && $m['player1_id'] && $m['player2_id']): ?>
             <div style="border-top:1px solid #f0f0f0;padding:0 4px 1px;text-align:right">
               <form method="post" action="<?= url('match/'.$m['id'].'/result/clear') ?>" style="display:inline"
                     data-confirm="Ergebnis wirklich löschen?">
@@ -1576,7 +1576,7 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
 <div class="card shadow-sm mb-4">
   <div class="card-header fw-semibold"><i class="bi bi-trophy me-1 text-warning"></i>Winners Bracket</div>
   <div class="card-body p-3">
-    <?php if (can_edit()): ?>
+    <?php if ((can_edit() && !$locked)): ?>
     <form id="dko-wb-form" method="post" action="<?= url('competition/'.$c['id'].'/results/bulk') ?>">
       <?= csrf_field() ?>
     </form>
@@ -1596,14 +1596,14 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
         <?php foreach ($dko_wb as $rd): ?>
         <div class="ko-round" style="display:flex;flex-direction:column;justify-content:space-around;width:<?= $dko_col_w ?>px;flex-shrink:0;height:100%;padding:0 8px">
           <?php foreach ($rd['matches'] as $m): ?>
-          <?= _dko_match_card($m, 'dko-wb-form', can_edit(), $wb_num_map[(int)$m['ko_round']][(int)$m['ko_position']] ?? null, null, null, $ko_seedings, $is_team) ?>
+          <?= _dko_match_card($m, 'dko-wb-form', (can_edit() && !$locked), $wb_num_map[(int)$m['ko_round']][(int)$m['ko_position']] ?? null, null, null, $ko_seedings, $is_team) ?>
           <?php endforeach; ?>
         </div>
         <?php endforeach; ?>
         <svg id="dko-wb-svg-<?= $c['id'] ?>" style="position:absolute;top:0;left:0;pointer-events:none;overflow:visible"
              width="<?= $dko_wb_w ?>" height="<?= $dko_wb_h ?>"></svg>
       </div>
-      <?php if (can_edit()): ?>
+      <?php if ((can_edit() && !$locked)): ?>
       <div class="mt-2">
         <button form="dko-wb-form" type="submit" class="btn btn-primary btn-sm">
           <i class="bi bi-save me-1"></i>Ergebnisse speichern
@@ -1647,7 +1647,7 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
 <div class="card shadow-sm mb-4">
   <div class="card-header fw-semibold"><i class="bi bi-arrow-down-circle me-1 text-danger"></i>Losers Bracket</div>
   <div class="card-body p-3">
-    <?php if (can_edit()): ?>
+    <?php if ((can_edit() && !$locked)): ?>
     <form id="dko-lb-form" method="post" action="<?= url('competition/'.$c['id'].'/results/bulk') ?>">
       <?= csrf_field() ?>
     </form>
@@ -1667,7 +1667,7 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
         <div class="lb-round" style="display:flex;flex-direction:column;justify-content:space-around;width:<?= $lb_col_w ?>px;flex-shrink:0;height:100%;padding:0 8px">
           <?php foreach ($rd['matches'] as $m): $lb_match_num++; $lr = (int)$m['ko_round']; $lp = (int)$m['ko_position']; ?>
           <?= _dko_match_card(
-              $m, 'dko-lb-form', can_edit(), $lb_match_num,
+              $m, 'dko-lb-form', (can_edit() && !$locked), $lb_match_num,
               !$m['player1_id'] ? ($lb_ph[$lr][$lp][1] ?? null) : null,
               !$m['player2_id'] ? ($lb_ph[$lr][$lp][2] ?? null) : null,
               [], $is_team
@@ -1679,7 +1679,7 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
              width="<?= $lb_total_w ?>" height="<?= $lb_total_h ?>"></svg>
       </div>
     </div>
-    <?php if (can_edit()): ?>
+    <?php if ((can_edit() && !$locked)): ?>
     <div class="mt-2">
       <button form="dko-lb-form" type="submit" class="btn btn-primary btn-sm">
         <i class="bi bi-save me-1"></i>LB Ergebnisse speichern
@@ -1694,21 +1694,21 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
 <div class="card shadow-sm mb-4 border-primary">
   <div class="card-header fw-semibold text-primary"><i class="bi bi-star-fill me-1 text-warning"></i>Großes Finale</div>
   <div class="card-body p-3">
-    <?php if (can_edit()): ?>
+    <?php if ((can_edit() && !$locked)): ?>
     <form id="dko-gf-form" method="post" action="<?= url('competition/'.$c['id'].'/results/bulk') ?>">
       <?= csrf_field() ?>
     </form>
     <?php endif; ?>
     <div class="d-flex gap-3 align-items-start">
       <div style="min-width:<?= $is_team ? 300 : 200 ?>px;max-width:<?= $is_team ? 450 : 300 ?>px">
-        <?= _dko_match_card($dko_gf, 'dko-gf-form', can_edit(), null, null, null, [], $is_team) ?>
+        <?= _dko_match_card($dko_gf, 'dko-gf-form', (can_edit() && !$locked), null, null, null, [], $is_team) ?>
       </div>
       <div class="small text-muted align-self-center">
         <div><strong>Spieler 1:</strong> WB-Sieger (ungeschlagen)</div>
         <div><strong>Spieler 2:</strong> LB-Sieger (1 Niederlage)</div>
       </div>
     </div>
-    <?php if (can_edit()): ?>
+    <?php if ((can_edit() && !$locked)): ?>
     <div class="mt-3">
       <button form="dko-gf-form" type="submit" class="btn btn-primary btn-sm">
         <i class="bi bi-save me-1"></i>Finale speichern
