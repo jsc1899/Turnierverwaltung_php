@@ -604,7 +604,9 @@ function settings(array $p): void {
     require_edit();
     csrf_verify();
     $cid = (int)$p['id'];
-    require_competition_open($cid);
+    if (!post('reopen')) {
+        require_competition_open($cid);
+    }
 
     // Sub-actions via hidden fields
     if (post('mark_done')) {

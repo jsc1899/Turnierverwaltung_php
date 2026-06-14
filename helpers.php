@@ -190,11 +190,11 @@ function require_tournament_open(int $tid): void {
 
 function require_competition_open(int $cid): void {
     $row = db_fetch(
-        "SELECT t.is_done FROM competition c JOIN tournament t ON t.id = c.tournament_id WHERE c.id = ?",
+        "SELECT t.is_done, c.phase FROM competition c JOIN tournament t ON t.id = c.tournament_id WHERE c.id = ?",
         [$cid]
     );
-    if ($row && (int)$row['is_done'] === 1) {
-        flash('danger', 'Dieses Turnier ist beendet – Änderungen sind nicht mehr möglich.');
+    if ($row && ((int)$row['is_done'] === 1 || $row['phase'] === 'done')) {
+        flash('danger', 'Dieser Bewerb ist beendet – Änderungen sind nicht mehr möglich.');
         redirect('competition/' . $cid);
     }
 }

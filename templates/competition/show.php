@@ -1,7 +1,7 @@
 <?php
 $phase_labels = ['setup'=>'Einrichtung','group'=>'Gruppenphase','ko'=>'KO-Phase','done'=>'Beendet'];
 $phase_colors = ['setup'=>'bg-secondary','group'=>'bg-warning text-dark','ko'=>'bg-info text-dark','done'=>'bg-success'];
-$locked = $t && (int)($t['is_done'] ?? 0) === 1;
+$locked = ($t && (int)($t['is_done'] ?? 0) === 1) || $c['phase'] === 'done';
 
 ob_start(); ?>
 <nav aria-label="breadcrumb" class="mb-3">
@@ -30,39 +30,41 @@ ob_start(); ?>
   </span>
   <?php endif; ?>
 
-  <?php if ((can_edit() && !$locked)): ?>
+  <?php if (can_edit()): ?>
   <div class="ms-auto d-flex gap-2 flex-wrap">
-    <?php if (in_array($c['phase'], ['group','ko'], true)): ?>
+    <?php if (!$locked && in_array($c['phase'], ['group','ko'], true)): ?>
     <form method="post" action="<?= url('competition/'.$c['id'].'/settings') ?>?action=done">
       <?= csrf_field() ?><input type="hidden" name="mark_done" value="1">
       <button class="btn btn-success btn-sm"><i class="bi bi-check-circle me-1"></i>Als beendet markieren</button>
     </form>
     <?php endif; ?>
-    <?php if ($c['phase'] === 'done'): ?>
+    <?php if ($c['phase'] === 'done' && !($t && (int)($t['is_done'] ?? 0) === 1)): ?>
     <form method="post" action="<?= url('competition/'.$c['id'].'/settings') ?>?action=reopen">
       <?= csrf_field() ?><input type="hidden" name="reopen" value="1">
       <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-counterclockwise me-1"></i>Wieder öffnen</button>
     </form>
     <?php endif; ?>
-    <?php if ($c['phase'] === 'group'): ?>
+    <?php if (!$locked && $c['phase'] === 'group'): ?>
     <form method="post" action="<?= url('competition/'.$c['id'].'/reset/groups') ?>"
           data-confirm="Alle Gruppenspiel-Ergebnisse löschen?">
       <?= csrf_field() ?>
       <button class="btn btn-outline-warning btn-sm"><i class="bi bi-arrow-counterclockwise me-1"></i>Gruppe zurücksetzen</button>
     </form>
     <?php endif; ?>
-    <?php if ($c['phase'] === 'ko'): ?>
+    <?php if (!$locked && $c['phase'] === 'ko'): ?>
     <form method="post" action="<?= url('competition/'.$c['id'].'/reset/ko') ?>"
           data-confirm="KO-Phase zurücksetzen?">
       <?= csrf_field() ?>
       <button class="btn btn-outline-warning btn-sm"><i class="bi bi-arrow-counterclockwise me-1"></i>KO zurücksetzen</button>
     </form>
     <?php endif; ?>
+    <?php if (!$locked): ?>
     <form method="post" action="<?= url('competition/'.$c['id'].'/delete') ?>"
           data-confirm="Bewerb wirklich löschen?">
       <?= csrf_field() ?>
       <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash me-1"></i>Löschen</button>
     </form>
+    <?php endif; ?>
   </div>
   <?php endif; ?>
 </div>
