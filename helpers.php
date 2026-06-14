@@ -199,6 +199,19 @@ function require_competition_open(int $cid): void {
     }
 }
 
+// ── Git-Version ────────────────────────────────────────────────────────────────
+
+function get_git_version(): string {
+    $log = __DIR__ . '/.git/logs/HEAD';
+    if (!file_exists($log)) return '';
+    $lines = file($log, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    $last  = end($lines);
+    if (!$last) return '';
+    // Format: <old> <new> <author> <email> <unix-ts> <tz>\t<message>
+    if (!preg_match('/^\S+ (\w{7})\w* .+? (\d+) [+-]\d+\t/', $last, $m)) return '';
+    return $m[1] . ' · ' . date('d.m.Y', (int)$m[2]);
+}
+
 // ── Render ─────────────────────────────────────────────────────────────────────
 
 function render(string $template, array $vars = []): void {

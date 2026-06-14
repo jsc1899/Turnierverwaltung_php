@@ -64,6 +64,10 @@
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item" href="<?= url('admin/users') ?>"><i class="bi bi-shield-lock me-1"></i>Benutzer</a></li>
             <li><a class="dropdown-item" href="<?= url('admin/design') ?>"><i class="bi bi-palette me-1"></i>Design</a></li>
+            <?php $ver = get_git_version(); if ($ver): ?>
+            <li><hr class="dropdown-divider"></li>
+            <li><span class="dropdown-item-text text-muted small"><i class="bi bi-tag me-1"></i><?= e($ver) ?></span></li>
+            <?php endif; ?>
             <?php endif; ?>
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item" href="<?= url('logout') ?>"><i class="bi bi-box-arrow-right me-1"></i>Abmelden</a></li>
