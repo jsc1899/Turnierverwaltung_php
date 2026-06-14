@@ -202,16 +202,9 @@ function require_competition_open(int $cid): void {
 // ── Git-Version ────────────────────────────────────────────────────────────────
 
 function get_git_version(): string {
-    $log = __DIR__ . '/.git/logs/HEAD';
-    if (file_exists($log)) {
-        $lines = file($log, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        $last  = end($lines);
-        if ($last && preg_match('/^\S+ [0-9a-f]{40} .+? (\d+) [+-]\d+\t/', $last, $m)) {
-            return date('d.m.Y H:i', (int)$m[1]);
-        }
-    }
-    $mtime = @filemtime(__DIR__ . '/index.php');
-    return $mtime ? date('d.m.Y H:i', $mtime) : '';
+    $f = __DIR__ . '/version.txt';
+    if (!file_exists($f)) return '';
+    return trim((string)file_get_contents($f));
 }
 
 // ── Render ─────────────────────────────────────────────────────────────────────
