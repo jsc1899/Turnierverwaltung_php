@@ -209,7 +209,7 @@ function get_git_version(): string {
     if (!$last) return '';
     // Format: <old> <new> <author> <email> <unix-ts> <tz>\t<message>
     if (!preg_match('/^\S+ (\w{7})\w* .+? (\d+) [+-]\d+\t/', $last, $m)) return '';
-    return $m[1] . ' · ' . date('d.m.Y', (int)$m[2]);
+    return $m[1] . ' · ' . date('d.m.Y H:i', (int)$m[2]);
 }
 
 // ── Render ─────────────────────────────────────────────────────────────────────
