@@ -75,9 +75,28 @@ function assign_courts(int $cid): void {
     }
 
     // KO-Spiele (group_id IS NULL): Pool 1..N, je Runde ab Platz 1 (Finale = Platz 1).
+    // Einzel-KO und Doppel-KO (bracket NULL/W/L/GF): jedes Bracket eigenständig.
     db_execute(
         "UPDATE `match` SET court_no = (ko_position % ?) + 1
-         WHERE competition_id=? AND group_id IS NULL AND ko_position IS NOT NULL",
+         WHERE competition_id=? AND group_id IS NULL AND ko_position IS NOT NULL
+           AND (bracket IS NULL OR bracket NOT LIKE 'C%')",
         [$N, $cid]
     );
+
+    // Platzierungs-Brackets / Kreuzspiele (bracket 'C%'): Alle Blöcke einer Runde spielen
+    // gleichzeitig → Spielplätze über die Blöcke hinweg FORTLAUFEND nummerieren, nicht je
+    // Block wieder bei 1 (z.B. Block „Plätze 1–8" Runde 1 → Plätze 1–4, Block „Plätze 9–16"
+    // Runde 1 → Plätze 5–8 …). Reihenfolge: pro Runde nach numerischem Block-Index, dann Position.
+    $pl = db_fetchall(
+        "SELECT id, ko_round FROM `match`
+         WHERE competition_id=? AND group_id IS NULL AND bracket LIKE 'C%' AND ko_position IS NOT NULL
+         ORDER BY ko_round, CAST(SUBSTRING(bracket, 2) AS UNSIGNED), ko_position",
+        [$cid]
+    );
+    $cur_round = null; $i = 0;
+    foreach ($pl as $m) {
+        if ((int)$m['ko_round'] !== $cur_round) { $cur_round = (int)$m['ko_round']; $i = 0; }
+        db_execute("UPDATE `match` SET court_no=? WHERE id=?", [($i % $N) + 1, $m['id']]);
+        $i++;
+    }
 }
