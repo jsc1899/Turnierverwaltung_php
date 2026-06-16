@@ -156,7 +156,7 @@ ob_start(); ?>
         <li><strong>Bewerbstyp</strong> — Einzelbewerb, Doppelbewerb oder Teambewerb (kann nach dem ersten Auslosen nicht mehr geändert werden)</li>
         <li><strong>Spiele pro Team</strong> — Nur bei Teambewerb; Anzahl der Einzel-Duelle pro Mannschaftsspiel (0 = direkte Gesamtergebnis-Eingabe, 1 = ein Einzel ohne Spielerauswahl; ab 2 wird pro Duel eine Spielerauswahl eingeblendet; nach dem ersten Auslosen gesperrt)</li>
         <li><strong>Modus</strong> — Gruppenphase + KO, Nur KO-Runde oder Doppel-KO (nach dem ersten Auslosen gesperrt)</li>
-        <li><strong>Gruppengröße</strong> — Anzahl Spieler pro Gruppe (Gruppenphase), 3–8 Spieler</li>
+        <li><strong>Gruppengröße</strong> — Anzahl Spieler pro Gruppe (Gruppenphase), 3–10 Spieler</li>
         <li><strong>KO-Aufstieg</strong> — Wie viele Spieler pro Gruppe in die KO-Runde aufsteigen (0 = nur Gruppenphase)</li>
         <li><strong>Platz-3-Spiel</strong> — Ob die Halbfinalverlierer um Platz 3 spielen</li>
         <li><strong>Max. Teilnehmer</strong> — Obergrenze (0 = unbegrenzt)</li>
@@ -313,7 +313,7 @@ ob_start(); ?>
       <h2 class="h4 border-bottom pb-2">Auslosung</h2>
 
       <h5 id="gruppenphase" class="mt-3">Gruppenphase</h5>
-      <p>Voraussetzung: Modus <em>Gruppenphase + KO</em>, mindestens so viele Teilnehmer wie eine Gruppenanzahl × Gruppengröße (3–8 Spieler/Teams pro Gruppe).</p>
+      <p>Voraussetzung: Modus <em>Gruppenphase + KO</em>, mindestens so viele Teilnehmer wie eine Gruppenanzahl × Gruppengröße (3–10 Spieler/Teams pro Gruppe).</p>
       <ol>
         <li>Klicke auf <strong>Gruppen auslosen</strong> — Teilnehmer werden nach Spielstärke gereiht und gleichmäßig auf die Gruppen verteilt</li>
         <li>Die Gruppenreihenfolge kann per Drag &amp; Drop angepasst werden (<strong>Gruppen neu ordnen</strong>)</li>

@@ -5,15 +5,6 @@ $registry_sports_list = array_values(array_filter($sports_list, fn($s) => !in_ar
 ob_start(); ?>
 <div class="d-flex align-items-center mb-1 gap-2">
   <h2 class="mb-0"><i class="bi bi-person-lines-fill me-2"></i>Spielerregister</h2>
-  <?php if (can_edit()): ?>
-  <button class="btn btn-primary btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#newPlayerModal"
-          id="btn-new-player">
-    <i class="bi bi-person-plus me-1"></i>Neuer Spieler
-  </button>
-  <a href="<?= url('players/import') ?>" class="btn btn-outline-secondary btn-sm">
-    <i class="bi bi-file-earmark-arrow-up me-1"></i>Importieren
-  </a>
-  <?php endif; ?>
 </div>
 <p class="text-muted small mb-3">Stammdaten und Spielstärken aller registrierten Spieler.</p>
 
@@ -42,6 +33,17 @@ ob_start(); ?>
 
   <!-- ── Tab: Spieler ── -->
   <div class="tab-pane fade show active p-3" id="tab-spieler" role="tabpanel">
+    <?php if (can_edit()): ?>
+    <div class="mb-2 d-flex gap-2">
+      <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newPlayerModal"
+              id="btn-new-player">
+        <i class="bi bi-person-plus me-1"></i>Neuer Spieler
+      </button>
+      <a href="<?= url('players/import') ?>" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-file-earmark-arrow-up me-1"></i>Importieren
+      </a>
+    </div>
+    <?php endif; ?>
     <?php if ($players): ?>
     <div class="d-flex align-items-center mb-2 gap-2">
       <span class="text-muted small"><?= count(array_filter($players, fn($p) => $p['is_active'])) ?> Einträge</span>
@@ -176,6 +178,13 @@ ob_start(); ?>
   <!-- ── Tab: Doppel ── -->
   <div class="tab-pane fade p-3" id="tab-doppel" role="tabpanel">
     <?php $sport_labels = ['tischtennis'=>'Tischtennis','tennis'=>'Tennis','fussball'=>'Fußball','cornhole'=>'Cornhole']; ?>
+    <?php if (can_edit()): ?>
+    <div class="mb-2">
+      <a href="<?= url('players/doubles/import') ?>" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-file-earmark-arrow-up me-1"></i>Doppel importieren
+      </a>
+    </div>
+    <?php endif; ?>
     <?php if ($all_doubles): ?>
     <div class="d-flex align-items-center mb-2 gap-2">
       <span class="text-muted small"><?= count(array_filter($all_doubles, fn($d) => $d['is_active'])) ?> Einträge</span>
@@ -305,6 +314,13 @@ ob_start(); ?>
 
   <!-- ── Tab: Teams ── -->
   <div class="tab-pane fade p-3" id="tab-teams" role="tabpanel">
+    <?php if (can_edit()): ?>
+    <div class="mb-2">
+      <a href="<?= url('players/teams/import') ?>" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-file-earmark-arrow-up me-1"></i>Teams importieren
+      </a>
+    </div>
+    <?php endif; ?>
     <?php if ($all_teams): ?>
     <div class="d-flex align-items-center mb-2 gap-2">
       <span class="text-muted small"><?= count(array_filter($all_teams, fn($t) => $t['is_active'])) ?> Einträge</span>

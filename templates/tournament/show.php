@@ -364,7 +364,15 @@ $nennung_badge = $pending_count + $change_count;
                 <option value="6">6 Teilnehmer</option>
                 <option value="7">7 Teilnehmer</option>
                 <option value="8">8 Teilnehmer</option>
+                <option value="9">9 Teilnehmer</option>
+                <option value="10">10 Teilnehmer</option>
               </select>
+            </div>
+            <div class="col-sm-3 d-flex align-items-end pb-1" id="new-byes-wrap">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="show_byes" id="new_show_byes">
+                <label class="form-check-label" for="new_show_byes">Spielrunden anzeigen</label>
+              </div>
             </div>
             <div class="col-sm-3" id="new-advance-wrap">
               <label class="form-label">KO-Aufstieg</label>
@@ -400,9 +408,13 @@ $nennung_badge = $pending_count + $change_count;
                 <label class="form-check-label" for="new_show_seeding">Setzungen anzeigen (KO)</label>
               </div>
             </div>
-            <div class="col-sm-6">
-              <label class="form-label">Max. Teilnehmer <span class="text-muted small">(0 = unbegrenzt)</span></label>
+            <div class="col-sm-3">
+              <label class="form-label">Max. Teilnehmer <span class="text-muted small">(0 = ∞)</span></label>
               <input type="number" name="max_players" class="form-control" value="0" min="0">
+            </div>
+            <div class="col-sm-3">
+              <label class="form-label">Spielplätze <span class="text-muted small">(0 = aus)</span></label>
+              <input type="number" name="num_courts" class="form-control" value="0" min="0" max="20">
             </div>
             <div class="col-sm-6 d-flex align-items-end pb-1">
               <div class="form-check">
@@ -496,8 +508,10 @@ function toggleGroupSettings() {
   var isKo = (mode === 'ko_only' || mode === 'double_ko');
   var gsWrap  = document.getElementById('new-group-size-wrap');
   var advWrap = document.getElementById('new-advance-wrap');
+  var byWrap  = document.getElementById('new-byes-wrap');
   if (gsWrap)  gsWrap.style.display  = isKo ? 'none' : '';
   if (advWrap) advWrap.style.display = isKo ? 'none' : '';
+  if (byWrap)  byWrap.style.display  = isKo ? 'none' : '';
   newToggleThirdPlace();
 }
 function newToggleThirdPlace() {

@@ -472,10 +472,16 @@ function player_profile_json(array $p): void {
 
 function import_template(array $p): void {
     require_edit();
+    $headers = [
+        'Nachname', 'Vorname', 'Geschlecht', 'Verein', 'Pass-Nr.', 'E-Mail',
+        'Spielstärke Tischtennis', 'Spielstärke Tennis', 'Spielstärke Fußball', 'Spielstärke Cornhole',
+        'RatingsCentral-ID', 'ÖTV-ID',
+    ];
+    $example = ['Mustermann', 'Max', 'm', 'Muster SC', 'TT123', 'max@example.com', '1000', '4.5', '0', '0', '', ''];
     header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     header('Content-Disposition: attachment; filename="spieler_vorlage.xlsx"');
     header('Cache-Control: max-age=0');
-    echo _xlsx_build_template();
+    echo _xlsx_build_template($headers, $example, 'Spieler');
     exit;
 }
 
@@ -571,7 +577,212 @@ function import_players(array $p): void {
     ]);
 }
 
+// ── Doppel-Import ─────────────────────────────────────────────────────────────
+
+function import_doubles_template(array $p): void {
+    require_edit();
+    $headers = [
+        'Spieler 1 Nachname', 'Spieler 1 Vorname', 'Spieler 1 Pass-Nr.',
+        'Spieler 2 Nachname', 'Spieler 2 Vorname', 'Spieler 2 Pass-Nr.',
+    ];
+    $example = ['Mustermann', 'Max', 'TT123', 'Müller', 'Anna', ''];
+    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    header('Content-Disposition: attachment; filename="doppel_vorlage.xlsx"');
+    header('Cache-Control: max-age=0');
+    echo _xlsx_build_template($headers, $example, 'Doppel');
+    exit;
+}
+
+function import_doubles(array $p): void {
+    require_edit();
+    $info = 'Mitglieder werden über die <strong>Pass-Nr.</strong> (sonst <strong>Nachname + Vorname</strong>) '
+          . 'einem Registerspieler zugeordnet. Unbekannte Spieler werden automatisch im Register angelegt. '
+          . 'Ein Doppel wird übersprungen, wenn die Paarung bereits existiert.';
+    $base = [
+        'page_title'   => 'Doppel importieren',
+        'template_url' => 'players/doubles/import/template',
+        'import_url'   => 'players/doubles/import',
+        'info_html'    => $info,
+    ];
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') { render('player/import', $base); return; }
+    csrf_verify();
+
+    $rows = _import_rows_from_upload($_FILES['file'] ?? null, 'players/doubles/import');
+    if ($rows === null) return;
+
+    $imported = 0; $skipped = 0; $created = 0; $errors = [];
+    foreach ($rows as $i => $row) {
+        $row  = array_pad(array_values($row), 6, '');
+        $line = $i + 2;
+        $m1 = _resolve_or_create_player($row[0], $row[1], $row[2]);
+        $m2 = _resolve_or_create_player($row[3], $row[4], $row[5]);
+        if (isset($m1['error'])) { $errors[] = "Zeile $line: Spieler 1 " . _member_err($m1['error']); continue; }
+        if (isset($m2['error'])) { $errors[] = "Zeile $line: Spieler 2 " . _member_err($m2['error']); continue; }
+        if ($m1['created']) $created++;
+        if ($m2['created']) $created++;
+        if ($m1['id'] === $m2['id']) { $errors[] = "Zeile $line: identische Spieler — übersprungen."; continue; }
+
+        $exist = db_fetch(
+            "SELECT id FROM `double` WHERE (player1_id=? AND player2_id=?) OR (player1_id=? AND player2_id=?)",
+            [$m1['id'], $m2['id'], $m2['id'], $m1['id']]
+        );
+        if ($exist) { $skipped++; continue; }
+
+        $pl1 = db_fetch("SELECT name, firstname, skill FROM player WHERE id=?", [$m1['id']]);
+        $pl2 = db_fetch("SELECT name, firstname, skill FROM player WHERE id=?", [$m2['id']]);
+        $n1   = trim(($pl1['firstname'] ? $pl1['firstname'] . ' ' : '') . $pl1['name']);
+        $n2   = trim(($pl2['firstname'] ? $pl2['firstname'] . ' ' : '') . $pl2['name']);
+        $name = $n1 . ' / ' . $n2;
+        $skill = round((float)$pl1['skill'] + (float)$pl2['skill'], 1);
+        db_insert("INSERT INTO `double` (player1_id, player2_id, name, skill) VALUES (?,?,?,?)",
+            [$m1['id'], $m2['id'], $name, $skill]);
+        $imported++;
+    }
+
+    render('player/import', $base + [
+        'imported' => $imported, 'skipped' => $skipped, 'created' => $created,
+        'errors' => $errors, 'done' => true,
+    ]);
+}
+
+// ── Team-Import ───────────────────────────────────────────────────────────────
+
+function import_teams_template(array $p): void {
+    require_edit();
+    $headers = ['Teamname', 'Nachname', 'Vorname', 'Pass-Nr.'];
+    $example = ['Team Alpha', 'Mustermann', 'Max', 'TT123'];
+    $extra   = [
+        ['Team Alpha', 'Müller', 'Anna', ''],   // weiteres Mitglied desselben Teams
+        ['Team Beta', '', '', ''],              // Team ohne Spieler (nur Teamname)
+    ];
+    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    header('Content-Disposition: attachment; filename="team_vorlage.xlsx"');
+    header('Cache-Control: max-age=0');
+    echo _xlsx_build_template($headers, $example, 'Teams', $extra);
+    exit;
+}
+
+function import_teams(array $p): void {
+    require_edit();
+    $info = 'Langformat: <strong>eine Zeile je Mitglied</strong>, gruppiert nach <strong>Teamname</strong> '
+          . '(beliebige Teamgröße). Mitglieder werden über die <strong>Pass-Nr.</strong> (sonst '
+          . '<strong>Nachname + Vorname</strong>) zugeordnet; unbekannte Spieler werden automatisch angelegt. '
+          . 'Ein <strong>Team ohne Mitglieder</strong> ist möglich — dann nur die Spalte <strong>Teamname</strong> '
+          . 'ausfüllen. Ein Team wird übersprungen, wenn bereits ein Team mit gleichem Namen existiert.';
+    $base = [
+        'page_title'   => 'Teams importieren',
+        'template_url' => 'players/teams/import/template',
+        'import_url'   => 'players/teams/import',
+        'info_html'    => $info,
+    ];
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') { render('player/import', $base); return; }
+    csrf_verify();
+
+    $rows = _import_rows_from_upload($_FILES['file'] ?? null, 'players/teams/import');
+    if ($rows === null) return;
+
+    // Zeilen nach Teamname gruppieren (Reihenfolge erhalten)
+    $teams = []; $order = [];
+    foreach ($rows as $i => $row) {
+        $row = array_pad(array_values($row), 4, '');
+        $tn  = trim($row[0]);
+        if ($tn === '') continue;
+        $key = mb_strtolower($tn);
+        if (!isset($teams[$key])) { $teams[$key] = ['name' => $tn, 'members' => []]; $order[] = $key; }
+        // Zeile nur mit Teamname (keine Mitgliedsdaten) → Team ohne Spieler, keine Mitgliedszeile
+        if (trim($row[1]) === '' && trim($row[2]) === '' && trim($row[3]) === '') continue;
+        $teams[$key]['members'][] = ['name' => $row[1], 'firstname' => $row[2], 'pass' => $row[3], 'line' => $i + 2];
+    }
+
+    $imported = 0; $skipped = 0; $created = 0; $errors = [];
+    foreach ($order as $key) {
+        $g = $teams[$key];
+        if (db_fetch("SELECT id FROM `team` WHERE name=?", [$g['name']])) { $skipped++; continue; }
+
+        $ids = []; $teamSkill = 0.0;
+        foreach ($g['members'] as $mem) {
+            $r = _resolve_or_create_player($mem['name'], $mem['firstname'], $mem['pass']);
+            if (isset($r['error'])) {
+                $errors[] = 'Team ' . $g['name'] . ' (Zeile ' . $mem['line'] . '): Mitglied ' . _member_err($r['error']);
+                continue;
+            }
+            if ($r['created']) $created++;
+            $ids[$r['id']] = true;
+        }
+        // Teams ohne (gültige) Mitglieder werden trotzdem angelegt.
+
+        foreach (array_keys($ids) as $pid) {
+            $sk = db_fetch("SELECT skill FROM player WHERE id=?", [$pid]);
+            $teamSkill += (float)($sk['skill'] ?? 0);
+        }
+        $tid = (int)db_insert("INSERT INTO `team` (name, skill) VALUES (?,?)", [$g['name'], round($teamSkill, 1)]);
+        foreach (array_keys($ids) as $pid) {
+            db_execute("INSERT IGNORE INTO `team_player` (team_id, player_id) VALUES (?,?)", [$tid, $pid]);
+        }
+        $imported++;
+    }
+
+    render('player/import', $base + [
+        'imported' => $imported, 'skipped' => $skipped, 'created' => $created,
+        'errors' => $errors, 'done' => true,
+    ]);
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+// Liest die hochgeladene Datei (.xlsx/.csv), entfernt die Kopfzeile und liefert die
+// Datenzeilen — oder null (mit Flash + Redirect) bei Fehler/leerer Datei.
+function _import_rows_from_upload(?array $file, string $redirect): ?array {
+    if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
+        flash('danger', 'Keine gültige Datei hochgeladen.');
+        redirect($redirect); return null;
+    }
+    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    if ($ext === 'xlsx') {
+        $rows = _xlsx_parse($file['tmp_name']);
+    } elseif ($ext === 'csv') {
+        $rows = _csv_parse($file['tmp_name']);
+    } else {
+        flash('danger', 'Nur .xlsx oder .csv Dateien erlaubt.');
+        redirect($redirect); return null;
+    }
+    if (count($rows) < 2) {
+        flash('warning', 'Keine Daten gefunden (nur Kopfzeile oder leer).');
+        redirect($redirect); return null;
+    }
+    array_shift($rows); // Kopfzeile entfernen
+    return array_values($rows);
+}
+
+// Ordnet ein Importmitglied einem Registerspieler zu (Pass-Nr. vor Name) oder legt es neu an.
+// Rückgabe: ['id'=>int,'created'=>bool] oder ['error'=>'mehrdeutig'|'leer'].
+function _resolve_or_create_player(string $name, string $firstname, string $passnr): array {
+    $name = trim($name); $firstname = trim($firstname); $passnr = trim($passnr);
+    if ($name === '' && $passnr === '') return ['error' => 'leer'];
+
+    if ($passnr !== '') {
+        $hit = db_fetchall("SELECT id FROM player WHERE pass_nr=?", [$passnr]);
+        if (count($hit) === 1) return ['id' => (int)$hit[0]['id'], 'created' => false];
+        if (count($hit) > 1)   return ['error' => 'mehrdeutig'];
+    }
+    if ($name === '') return ['error' => 'leer']; // nur Pass-Nr., aber nicht gefunden → kein Anlegen möglich
+
+    $hit = db_fetchall("SELECT id FROM player WHERE name=? AND firstname=?", [$name, $firstname]);
+    if (count($hit) === 1) return ['id' => (int)$hit[0]['id'], 'created' => false];
+    if (count($hit) > 1)   return ['error' => 'mehrdeutig'];
+
+    $pid = (int)db_insert(
+        "INSERT INTO player (name, firstname, pass_nr) VALUES (?,?,?)",
+        [$name, $firstname, $passnr ?: null]
+    );
+    return ['id' => $pid, 'created' => true];
+}
+
+function _member_err(string $code): string {
+    return $code === 'mehrdeutig'
+        ? 'mehrdeutig (mehrere Treffer im Register) — übersprungen.'
+        : 'unvollständig (Nachname fehlt) — übersprungen.';
+}
 
 function _save_player_skills(int $pid): void {
     foreach (SPORTS_LIST as [$sport_key]) {
@@ -589,20 +800,27 @@ function _save_player_skills(int $pid): void {
 
 // ── XLSX/CSV Import-Hilfsfunktionen ──────────────────────────────────────────
 
-function _xlsx_build_template(): string {
-    $headers = [
-        'Nachname', 'Vorname', 'Geschlecht', 'Verein', 'Pass-Nr.', 'E-Mail',
-        'Spielstärke Tischtennis', 'Spielstärke Tennis', 'Spielstärke Fußball', 'Spielstärke Cornhole',
-        'RatingsCentral-ID', 'ÖTV-ID',
-    ];
-    $example = ['Mustermann', 'Max', 'm', 'Muster SC', 'TT123', 'max@example.com', '1000', '4.5', '0', '0', '', ''];
+function _xlsx_col_letter(int $idx): string {
+    $s = ''; $idx++;
+    while ($idx > 0) { $m = ($idx - 1) % 26; $s = chr(65 + $m) . $s; $idx = intdiv($idx - 1, 26); }
+    return $s;
+}
 
-    // Shared strings: headers + example values
-    $strings = array_unique(array_merge($headers, array_filter($example, fn($v) => !is_numeric($v) || $v === '')));
-    $strings = array_values($strings);
+function _xlsx_build_template(array $headers, array $example, string $sheetName = 'Tabelle1', array $extraRows = []): string {
+    $dataRows = array_merge([$example], $extraRows);
+
+    // Shared strings: headers + alle nicht-numerischen Zellenwerte aller Datenzeilen
+    $strVals = $headers;
+    foreach ($dataRows as $dr) {
+        foreach ($dr as $v) { if (!is_numeric($v) || $v === '') $strVals[] = $v; }
+    }
+    $strings = array_values(array_unique($strVals));
     $strIdx  = array_flip($strings);
 
-    $colLetters = ['A','B','C','D','E','F','G','H','I','J','K','L'];
+    $cols = count($headers);
+    foreach ($dataRows as $dr) $cols = max($cols, count($dr));
+    $colLetters = [];
+    for ($i = 0; $i < $cols; $i++) $colLetters[] = _xlsx_col_letter($i);
 
     // Row 1: bold headers (style s="1")
     $row1 = '';
@@ -611,17 +829,22 @@ function _xlsx_build_template(): string {
         $row1 .= "<c r=\"{$colLetters[$ci]}1\" t=\"s\" s=\"1\"><v>$si</v></c>";
     }
 
-    // Row 2: example data
-    $row2 = '';
-    foreach ($example as $ci => $v) {
-        $col = $colLetters[$ci];
-        if (is_numeric($v) && $v !== '') {
-            $row2 .= "<c r=\"{$col}2\"><v>$v</v></c>";
-        } else {
-            $si   = $strIdx[$v] ?? null;
-            if ($si === null) { $strings[] = $v; $si = count($strings) - 1; $strIdx[$v] = $si; }
-            $row2 .= "<c r=\"{$col}2\" t=\"s\"><v>$si</v></c>";
+    // Datenzeilen ab Zeile 2
+    $rowsXml = '';
+    foreach ($dataRows as $d => $dr) {
+        $rn = $d + 2;
+        $cells = '';
+        foreach ($dr as $ci => $v) {
+            $col = $colLetters[$ci];
+            if (is_numeric($v) && $v !== '') {
+                $cells .= "<c r=\"{$col}{$rn}\"><v>$v</v></c>";
+            } else {
+                $si = $strIdx[$v] ?? null;
+                if ($si === null) { $strings[] = $v; $si = count($strings) - 1; $strIdx[$v] = $si; }
+                $cells .= "<c r=\"{$col}{$rn}\" t=\"s\"><v>$si</v></c>";
+            }
         }
+        $rowsXml .= "<row r=\"$rn\">$cells</row>";
     }
 
     $ssXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -635,12 +858,12 @@ function _xlsx_build_template(): string {
         . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
         . '<sheetData>'
         . "<row r=\"1\">$row1</row>"
-        . "<row r=\"2\">$row2</row>"
+        . $rowsXml
         . '</sheetData></worksheet>';
 
     $wbXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         . '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
-        . '<sheets><sheet name="Spieler" sheetId="1" r:id="rId1"/></sheets>'
+        . '<sheets><sheet name="' . htmlspecialchars($sheetName, ENT_XML1 | ENT_QUOTES) . '" sheetId="1" r:id="rId1"/></sheets>'
         . '</workbook>';
 
     $stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'

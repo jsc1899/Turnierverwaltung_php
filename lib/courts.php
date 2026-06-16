@@ -1,0 +1,83 @@
+<?php
+
+// Spielplatz-Zuordnung (Courts).
+// competition.num_courts = Anzahl Plätze (0 = aus). Plätze sind an Gruppen gebunden
+// (grp.courts = komma-separierte Liste); Begegnungen rotieren über die Plätze ihrer Gruppe.
+// KO-Spiele werden aus dem gesamten Pool 1..N zugewiesen (court = ko_position % N + 1).
+
+/**
+ * Gleichmäßige Standard-Verteilung der Plätze auf die Gruppen (zusammenhängende Blöcke).
+ * @return array Liste je Gruppenindex mit Platznummern, z.B. (6,3) → [[1,2],[3,4],[5,6]].
+ */
+function default_group_courts(int $num_courts, int $num_groups): array {
+    if ($num_groups <= 0) return [];
+    if ($num_courts <= 0) return array_fill(0, $num_groups, []);
+
+    $res = [];
+    if ($num_courts >= $num_groups) {
+        $base = intdiv($num_courts, $num_groups);
+        $rem  = $num_courts % $num_groups;   // Rest auf die ersten Gruppen
+        $c = 1;
+        for ($i = 0; $i < $num_groups; $i++) {
+            $cnt = $base + ($i < $rem ? 1 : 0);
+            $block = [];
+            for ($j = 0; $j < $cnt; $j++) $block[] = $c++;
+            $res[] = $block;
+        }
+    } else {
+        // Weniger Plätze als Gruppen → Gruppen teilen sich Plätze zyklisch.
+        for ($i = 0; $i < $num_groups; $i++) $res[] = [($i % $num_courts) + 1];
+    }
+    return $res;
+}
+
+/**
+ * Parst eine Platzliste (komma/whitespace-getrennt), filtert auf 1..num_courts,
+ * entfernt Duplikate und sortiert aufsteigend.
+ */
+function parse_courts(string $s, int $num_courts): array {
+    $parts = preg_split('/[^0-9]+/', $s, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+    $set = [];
+    foreach ($parts as $p) {
+        $n = (int)$p;
+        if ($n >= 1 && $n <= $num_courts) $set[$n] = true;
+    }
+    $out = array_keys($set);
+    sort($out);
+    return $out;
+}
+
+/**
+ * Weist allen Begegnungen eines Bewerbs ihre Platznummer zu (idempotent).
+ * Nach jedem (Neu-)Aufbau der Matches und nach Einstellungsänderungen aufrufen.
+ */
+function assign_courts(int $cid): void {
+    $c = db_fetch("SELECT num_courts FROM competition WHERE id=?", [$cid]);
+    $N = $c ? (int)$c['num_courts'] : 0;
+
+    if ($N <= 0) {
+        db_execute("UPDATE `match` SET court_no=NULL WHERE competition_id=?", [$cid]);
+        return;
+    }
+
+    // Gruppenspiele: je Gruppe Plätze (manuell oder Default), Begegnungen rotierend.
+    $groups   = db_fetchall("SELECT id, courts FROM grp WHERE competition_id=? ORDER BY name", [$cid]);
+    $defaults = default_group_courts($N, count($groups));
+    foreach ($groups as $idx => $g) {
+        $courts = parse_courts((string)($g['courts'] ?? ''), $N);
+        if (!$courts) $courts = $defaults[$idx] ?? [];
+        $matches = db_fetchall("SELECT id FROM `match` WHERE group_id=? ORDER BY match_order, id", [$g['id']]);
+        $cnt = count($courts);
+        foreach ($matches as $k => $m) {
+            $court = $cnt ? $courts[$k % $cnt] : null;
+            db_execute("UPDATE `match` SET court_no=? WHERE id=?", [$court, $m['id']]);
+        }
+    }
+
+    // KO-Spiele (group_id IS NULL): Pool 1..N, je Runde ab Platz 1 (Finale = Platz 1).
+    db_execute(
+        "UPDATE `match` SET court_no = (ko_position % ?) + 1
+         WHERE competition_id=? AND group_id IS NULL AND ko_position IS NOT NULL",
+        [$N, $cid]
+    );
+}

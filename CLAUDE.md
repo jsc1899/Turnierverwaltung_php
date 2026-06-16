@@ -134,7 +134,24 @@ HMAC-SHA256-Tokens im Format `base64url(payload).base64url(timestamp).base64url(
 
 ### Round-Robin-Spielplan (`lib/round_robin.php`)
 
-`round_robin_schedule(player_ids)` gibt Spielpaarungen nach der Standard-Kreis-Methode zurück. Ungerade Spieleranzahl wird durch einen Freilos-Slot ergänzt.
+Gruppengröße: 3–10 Teilnehmer. Rundenbasierte Auslosung (Kreismethode): Der Plan wird in Runden gegliedert, in denen jeder Teilnehmer genau einmal spielt → gleichmäßige Verteilung über den gesamten Spielplan (kein „Front-Loading"). Zur Vermeidung von Back-to-Back (zwei Partien direkt hintereinander, v.a. an Rundenübergängen) werden mehrere zufällige Kandidaten erzeugt und der mit den wenigsten Back-to-Back-Übergängen gewählt (`rr_count_back_to_back`-frei ab 5 Teilnehmern immer möglich; bei 3/4 sind einzelne unvermeidbar). Zufall (wechselnde Spielpläne) durch Mischen von Teilnehmern, Runden, Spielreihenfolge und Seitenwahl.
+
+- `round_robin_schedule(player_ids)` → flache Paarliste `[[p1,p2], …]` (rückwärtskompatibel).
+- `round_robin_schedule_rounds(player_ids)` → `['matches' => [['p1','p2','round'], …], 'byes' => [rundenNr => spielfreie_ID|null]]`. `draw_groups()` speichert `round_no` je `match`; die Spielfreien werden bei der Anzeige aus `round_no` + Gruppenmitglieder berechnet (nicht als Match-Zeile gespeichert).
+- Bewerbsoption `competition.show_byes`: zeigt spielfreie Teilnehmer (ungerade Gruppen) als Inline-Zeile je Runde im Spielplan an — in der Web-Ansicht (`templates/competition/show.php`) und im Gruppen-PDF (`generate_groups_pdf`).
+
+### Spielplätze / Courts (`lib/courts.php`)
+
+Optional: `competition.num_courts` (0 = aus). Plätze sind an Gruppen gebunden (`grp.courts`,
+komma-separiert), Begegnungen rotieren über die Plätze ihrer Gruppe; KO-Spiele nutzen den
+gesamten Pool (`court = ko_position % num_courts + 1`, Finale = Platz 1).
+- `default_group_courts(num_courts, num_groups)` → gleichmäßige Blöcke (z.B. (6,3)→[[1,2],[3,4],[5,6]]).
+- `parse_courts(str, num_courts)` → normalisierte Platzliste (1..N, dedupe, sortiert).
+- `assign_courts(cid)` schreibt `match.court_no`; **nach jedem Draw** (`draw_groups`,
+  `groups_reorder`, `draw_ko`/`draw_ko_direct`, Doppel-KO) und nach `settings()` aufrufen.
+- `draw_groups()` belegt `grp.courts` initial mit dem Default-Block (manuell editierbar via
+  `save_courts()` / `POST /competition/{id}/courts`). Anzeige „Platz X" in Web (Gruppe + KO) und
+  in allen Match-PDFs inkl. Match-Cards.
 
 ### PDF- & CSV-Exporte (`lib/pdf.php`)
 
@@ -152,6 +169,24 @@ Export-Funktionen:
 - `generate_players_registry_pdf()` / `generate_players_registry_csv()` — globales Spielerregister
 - `generate_competition_players_pdf(cid)` / `generate_competition_players_csv(cid)`
 
+### Excel/CSV-Import im Spielerregister (`routes/player.php`)
+
+Drei Importe (je `require_edit()`, GET = Formular/Vorlage, POST = Verarbeitung), alle nutzen
+das generische Template `templates/player/import.php` via `render('player/import', …)`:
+- **Spieler**: `import_players()` / `import_template()` — Dedup über Pass-Nr. oder Nachname+Vorname.
+- **Doppel**: `import_doubles()` / `import_doubles_template()` — eine Zeile je Doppel
+  (Spieler 1 + Spieler 2 je `Nachname|Vorname|Pass-Nr.`).
+- **Teams**: `import_teams()` / `import_teams_template()` — Langformat, eine Zeile je Mitglied,
+  gruppiert nach `Teamname`. Zeilen mit nur ausgefülltem `Teamname` (Mitgliedsspalten leer)
+  legen ein **Team ohne Mitglieder** an. `_xlsx_build_template(...)` akzeptiert via `$extraRows`
+  mehrere Beispielzeilen.
+
+Geteilte Helfer: `_xlsx_build_template(headers, example, sheet)` (XLSX-Vorlage), `_xlsx_parse()`
+/ `_csv_parse()` (Einlesen), `_import_rows_from_upload()` (Upload→Datenzeilen).
+**Mitglieder-Matching** `_resolve_or_create_player(name, firstname, passnr)`: Pass-Nr. vor
+Name; mehrere Namens-Treffer → `error: mehrdeutig`; nicht gefunden → Spieler wird automatisch
+angelegt (`created=true`). Dedup: Doppel über Paar (beide Reihenfolgen), Team über Namen.
+
 ### Registrierungs-Workflow
 
 1. Spieler sendet öffentliches Formular → `registration`-Zeile (status=pending) + `registration_competition`-Zeilen
@@ -165,13 +200,13 @@ Export-Funktionen:
 | Tabelle | Zweck |
 |---------|-------|
 | `tournament` | Oberste Ebene |
-| `competition` | Disziplin innerhalb eines Turniers; `phase`: setup→group→ko→done; `mode`: groups_ko/ko_only/double_ko; `show_seeding`, `seeding_order` ('asc'/'desc') für KO-Modi |
+| `competition` | Disziplin innerhalb eines Turniers; `phase`: setup→group→ko→done; `mode`: groups_ko/ko_only/double_ko; `show_seeding`, `seeding_order` ('asc'/'desc') für KO-Modi; `show_byes` (spielfreie Teilnehmer im Gruppen-Spielplan anzeigen); `num_courts` (Anzahl Spielplätze, 0 = aus) |
 | `player` | Globales Spielerregister |
 | `player_skill` | Spielstärke pro Sport (PK: player_id + sport) |
 | `competition_player` | Einem Bewerb zugeordnete Spieler (mit bewerbs-spezifischer Spielstärke) |
-| `grp` | Benannte Gruppen (A, B, C…) innerhalb eines Bewerbs |
+| `grp` | Benannte Gruppen (A, B, C…) innerhalb eines Bewerbs; `courts` = komma-separierte Platzliste der Gruppe |
 | `group_player` | Spieler in einer Gruppe |
-| `match` | Gruppenspiele (`group_id IS NOT NULL`) und KO-Spiele (`group_id IS NULL`, `ko_round` gesetzt); `bracket`-Spalte: NULL=Einzel-KO, 'W'/'L'/'GF'=Doppel-KO |
+| `match` | Gruppenspiele (`group_id IS NOT NULL`, `round_no` = Runde der Kreismethode) und KO-Spiele (`group_id IS NULL`, `ko_round` gesetzt); `bracket`-Spalte: NULL=Einzel-KO, 'W'/'L'/'GF'=Doppel-KO; `court_no` = zugewiesener Spielplatz |
 | `registration` | Öffentliche Anmeldung (status: pending/confirmed/rejected) |
 | `registration_competition` | Welche Bewerbe eine Anmeldung umfasst |
 | `registration_change_request` | Abmelde- oder Änderungsantrag des Spielers |

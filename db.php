@@ -329,6 +329,11 @@ function init_db(): void {
         "ALTER TABLE `group_team`   ADD COLUMN tiebreak_order INT NULL DEFAULT NULL",
         "ALTER TABLE `team_match_duel` ADD COLUMN duel_label VARCHAR(32) NULL DEFAULT NULL",
         "ALTER TABLE competition ADD COLUMN score_mode VARCHAR(10) NOT NULL DEFAULT 'match'",
+        "ALTER TABLE `match` ADD COLUMN round_no INT NULL DEFAULT NULL",
+        "ALTER TABLE competition ADD COLUMN show_byes TINYINT(1) NOT NULL DEFAULT 0",
+        "ALTER TABLE competition ADD COLUMN num_courts INT NOT NULL DEFAULT 0",
+        "ALTER TABLE `match` ADD COLUMN court_no INT NULL DEFAULT NULL",
+        "ALTER TABLE grp ADD COLUMN courts VARCHAR(255) NOT NULL DEFAULT ''",
     ];
     foreach ($migrations as $sql) {
         try { $pdo->exec($sql); } catch (\PDOException $e) { /* Spalte/Typ bereits korrekt */ }

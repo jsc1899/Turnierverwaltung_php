@@ -1,4 +1,12 @@
-<?php ob_start(); ?>
+<?php
+$page_title   = $page_title   ?? 'Importieren';
+$template_url  = $template_url ?? 'players/import/template';
+$import_url    = $import_url   ?? 'players/import';
+$info_html     = $info_html    ?? 'Ein Spieler wird übersprungen, wenn bereits ein Eintrag mit derselben '
+                  . '<strong>Pass-Nr.</strong> oder demselben <strong>Nachname + Vorname</strong> existiert. '
+                  . 'Bestehende Einträge werden nicht verändert.';
+$has_created   = isset($created);
+ob_start(); ?>
 <nav aria-label="breadcrumb" class="mb-3">
   <ol class="breadcrumb">
     <li class="breadcrumb-item"><a href="<?= url('players') ?>">Spielerregister</a></li>
@@ -8,7 +16,7 @@
 
 <div class="row justify-content-center">
   <div class="col-lg-7">
-    <h2 class="mb-4"><i class="bi bi-file-earmark-arrow-up me-2"></i>Spieler importieren</h2>
+    <h2 class="mb-4"><i class="bi bi-file-earmark-arrow-up me-2"></i><?= e($page_title) ?></h2>
 
     <?php if ($done ?? false): ?>
     <div class="card shadow-sm mb-4">
@@ -23,6 +31,12 @@
             <div class="fs-1 fw-bold text-warning"><?= (int)($skipped ?? 0) ?></div>
             <div class="text-muted small">übersprungen (Duplikat)</div>
           </div>
+          <?php if ($has_created): ?>
+          <div class="col">
+            <div class="fs-1 fw-bold text-primary"><?= (int)$created ?></div>
+            <div class="text-muted small">neue Spieler angelegt</div>
+          </div>
+          <?php endif; ?>
           <?php if ($errors ?? []): ?>
           <div class="col">
             <div class="fs-1 fw-bold text-danger"><?= count($errors) ?></div>
@@ -39,7 +53,7 @@
         <?php endif; ?>
         <div class="d-flex gap-2 mt-3">
           <a href="<?= url('players') ?>" class="btn btn-primary"><i class="bi bi-person-lines-fill me-1"></i>Zum Register</a>
-          <a href="<?= url('players/import') ?>" class="btn btn-outline-secondary">Weiteren Import</a>
+          <a href="<?= url($import_url) ?>" class="btn btn-outline-secondary">Weiteren Import</a>
         </div>
       </div>
     </div>
@@ -51,7 +65,7 @@
         <p class="mb-0 text-muted small flex-grow-1">
           Vorlage herunterladen, in Excel ausfüllen und als <code>.xlsx</code> oder <code>.csv</code> hochladen.
         </p>
-        <a href="<?= url('players/import/template') ?>" class="btn btn-outline-success btn-sm text-nowrap">
+        <a href="<?= url($template_url) ?>" class="btn btn-outline-success btn-sm text-nowrap">
           <i class="bi bi-file-earmark-excel me-1"></i>Vorlage (.xlsx)
         </a>
       </div>
@@ -76,9 +90,7 @@
 
     <div class="card border-0 bg-light">
       <div class="card-body small text-muted">
-        <strong>Duplikatsprüfung:</strong> Ein Spieler wird übersprungen, wenn bereits ein Eintrag mit derselben
-        <strong>Pass-Nr.</strong> oder demselben <strong>Nachname + Vorname</strong> existiert.
-        Bestehende Einträge werden nicht verändert.
+        <strong>Hinweis:</strong> <?= $info_html ?>
       </div>
     </div>
 

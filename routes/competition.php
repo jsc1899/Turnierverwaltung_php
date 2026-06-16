@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../lib/standings.php';
 require_once __DIR__ . '/../lib/round_robin.php';
 require_once __DIR__ . '/../lib/ko_bracket.php';
+require_once __DIR__ . '/../lib/courts.php';
 
 // _maybe_set_done() is defined in lib/ko_bracket.php (required above)
 
@@ -14,7 +15,7 @@ function new_competition(array $p): void {
     csrf_verify();
     require_tournament_open((int)$p['tid']);
     $name          = trim(post('name'));
-    $group_size    = max(3, min(8, (int)post('group_size', 4)));
+    $group_size    = max(3, min(10, (int)post('group_size', 4)));
     $advance_count = max(0, min(2, (int)post('advance_count', 1)));
     $mode          = in_array(post('mode'), ['groups_ko', 'ko_only', 'double_ko']) ? post('mode') : 'groups_ko';
     $comp_type          = post('comp_type', 'single');
@@ -28,6 +29,8 @@ function new_competition(array $p): void {
     $seeding_order      = post('seeding_order') === 'asc' ? 'asc' : 'desc';
     $team_size          = $is_team ? max(0, min(20, (int)post('team_size', 0))) : 0;
     $score_mode         = in_array(post('score_mode'), ['sets', 'sets_grp']) ? post('score_mode') : 'match';
+    $show_byes          = post('show_byes') ? 1 : 0;
+    $num_courts         = max(0, min(20, (int)post('num_courts', 0)));
 
     if (!$name) {
         flash('danger', 'Name erforderlich.');
@@ -37,10 +40,10 @@ function new_competition(array $p): void {
     db_insert(
         "INSERT INTO competition
          (tournament_id, name, group_size, advance_count, mode, is_doubles, is_team,
-          third_place, show_seeding, show_skill, registrations_open, max_players, seeding_order, team_size, score_mode)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+          third_place, show_seeding, show_skill, registrations_open, max_players, seeding_order, team_size, score_mode, show_byes, num_courts)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         [$p['tid'], $name, $group_size, $advance_count, $mode, $is_doubles, $is_team,
-         $third_place, $show_seeding, $show_skill, $registrations_open, $max_players, $seeding_order, $team_size, $score_mode]
+         $third_place, $show_seeding, $show_skill, $registrations_open, $max_players, $seeding_order, $team_size, $score_mode, $show_byes, $num_courts]
     );
     redirect('tournament/' . $p['tid']);
 }
@@ -630,7 +633,7 @@ function settings(array $p): void {
 
 
     $name              = trim(post('name', ''));
-    $group_size        = max(3, min(8, (int)post('group_size', 4)));
+    $group_size        = max(3, min(10, (int)post('group_size', 4)));
     $advance_count     = max(0, min(2, (int)post('advance_count', 1)));
     $third_place       = post('third_place') ? 1 : 0;
     $registrations_open = post('registrations_open') ? 1 : 0;
@@ -640,6 +643,8 @@ function settings(array $p): void {
     $seeding_order     = post('seeding_order') === 'asc' ? 'asc' : 'desc';
     $team_size         = max(0, (int)post('team_size', 0));
     $score_mode        = in_array(post('score_mode'), ['sets', 'sets_grp']) ? post('score_mode') : 'match';
+    $show_byes         = post('show_byes') ? 1 : 0;
+    $num_courts        = max(0, min(20, (int)post('num_courts', 0)));
 
     $c = db_fetch("SELECT phase, mode, is_doubles, is_team FROM competition WHERE id=?", [$cid]);
     if (!$c) { redirect('competition/' . $cid); return; }
@@ -674,16 +679,37 @@ function settings(array $p): void {
     }
 
     if (in_array($c['mode'], ['ko_only', 'double_ko'], true)) {
-        db_execute("UPDATE competition SET third_place=?, registrations_open=?, max_players=?, show_seeding=?, show_skill=?, seeding_order=?, team_size=?, score_mode=? WHERE id=?",
-            [$third_place, $registrations_open, $max_players, $show_seeding, $show_skill, $seeding_order, $team_size, $score_mode, $cid]);
+        db_execute("UPDATE competition SET third_place=?, registrations_open=?, max_players=?, show_seeding=?, show_skill=?, seeding_order=?, team_size=?, score_mode=?, num_courts=? WHERE id=?",
+            [$third_place, $registrations_open, $max_players, $show_seeding, $show_skill, $seeding_order, $team_size, $score_mode, $num_courts, $cid]);
     } elseif ($c && $c['phase'] === 'setup') {
-        db_execute("UPDATE competition SET group_size=?, advance_count=?, third_place=?, registrations_open=?, max_players=?, show_skill=?, seeding_order=?, team_size=?, score_mode=? WHERE id=?",
-            [$group_size, $advance_count, $third_place, $registrations_open, $max_players, $show_skill, $seeding_order, $team_size, $score_mode, $cid]);
+        db_execute("UPDATE competition SET group_size=?, advance_count=?, third_place=?, registrations_open=?, max_players=?, show_skill=?, seeding_order=?, team_size=?, score_mode=?, show_byes=?, num_courts=? WHERE id=?",
+            [$group_size, $advance_count, $third_place, $registrations_open, $max_players, $show_skill, $seeding_order, $team_size, $score_mode, $show_byes, $num_courts, $cid]);
     } else {
-        db_execute("UPDATE competition SET advance_count=?, third_place=?, registrations_open=?, max_players=?, show_skill=?, seeding_order=?, team_size=?, score_mode=? WHERE id=?",
-            [$advance_count, $third_place, $registrations_open, $max_players, $show_skill, $seeding_order, $team_size, $score_mode, $cid]);
+        db_execute("UPDATE competition SET advance_count=?, third_place=?, registrations_open=?, max_players=?, show_skill=?, seeding_order=?, team_size=?, score_mode=?, show_byes=?, num_courts=? WHERE id=?",
+            [$advance_count, $third_place, $registrations_open, $max_players, $show_skill, $seeding_order, $team_size, $score_mode, $show_byes, $num_courts, $cid]);
     }
+    assign_courts($cid);
     flash('success', 'Einstellungen gespeichert.');
+    redirect('competition/' . $cid);
+}
+
+// Manuelle Platzzuordnung pro Gruppe speichern (Formularfeld courts[<group_id>] = "1,2").
+function save_courts(array $p): void {
+    require_edit();
+    csrf_verify();
+    $cid = (int)$p['id'];
+    $c = db_fetch("SELECT num_courts FROM competition WHERE id=?", [$cid]);
+    if (!$c) { redirect('competition/' . $cid); return; }
+    $N = (int)$c['num_courts'];
+    $valid_gids = array_column(db_fetchall("SELECT id FROM grp WHERE competition_id=?", [$cid]), 'id');
+    foreach ((array)($_POST['courts'] ?? []) as $gid_str => $val) {
+        $gid = (int)$gid_str;
+        if (!in_array($gid, $valid_gids)) continue;
+        $courts = parse_courts((string)$val, $N);
+        db_execute("UPDATE grp SET courts=? WHERE id=?", [implode(',', $courts), $gid]);
+    }
+    assign_courts($cid);
+    flash('success', 'Platzzuordnung gespeichert.');
     redirect('competition/' . $cid);
 }
 
@@ -942,7 +968,7 @@ function draw_groups(array $p): void {
     $group_size = (int)$c['group_size'];
     $num_groups = max(1, (int)round($n / $group_size));
     while ($num_groups > 1 && $n / $num_groups < 3) $num_groups--;
-    while ($n / $num_groups > 8) $num_groups++;
+    while ($n / $num_groups > 10) $num_groups++;
 
     $pdo = get_db();
     $pdo->beginTransaction();
@@ -956,6 +982,12 @@ function draw_groups(array $p): void {
                 "INSERT INTO grp (competition_id, name) VALUES (?,?)",
                 [$cid, 'Gruppe ' . chr(65 + $i)]
             );
+        }
+
+        // Standard-Platzverteilung als Startwert (manuell überschreibbar)
+        $court_blocks = default_group_courts((int)($c['num_courts'] ?? 0), $num_groups);
+        foreach ($group_ids as $gi => $gid) {
+            db_execute("UPDATE grp SET courts=? WHERE id=?", [implode(',', $court_blocks[$gi] ?? []), $gid]);
         }
 
         $participant_ids = array_column($rows, 'participant_id');
@@ -984,11 +1016,11 @@ function draw_groups(array $p): void {
                     db_fetchall("SELECT team_id FROM group_team WHERE group_id=?", [$gid]),
                     'team_id'
                 );
-                $pairs = round_robin_schedule($pids);
-                foreach ($pairs as $order => [$t1, $t2]) {
+                $sched = round_robin_schedule_rounds($pids);
+                foreach ($sched['matches'] as $order => $mm) {
                     db_execute(
-                        "INSERT INTO `match` (competition_id, group_id, team1_id, team2_id, match_order) VALUES (?,?,?,?,?)",
-                        [$cid, $gid, $t1, $t2, $order + 1]
+                        "INSERT INTO `match` (competition_id, group_id, team1_id, team2_id, match_order, round_no) VALUES (?,?,?,?,?,?)",
+                        [$cid, $gid, $mm['p1'], $mm['p2'], $order + 1, $mm['round']]
                     );
                 }
             } elseif ($is_doubles) {
@@ -996,11 +1028,11 @@ function draw_groups(array $p): void {
                     db_fetchall("SELECT double_id FROM group_double WHERE group_id=?", [$gid]),
                     'double_id'
                 );
-                $pairs = round_robin_schedule($pids);
-                foreach ($pairs as $order => [$d1, $d2]) {
+                $sched = round_robin_schedule_rounds($pids);
+                foreach ($sched['matches'] as $order => $mm) {
                     db_execute(
-                        "INSERT INTO `match` (competition_id, group_id, double1_id, double2_id, match_order) VALUES (?,?,?,?,?)",
-                        [$cid, $gid, $d1, $d2, $order + 1]
+                        "INSERT INTO `match` (competition_id, group_id, double1_id, double2_id, match_order, round_no) VALUES (?,?,?,?,?,?)",
+                        [$cid, $gid, $mm['p1'], $mm['p2'], $order + 1, $mm['round']]
                     );
                 }
             } else {
@@ -1008,11 +1040,11 @@ function draw_groups(array $p): void {
                     db_fetchall("SELECT player_id FROM group_player WHERE group_id=?", [$gid]),
                     'player_id'
                 );
-                $pairs = round_robin_schedule($pids);
-                foreach ($pairs as $order => [$p1, $p2]) {
+                $sched = round_robin_schedule_rounds($pids);
+                foreach ($sched['matches'] as $order => $mm) {
                     db_execute(
-                        "INSERT INTO `match` (competition_id, group_id, player1_id, player2_id, match_order) VALUES (?,?,?,?,?)",
-                        [$cid, $gid, $p1, $p2, $order + 1]
+                        "INSERT INTO `match` (competition_id, group_id, player1_id, player2_id, match_order, round_no) VALUES (?,?,?,?,?,?)",
+                        [$cid, $gid, $mm['p1'], $mm['p2'], $order + 1, $mm['round']]
                     );
                 }
             }
@@ -1024,6 +1056,7 @@ function draw_groups(array $p): void {
         flash('danger', 'Fehler beim Auslosen der Gruppen.');
         redirect('competition/' . $cid); return;
     }
+    assign_courts($cid);
     flash('success', 'Gruppen wurden ausgelost!');
     redirect('competition/' . $cid);
 }
@@ -1128,6 +1161,7 @@ function draw_ko(array $p): void {
     }
 
     _build_ko_bracket($cid, $bracket, (bool)$c['third_place'], $is_doubles, $is_team);
+    assign_courts($cid);
     flash('success', 'KO-Bracket wurde ausgelost!');
     redirect('competition/' . $cid);
 }
@@ -1183,6 +1217,7 @@ function draw_ko_direct(array $p): void {
     if ($c['mode'] === 'double_ko') {
         require_once __DIR__ . '/../lib/double_ko_bracket.php';
         draw_double_ko($cid, $participants, $is_doubles, $is_team);
+        assign_courts($cid);
         flash('success', 'Doppel-KO-Bracket wurde ausgelost!');
         redirect('competition/' . $cid);
         return;
@@ -1204,6 +1239,7 @@ function draw_ko_direct(array $p): void {
     }
 
     _build_ko_bracket($cid, $bracket, (bool)$c['third_place'], $is_doubles, $is_team);
+    assign_courts($cid);
     flash('success', 'KO-Bracket wurde ausgelost!');
     redirect('competition/' . $cid);
 }
@@ -1304,11 +1340,11 @@ function groups_reorder(array $p): void {
                     db_fetchall("SELECT team_id FROM group_team WHERE group_id=?", [$gid]),
                     'team_id'
                 );
-                $pairs = round_robin_schedule($ids_arr);
-                foreach ($pairs as $order => [$t1, $t2]) {
+                $sched = round_robin_schedule_rounds($ids_arr);
+                foreach ($sched['matches'] as $order => $mm) {
                     db_execute(
-                        "INSERT INTO `match` (competition_id, group_id, team1_id, team2_id, match_order) VALUES (?,?,?,?,?)",
-                        [$cid, $gid, $t1, $t2, $order + 1]
+                        "INSERT INTO `match` (competition_id, group_id, team1_id, team2_id, match_order, round_no) VALUES (?,?,?,?,?,?)",
+                        [$cid, $gid, $mm['p1'], $mm['p2'], $order + 1, $mm['round']]
                     );
                 }
             } elseif ($is_doubles) {
@@ -1316,11 +1352,11 @@ function groups_reorder(array $p): void {
                     db_fetchall("SELECT double_id FROM group_double WHERE group_id=?", [$gid]),
                     'double_id'
                 );
-                $pairs = round_robin_schedule($ids_arr);
-                foreach ($pairs as $order => [$d1, $d2]) {
+                $sched = round_robin_schedule_rounds($ids_arr);
+                foreach ($sched['matches'] as $order => $mm) {
                     db_execute(
-                        "INSERT INTO `match` (competition_id, group_id, double1_id, double2_id, match_order) VALUES (?,?,?,?,?)",
-                        [$cid, $gid, $d1, $d2, $order + 1]
+                        "INSERT INTO `match` (competition_id, group_id, double1_id, double2_id, match_order, round_no) VALUES (?,?,?,?,?,?)",
+                        [$cid, $gid, $mm['p1'], $mm['p2'], $order + 1, $mm['round']]
                     );
                 }
             } else {
@@ -1328,11 +1364,11 @@ function groups_reorder(array $p): void {
                     db_fetchall("SELECT player_id FROM group_player WHERE group_id=?", [$gid]),
                     'player_id'
                 );
-                $pairs = round_robin_schedule($ids_arr);
-                foreach ($pairs as $order => [$p1, $p2]) {
+                $sched = round_robin_schedule_rounds($ids_arr);
+                foreach ($sched['matches'] as $order => $mm) {
                     db_execute(
-                        "INSERT INTO `match` (competition_id, group_id, player1_id, player2_id, match_order) VALUES (?,?,?,?,?)",
-                        [$cid, $gid, $p1, $p2, $order + 1]
+                        "INSERT INTO `match` (competition_id, group_id, player1_id, player2_id, match_order, round_no) VALUES (?,?,?,?,?,?)",
+                        [$cid, $gid, $mm['p1'], $mm['p2'], $order + 1, $mm['round']]
                     );
                 }
             }
@@ -1343,6 +1379,7 @@ function groups_reorder(array $p): void {
         flash('danger', 'Fehler beim Umstellen der Gruppen.');
         redirect('competition/' . $cid); return;
     }
+    assign_courts($cid);
     flash('success', 'Gruppen neu eingeteilt.');
     redirect('competition/' . $cid);
 }
