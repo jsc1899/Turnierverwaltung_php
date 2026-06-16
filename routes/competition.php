@@ -6,6 +6,30 @@ require_once __DIR__ . '/../lib/courts.php';
 
 // _maybe_set_done() is defined in lib/ko_bracket.php (required above)
 
+// Liest die Kreuz/Getrennt-Konfiguration (Modus groups_cross) aus dem Formular:
+// pro Tier (= ceil(group_size/2)) 'x' (Kreuz, Default) oder 's' (getrennt), als CSV.
+function _cross_config_from_post(int $group_size): string {
+    $tiers = max(1, (int)ceil($group_size / 2));
+    $in    = (array)($_POST['cross_config'] ?? []);
+    $in    = array_values($in);
+    $parts = [];
+    for ($i = 0; $i < $tiers; $i++) $parts[] = (($in[$i] ?? 'x') === 's') ? 's' : 'x';
+    return implode(',', $parts);
+}
+
+// Leitet aus dem Formular (mode + finalrunde + advance_count) den gespeicherten Modus und die
+// Aufsteigerzahl ab. UI-Mode 'groups_ko' + finalrunde 'cross' → Modus 'groups_cross'.
+// Rückgabe: [string $mode, int $advance_count].
+function _resolve_finalrunde(): array {
+    $ui = post('mode', 'groups_ko');
+    if (in_array($ui, ['ko_only', 'double_ko'], true)) return [$ui, 0];
+    // Gruppenphase
+    $fr = post('finalrunde', 'none');
+    if ($fr === 'cross' || $ui === 'groups_cross') return ['groups_cross', 0];
+    if ($fr === 'ko') return ['groups_ko', max(1, min(2, (int)post('advance_count', 1)))];
+    return ['groups_ko', 0];
+}
+
 function _get_player_skill(int $pid, string $sport): float {
     return player_sport_skill($pid, $sport);
 }
@@ -16,8 +40,7 @@ function new_competition(array $p): void {
     require_tournament_open((int)$p['tid']);
     $name          = trim(post('name'));
     $group_size    = max(3, min(10, (int)post('group_size', 4)));
-    $advance_count = max(0, min(2, (int)post('advance_count', 1)));
-    $mode          = in_array(post('mode'), ['groups_ko', 'ko_only', 'double_ko']) ? post('mode') : 'groups_ko';
+    [$mode, $advance_count] = _resolve_finalrunde();
     $comp_type          = post('comp_type', 'single');
     $is_team            = $comp_type === 'team'    ? 1 : 0;
     $is_doubles         = $comp_type === 'doubles' ? 1 : 0;
@@ -31,6 +54,8 @@ function new_competition(array $p): void {
     $score_mode         = in_array(post('score_mode'), ['sets', 'sets_grp']) ? post('score_mode') : 'match';
     $show_byes          = post('show_byes') ? 1 : 0;
     $num_courts         = max(0, min(20, (int)post('num_courts', 0)));
+    $team_result_mode   = post('team_result_mode') === 'sum' ? 'sum' : 'wins';
+    $cross_config       = _cross_config_from_post($group_size);
 
     if (!$name) {
         flash('danger', 'Name erforderlich.');
@@ -40,10 +65,10 @@ function new_competition(array $p): void {
     db_insert(
         "INSERT INTO competition
          (tournament_id, name, group_size, advance_count, mode, is_doubles, is_team,
-          third_place, show_seeding, show_skill, registrations_open, max_players, seeding_order, team_size, score_mode, show_byes, num_courts)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+          third_place, show_seeding, show_skill, registrations_open, max_players, seeding_order, team_size, score_mode, show_byes, num_courts, team_result_mode, cross_config)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         [$p['tid'], $name, $group_size, $advance_count, $mode, $is_doubles, $is_team,
-         $third_place, $show_seeding, $show_skill, $registrations_open, $max_players, $seeding_order, $team_size, $score_mode, $show_byes, $num_courts]
+         $third_place, $show_seeding, $show_skill, $registrations_open, $max_players, $seeding_order, $team_size, $score_mode, $show_byes, $num_courts, $team_result_mode, $cross_config]
     );
     redirect('tournament/' . $p['tid']);
 }
@@ -298,6 +323,7 @@ function show(array $p): void {
     $dko_wb            = [];
     $dko_lb            = [];
     $dko_gf            = null;
+    $cross_blocks      = [];
 
     if (in_array($c['phase'], ['ko', 'done'], true)) {
         if ($c['mode'] === 'double_ko') {
@@ -385,6 +411,64 @@ function show(array $p): void {
                         ['rank'=>2,'name'=>$dko_gf['p1name'],'club'=>$dko_gf['p1club']],
                     ];
                 }
+            }
+        } elseif ($c['mode'] === 'groups_cross') {
+            require_once __DIR__ . '/../lib/placement_bracket.php';
+            if ($is_team) {
+                $cm = db_fetchall(
+                    "SELECT m.*, COALESCE(t1.name,'') as p1name, COALESCE(t2.name,'') as p2name, '' as p1club, '' as p2club
+                     FROM `match` m LEFT JOIN `team` t1 ON t1.id=m.team1_id LEFT JOIN `team` t2 ON t2.id=m.team2_id
+                     WHERE m.competition_id=? AND m.group_id IS NULL AND m.bracket LIKE 'C%'
+                     ORDER BY m.bracket, m.ko_round, m.ko_position", [$cid]);
+                $cm = array_map(function($m){ $m['player1_id']=$m['team1_id']; $m['player2_id']=$m['team2_id']; return $m; }, $cm);
+            } elseif ($is_doubles) {
+                $cm = db_fetchall(
+                    "SELECT m.*, COALESCE(CONCAT(dp1a.name,' / ',dp1b.name),'') as p1name,
+                     COALESCE(CONCAT(dp2a.name,' / ',dp2b.name),'') as p2name, '' as p1club, '' as p2club
+                     FROM `match` m
+                     LEFT JOIN `double` d1 ON d1.id=m.double1_id LEFT JOIN `double` d2 ON d2.id=m.double2_id
+                     LEFT JOIN player dp1a ON dp1a.id=d1.player1_id LEFT JOIN player dp1b ON dp1b.id=d1.player2_id
+                     LEFT JOIN player dp2a ON dp2a.id=d2.player1_id LEFT JOIN player dp2b ON dp2b.id=d2.player2_id
+                     WHERE m.competition_id=? AND m.group_id IS NULL AND m.bracket LIKE 'C%'
+                     ORDER BY m.bracket, m.ko_round, m.ko_position", [$cid]);
+                $cm = array_map(function($m){ $m['player1_id']=$m['double1_id']; $m['player2_id']=$m['double2_id']; return $m; }, $cm);
+            } else {
+                $cm = db_fetchall(
+                    "SELECT m.*, TRIM(CONCAT(p1.name, IF(COALESCE(p1.firstname,'')!='',CONCAT(' ',p1.firstname),''))) as p1name,
+                     TRIM(CONCAT(p2.name, IF(COALESCE(p2.firstname,'')!='',CONCAT(' ',p2.firstname),''))) as p2name,
+                     p1.club as p1club, p2.club as p2club
+                     FROM `match` m LEFT JOIN player p1 ON p1.id=m.player1_id LEFT JOIN player p2 ON p2.id=m.player2_id
+                     WHERE m.competition_id=? AND m.group_id IS NULL AND m.bracket LIKE 'C%'
+                     ORDER BY m.bracket, m.ko_round, m.ko_position", [$cid]);
+            }
+            $byblock = [];
+            foreach ($cm as $m) { $byblock[$m['bracket']][] = $m; }
+            foreach ($byblock as $tag => $ms) {
+                $r1 = array_values(array_filter($ms, fn($x) => (int)$x['ko_round'] === 1));
+                $S  = 2 * count($r1);
+                $blockLo = $r1 ? (int)$r1[0]['place_lo'] : 1;
+                $real = 0;
+                foreach ($r1 as $x) { if (!empty($x['player1_id'])) $real++; if (!empty($x['player2_id'])) $real++; }
+                $hi = $blockLo + max(1, $real) - 1;
+                $label = $real > 1 ? "Plätze {$blockLo}–{$hi}" : "Platz {$blockLo}";
+                $rounds = [];
+                foreach ($ms as $m) {
+                    $r  = (int)$m['ko_round'];
+                    $ps = $S > 0 ? ($S >> ($r - 1)) : 2;
+                    $lo = (int)$m['place_lo']; $ph = $lo + $ps - 1;
+                    $m['place_label'] = $ps <= 2 ? "Pl. {$lo}/{$ph}" : "Pl. {$lo}–{$ph}";
+                    $rounds[$r]['matches'][] = $m;
+                }
+                ksort($rounds);
+                $cross_blocks[] = ['tag' => $tag, 'label' => $label, 'rounds' => array_values($rounds)];
+            }
+            $nameById = [];
+            foreach ($cm as $m) {
+                if (!empty($m['player1_id'])) $nameById[(int)$m['player1_id']] = ['name' => $m['p1name'], 'club' => $m['p1club'] ?? ''];
+                if (!empty($m['player2_id'])) $nameById[(int)$m['player2_id']] = ['name' => $m['p2name'], 'club' => $m['p2club'] ?? ''];
+            }
+            foreach (placement_final_places($cid) as $place => $pid) {
+                $places[] = ['rank' => $place, 'name' => $nameById[$pid]['name'] ?? '?', 'club' => $nameById[$pid]['club'] ?? ''];
             }
         } else {
             if ($is_team) {
@@ -497,7 +581,9 @@ function show(array $p): void {
         }
     }
 
-    if ((int)$c['advance_count'] === 0 && (int)$unplayed_group === 0 && $groups) {
+    // Endplatzierung aus den Gruppentabellen nur bei reiner Gruppenphase (kein Finale).
+    // Bei Kreuzspielen (advance_count=0, aber Platzierungsrunde folgt) NICHT vorab anzeigen.
+    if ((int)$c['advance_count'] === 0 && $c['mode'] !== 'groups_cross' && (int)$unplayed_group === 0 && $groups) {
         $all_rows = [];
         foreach ($groups as $gi) {
             $all_rows = array_merge($all_rows, $gi['standings']);
@@ -600,6 +686,7 @@ function show(array $p): void {
         'dko_wb' => $dko_wb, 'dko_lb' => $dko_lb, 'dko_gf' => $dko_gf,
         'dko_cap' => $cap ?? 0, 'dko_lb_total' => $lb_total ?? 0,
         'ko_seedings' => $ko_seedings,
+        'cross_blocks' => $cross_blocks,
     ]);
 }
 
@@ -634,7 +721,7 @@ function settings(array $p): void {
 
     $name              = trim(post('name', ''));
     $group_size        = max(3, min(10, (int)post('group_size', 4)));
-    $advance_count     = max(0, min(2, (int)post('advance_count', 1)));
+    [$desired_mode, $advance_count] = _resolve_finalrunde();
     $third_place       = post('third_place') ? 1 : 0;
     $registrations_open = post('registrations_open') ? 1 : 0;
     $max_players       = max(0, (int)post('max_players', 0));
@@ -645,18 +732,23 @@ function settings(array $p): void {
     $score_mode        = in_array(post('score_mode'), ['sets', 'sets_grp']) ? post('score_mode') : 'match';
     $show_byes         = post('show_byes') ? 1 : 0;
     $num_courts        = max(0, min(20, (int)post('num_courts', 0)));
+    $team_result_mode  = post('team_result_mode') === 'sum' ? 'sum' : 'wins';
+    $cross_config      = _cross_config_from_post($group_size);
 
     $c = db_fetch("SELECT phase, mode, is_doubles, is_team FROM competition WHERE id=?", [$cid]);
     if (!$c) { redirect('competition/' . $cid); return; }
     if ($name) db_execute("UPDATE competition SET name=? WHERE id=?", [$name, $cid]);
 
-    // Modus nur in Setup-Phase änderbar
-    if ($c['phase'] === 'setup') {
-        $new_mode = post('mode', '');
-        if (in_array($new_mode, ['groups_ko', 'ko_only', 'double_ko'], true)) {
-            db_execute("UPDATE competition SET mode=? WHERE id=?", [$new_mode, $cid]);
-            $c['mode'] = $new_mode;
-        }
+    // Modus (aus mode + finalrunde abgeleitet) speichern:
+    //  - in Setup-Phase: beliebiger Moduswechsel
+    //  - in Gruppenphase: nur Wechsel der Finalrunde (groups_ko ↔ groups_cross), solange die
+    //    Finalrunde noch nicht ausgelost ist (struktureller Wechsel zu KO/Doppel-KO bleibt gesperrt).
+    $des_ok  = in_array($desired_mode, ['groups_ko', 'groups_cross', 'ko_only', 'double_ko'], true);
+    $cur_grp = in_array($c['mode'],     ['groups_ko', 'groups_cross'], true);
+    $des_grp = in_array($desired_mode,  ['groups_ko', 'groups_cross'], true);
+    if ($des_ok && ($c['phase'] === 'setup' || ($c['phase'] === 'group' && $cur_grp && $des_grp))) {
+        db_execute("UPDATE competition SET mode=? WHERE id=?", [$desired_mode, $cid]);
+        $c['mode'] = $desired_mode;
     }
 
     // is_doubles / is_team nur ändern solange noch keine Teilnehmer eingetragen
@@ -679,14 +771,14 @@ function settings(array $p): void {
     }
 
     if (in_array($c['mode'], ['ko_only', 'double_ko'], true)) {
-        db_execute("UPDATE competition SET third_place=?, registrations_open=?, max_players=?, show_seeding=?, show_skill=?, seeding_order=?, team_size=?, score_mode=?, num_courts=? WHERE id=?",
-            [$third_place, $registrations_open, $max_players, $show_seeding, $show_skill, $seeding_order, $team_size, $score_mode, $num_courts, $cid]);
+        db_execute("UPDATE competition SET third_place=?, registrations_open=?, max_players=?, show_seeding=?, show_skill=?, seeding_order=?, team_size=?, score_mode=?, num_courts=?, team_result_mode=? WHERE id=?",
+            [$third_place, $registrations_open, $max_players, $show_seeding, $show_skill, $seeding_order, $team_size, $score_mode, $num_courts, $team_result_mode, $cid]);
     } elseif ($c && $c['phase'] === 'setup') {
-        db_execute("UPDATE competition SET group_size=?, advance_count=?, third_place=?, registrations_open=?, max_players=?, show_skill=?, seeding_order=?, team_size=?, score_mode=?, show_byes=?, num_courts=? WHERE id=?",
-            [$group_size, $advance_count, $third_place, $registrations_open, $max_players, $show_skill, $seeding_order, $team_size, $score_mode, $show_byes, $num_courts, $cid]);
+        db_execute("UPDATE competition SET group_size=?, advance_count=?, third_place=?, registrations_open=?, max_players=?, show_skill=?, seeding_order=?, team_size=?, score_mode=?, show_byes=?, num_courts=?, team_result_mode=?, cross_config=? WHERE id=?",
+            [$group_size, $advance_count, $third_place, $registrations_open, $max_players, $show_skill, $seeding_order, $team_size, $score_mode, $show_byes, $num_courts, $team_result_mode, $cross_config, $cid]);
     } else {
-        db_execute("UPDATE competition SET advance_count=?, third_place=?, registrations_open=?, max_players=?, show_skill=?, seeding_order=?, team_size=?, score_mode=?, show_byes=?, num_courts=? WHERE id=?",
-            [$advance_count, $third_place, $registrations_open, $max_players, $show_skill, $seeding_order, $team_size, $score_mode, $show_byes, $num_courts, $cid]);
+        db_execute("UPDATE competition SET advance_count=?, third_place=?, registrations_open=?, max_players=?, show_skill=?, seeding_order=?, team_size=?, score_mode=?, show_byes=?, num_courts=?, team_result_mode=?, cross_config=? WHERE id=?",
+            [$advance_count, $third_place, $registrations_open, $max_players, $show_skill, $seeding_order, $team_size, $score_mode, $show_byes, $num_courts, $team_result_mode, $cross_config, $cid]);
     }
     assign_courts($cid);
     flash('success', 'Einstellungen gespeichert.');
@@ -1058,6 +1150,41 @@ function draw_groups(array $p): void {
     }
     assign_courts($cid);
     flash('success', 'Gruppen wurden ausgelost!');
+    redirect('competition/' . $cid);
+}
+
+// Modus groups_cross: nach der Gruppenphase vollständige Platzierungs-Brackets auslosen.
+function draw_cross(array $p): void {
+    require_edit();
+    csrf_verify();
+    $cid = (int)$p['id'];
+    require_competition_open($cid);
+    $c = db_fetch("SELECT * FROM competition WHERE id=?", [$cid]);
+    if (!$c || $c['mode'] !== 'groups_cross') { redirect('competition/' . $cid); return; }
+    $is_team    = !empty($c['is_team']);
+    $is_doubles = !$is_team && !empty($c['is_doubles']);
+
+    $unplayed = (int)db_fetch(
+        "SELECT COUNT(*) as n FROM `match` WHERE competition_id=? AND group_id IS NOT NULL AND played=0",
+        [$cid]
+    )['n'];
+    if ($unplayed > 0) {
+        flash('warning', "Noch $unplayed Gruppenspiele offen!");
+        redirect('competition/' . $cid);
+        return;
+    }
+
+    require_once __DIR__ . '/../lib/placement_bracket.php';
+    $flags  = $c['cross_config'] !== '' ? explode(',', $c['cross_config']) : [];
+    $blocks = build_placement_blocks($cid, $is_team, $is_doubles, $c['seeding_order'] ?? 'desc', $flags);
+    if (array_sum(array_column($blocks, 'count')) < 2) {
+        flash('danger', 'Nicht genug Teilnehmer für Kreuzspiele.');
+        redirect('competition/' . $cid);
+        return;
+    }
+    draw_placement($cid, $blocks, $is_doubles, $is_team);
+    assign_courts($cid);
+    flash('success', 'Kreuzspiele wurden ausgelost!');
     redirect('competition/' . $cid);
 }
 

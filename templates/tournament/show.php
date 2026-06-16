@@ -153,15 +153,17 @@ $nennung_badge = $pending_count + $change_count;
               <i class="bi bi-<?= $picon ?> me-1"></i><?= $ci['player_count'] ?><?= $c['max_players'] ? '/' . (int)$c['max_players'] : '' ?> <?= $plabel ?>
               &nbsp;·&nbsp;
               <?php if ($c['mode'] === 'ko_only'): ?>
-              KO-Runde
+              KO-Modus
               <?php elseif ($c['mode'] === 'double_ko'): ?>
-              Doppel-KO
+              Doppel-KO Modus
+              <?php elseif ($c['mode'] === 'groups_cross'): ?>
+              Gruppenphase à <?= $c['group_size'] ?> &nbsp;·&nbsp; Kreuzspiele
               <?php else: ?>
-              Gruppen à <?= $c['group_size'] ?>
+              Gruppenphase à <?= $c['group_size'] ?>
               &nbsp;·&nbsp;
-              <?php if ($c['advance_count'] == 0): ?>Nur Gruppen
-              <?php elseif ($c['advance_count'] == 1): ?>Top 1 → KO
-              <?php else: ?>Top 2 → KO<?php endif; ?>
+              <?php if ($c['advance_count'] == 0): ?>nur Gruppen
+              <?php elseif ($c['advance_count'] == 1): ?>KO (1 Aufsteiger)
+              <?php else: ?>KO (2 Aufsteiger)<?php endif; ?>
               <?php endif; ?>
             </div>
             <div class="d-flex align-items-center gap-2 mb-3">
@@ -347,17 +349,24 @@ $nennung_badge = $pending_count + $change_count;
               <label class="form-label">Spiele pro Team</label>
               <input type="number" name="team_size" class="form-control" value="0" min="0" max="20">
             </div>
+            <div class="col-sm-6" id="new-team-result-wrap" style="display:none">
+              <label class="form-label">Begegnungsergebnis</label>
+              <select name="team_result_mode" class="form-select">
+                <option value="wins" selected>Je Einzelsieg 1 Punkt</option>
+                <option value="sum">Einzelergebnisse aufsummieren</option>
+              </select>
+            </div>
             <div class="col-sm-6">
               <label class="form-label">Spielmodus</label>
               <select name="mode" class="form-select" id="comp-mode-select" onchange="toggleGroupSettings()">
-                <option value="groups_ko" selected>Gruppenphase + KO</option>
-                <option value="ko_only">Nur KO</option>
-                <option value="double_ko">Doppel-KO (mit Loser-Bracket)</option>
+                <option value="groups_ko" selected>Gruppenphase</option>
+                <option value="ko_only">KO-Modus</option>
+                <option value="double_ko">Doppel-KO Modus</option>
               </select>
             </div>
             <div class="col-sm-3" id="new-group-size-wrap">
               <label class="form-label">Gruppengröße</label>
-              <select name="group_size" class="form-select">
+              <select name="group_size" class="form-select" onchange="newToggleCross()">
                 <option value="3">3 Teilnehmer</option>
                 <option value="4" selected>4 Teilnehmer</option>
                 <option value="5">5 Teilnehmer</option>
@@ -368,19 +377,40 @@ $nennung_badge = $pending_count + $change_count;
                 <option value="10">10 Teilnehmer</option>
               </select>
             </div>
+            <div class="col-12" id="new-cross-wrap" style="display:none">
+              <label class="form-label">Kreuzspiele – Paarungen je Rang</label>
+              <div class="d-flex flex-wrap gap-3">
+                <?php for ($t = 1; $t <= 5; $t++): ?>
+                <div class="new-cross-tier" data-tier="<?= $t ?>">
+                  <div class="small text-muted mb-1">Rang <?= 2*$t-1 ?>+<?= 2*$t ?></div>
+                  <select name="cross_config[]" class="form-select form-select-sm" style="width:auto">
+                    <option value="x">über Kreuz</option>
+                    <option value="s">getrennt</option>
+                  </select>
+                </div>
+                <?php endfor; ?>
+              </div>
+            </div>
             <div class="col-sm-3 d-flex align-items-end pb-1" id="new-byes-wrap">
               <div class="form-check">
                 <input class="form-check-input" type="checkbox" name="show_byes" id="new_show_byes">
                 <label class="form-check-label" for="new_show_byes">Spielrunden anzeigen</label>
               </div>
             </div>
+            <div class="col-sm-3" id="new-finalrunde-wrap">
+              <label class="form-label">Finalrunde</label>
+              <select name="finalrunde" id="new-finalrunde" class="form-select"
+                      onchange="newToggleCross(); newToggleThirdPlace();">
+                <option value="none">nur Gruppenphase</option>
+                <option value="ko" selected>KO-Runde</option>
+                <option value="cross">Kreuzspiele</option>
+              </select>
+            </div>
             <div class="col-sm-3" id="new-advance-wrap">
-              <label class="form-label">KO-Aufstieg</label>
-              <select name="advance_count" id="new-advance-count" class="form-select"
-                      onchange="newToggleThirdPlace()">
-                <option value="0">Nur Gruppenphase</option>
-                <option value="1">Gruppenerste → KO</option>
-                <option value="2" selected>Erste &amp; Zweite → KO</option>
+              <label class="form-label">Aufsteiger</label>
+              <select name="advance_count" id="new-advance-count" class="form-select">
+                <option value="1" selected>1 (Gruppenerste)</option>
+                <option value="2">2 (Erste &amp; Zweite)</option>
               </select>
             </div>
             <div class="col-sm-6 d-flex align-items-end pb-1" id="new-third-place-wrap">
@@ -402,7 +432,7 @@ $nennung_badge = $pending_count + $change_count;
                 <label class="form-check-label" for="new_show_skill">Spielstärke anzeigen (Gruppe)</label>
               </div>
             </div>
-            <div class="col-sm-3 d-flex align-items-end pb-1">
+            <div class="col-sm-3 d-flex align-items-end pb-1" id="new-show-seeding-wrap" style="display:none">
               <div class="form-check">
                 <input class="form-check-input" type="checkbox" name="show_seeding" id="new_show_seeding" checked>
                 <label class="form-check-label" for="new_show_seeding">Setzungen anzeigen (KO)</label>
@@ -499,29 +529,54 @@ function openImageModal(src) {
 }
 function toggleTeamSize() {
   var sel  = document.getElementById('new-comp-type-select');
-  var wrap = document.getElementById('new-team-size-wrap');
-  if (wrap) wrap.style.display = (sel && sel.value === 'team') ? '' : 'none';
+  var show = (sel && sel.value === 'team');
+  ['new-team-size-wrap', 'new-team-result-wrap'].forEach(function(id) {
+    var wrap = document.getElementById(id);
+    if (wrap) wrap.style.display = show ? '' : 'none';
+  });
 }
 function toggleGroupSettings() {
   var sel  = document.getElementById('comp-mode-select');
   var mode = sel ? sel.value : 'groups_ko';
-  var isKo = (mode === 'ko_only' || mode === 'double_ko');
-  var gsWrap  = document.getElementById('new-group-size-wrap');
-  var advWrap = document.getElementById('new-advance-wrap');
-  var byWrap  = document.getElementById('new-byes-wrap');
-  if (gsWrap)  gsWrap.style.display  = isKo ? 'none' : '';
-  if (advWrap) advWrap.style.display = isKo ? 'none' : '';
-  if (byWrap)  byWrap.style.display  = isKo ? 'none' : '';
+  var isGroups = (mode === 'groups_ko');
+  // Gruppen-bezogene Felder (Größe, Spielrunden, Finalrunde) nur im Gruppenphase-Modus
+  ['new-group-size-wrap', 'new-byes-wrap', 'new-finalrunde-wrap'].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.style.display = isGroups ? '' : 'none';
+  });
+  // Setzungen anzeigen (KO) nur im KO-/Doppel-KO-Modus
+  var ss = document.getElementById('new-show-seeding-wrap');
+  if (ss) ss.style.display = (mode === 'ko_only' || mode === 'double_ko') ? '' : 'none';
+  newToggleCross();
   newToggleThirdPlace();
 }
+function newToggleCross() {
+  var sel = document.getElementById('comp-mode-select');
+  var fr  = document.getElementById('new-finalrunde');
+  var isGroups = sel && sel.value === 'groups_ko';
+  var frVal = fr ? fr.value : 'ko';
+  // Aufsteiger-Feld nur bei Finalrunde = KO-Runde
+  var adv = document.getElementById('new-advance-wrap');
+  if (adv) adv.style.display = (isGroups && frVal === 'ko') ? '' : 'none';
+  // Kreuz-Konfig nur bei Finalrunde = Kreuzspiele
+  var wrap = document.getElementById('new-cross-wrap');
+  if (wrap) {
+    wrap.style.display = (isGroups && frVal === 'cross') ? '' : 'none';
+    var gsSel = document.querySelector('#new-group-size-wrap select');
+    var gs = gsSel ? parseInt(gsSel.value, 10) : 4;
+    var ntiers = Math.ceil(gs / 2);
+    document.querySelectorAll('.new-cross-tier').forEach(function(el) {
+      el.style.display = (parseInt(el.dataset.tier, 10) <= ntiers) ? '' : 'none';
+    });
+  }
+}
 function newToggleThirdPlace() {
-  var sel    = document.getElementById('comp-mode-select');
-  var adv    = document.getElementById('new-advance-count');
-  var wrap   = document.getElementById('new-third-place-wrap');
+  var sel  = document.getElementById('comp-mode-select');
+  var fr   = document.getElementById('new-finalrunde');
+  var wrap = document.getElementById('new-third-place-wrap');
   if (!wrap) return;
-  var mode   = sel  ? sel.value  : 'groups_ko';
-  var advVal = adv  ? adv.value  : '2';
-  var show   = (mode === 'ko_only' || mode === 'double_ko') || advVal !== '0';
+  var mode  = sel ? sel.value : 'groups_ko';
+  var frVal = fr  ? fr.value  : 'ko';
+  var show  = (mode === 'ko_only' || mode === 'double_ko') || (mode === 'groups_ko' && frVal === 'ko');
   wrap.style.display = show ? '' : 'none';
 }
 function setSport(btn) {

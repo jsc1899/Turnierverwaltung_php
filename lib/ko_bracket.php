@@ -204,7 +204,7 @@ function draw_ko_bracket(int $cid, array $seedings, bool $third_place): void {
 }
 
 function _maybe_set_done(int $cid): void {
-    $c = db_fetch("SELECT phase, advance_count FROM competition WHERE id=?", [$cid]);
+    $c = db_fetch("SELECT phase, advance_count, mode FROM competition WHERE id=?", [$cid]);
     if (!$c || !in_array($c['phase'], ['group', 'ko'], true)) return;
     if ($c['phase'] === 'ko') {
         $final = db_fetch(
@@ -213,6 +213,9 @@ function _maybe_set_done(int $cid): void {
         );
         if ($final) db_execute("UPDATE competition SET phase='done' WHERE id=?", [$cid]);
     } elseif ($c['phase'] === 'group') {
+        // Im Kreuzspiele-Modus folgt nach der Gruppenphase noch die Platzierungsrunde — daher
+        // NICHT automatisch beenden, obwohl advance_count=0 ist.
+        if ($c['mode'] === 'groups_cross') return;
         $unplayed = db_fetch(
             "SELECT COUNT(*) as n FROM `match` WHERE competition_id=? AND played=0", [$cid]
         )['n'];

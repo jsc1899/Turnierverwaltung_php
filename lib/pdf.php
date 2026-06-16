@@ -169,7 +169,8 @@ function generate_groups_pdf(int $cid, ?int $gid = null): void {
     $team_size  = (int)($c['team_size'] ?? 0);
     $score_mode = $c['score_mode'] ?? 'match';
     $sets_mode_active = in_array($score_mode, ['sets', 'sets_grp']);
-    $show_einzel = ($is_team && $team_size >= 2) || $sets_mode_active;
+    $team_sum_mode = $is_team && ($c['team_result_mode'] ?? 'wins') === 'sum';
+    $show_einzel = ($is_team && $team_size >= 2 && !$team_sum_mode) || $sets_mode_active;
     $grp_score_mode = $sets_mode_active ? 'sets' : 'match';
     $col_v   = $sets_mode_active ? 'V (Sätze)'    : 'V';
     $col_pm  = $sets_mode_active ? '+/- (Sätze)'  : '+/-';
@@ -648,6 +649,98 @@ function _generate_dko_bracket_pdf(array $c, ?array $t): void {
     exit;
 }
 
+// ── Kreuzspiele / Platzierungs-Brackets (Modus groups_cross) ──────────────────
+
+function generate_cross_pdf(int $cid): void {
+    require_once __DIR__ . '/placement_bracket.php';
+    $c = db_fetch("SELECT * FROM competition WHERE id=?", [$cid]);
+    if (!$c) { http_response_code(404); exit; }
+    $t = db_fetch("SELECT name FROM tournament WHERE id=?", [$c['tournament_id']]);
+    $is_team    = !empty($c['is_team']);
+    $is_doubles = !$is_team && !empty($c['is_doubles']);
+
+    if ($is_team) {
+        $cm = db_fetchall("SELECT m.*, COALESCE(t1.name,'') p1name, COALESCE(t2.name,'') p2name
+            FROM `match` m LEFT JOIN `team` t1 ON t1.id=m.team1_id LEFT JOIN `team` t2 ON t2.id=m.team2_id
+            WHERE m.competition_id=? AND m.group_id IS NULL AND m.bracket LIKE 'C%'
+            ORDER BY m.bracket, m.ko_round, m.ko_position", [$cid]);
+        $cm = array_map(fn($m) => $m + ['p1id' => $m['team1_id'], 'p2id' => $m['team2_id']], $cm);
+    } elseif ($is_doubles) {
+        $cm = db_fetchall("SELECT m.*, COALESCE(CONCAT(dp1a.name,' / ',dp1b.name),'') p1name,
+            COALESCE(CONCAT(dp2a.name,' / ',dp2b.name),'') p2name
+            FROM `match` m LEFT JOIN `double` d1 ON d1.id=m.double1_id LEFT JOIN `double` d2 ON d2.id=m.double2_id
+            LEFT JOIN player dp1a ON dp1a.id=d1.player1_id LEFT JOIN player dp1b ON dp1b.id=d1.player2_id
+            LEFT JOIN player dp2a ON dp2a.id=d2.player1_id LEFT JOIN player dp2b ON dp2b.id=d2.player2_id
+            WHERE m.competition_id=? AND m.group_id IS NULL AND m.bracket LIKE 'C%'
+            ORDER BY m.bracket, m.ko_round, m.ko_position", [$cid]);
+        $cm = array_map(fn($m) => $m + ['p1id' => $m['double1_id'], 'p2id' => $m['double2_id']], $cm);
+    } else {
+        $cm = db_fetchall("SELECT m.*,
+            TRIM(CONCAT(p1.name, IF(COALESCE(p1.firstname,'')!='',CONCAT(' ',p1.firstname),''))) p1name,
+            TRIM(CONCAT(p2.name, IF(COALESCE(p2.firstname,'')!='',CONCAT(' ',p2.firstname),''))) p2name
+            FROM `match` m LEFT JOIN player p1 ON p1.id=m.player1_id LEFT JOIN player p2 ON p2.id=m.player2_id
+            WHERE m.competition_id=? AND m.group_id IS NULL AND m.bracket LIKE 'C%'
+            ORDER BY m.bracket, m.ko_round, m.ko_position", [$cid]);
+        $cm = array_map(fn($m) => $m + ['p1id' => $m['player1_id'], 'p2id' => $m['player2_id']], $cm);
+    }
+
+    $byblock = []; $nameById = [];
+    foreach ($cm as $m) {
+        $byblock[$m['bracket']][] = $m;
+        if (!empty($m['p1id'])) $nameById[(int)$m['p1id']] = $m['p1name'];
+        if (!empty($m['p2id'])) $nameById[(int)$m['p2id']] = $m['p2name'];
+    }
+
+    $html  = pdf_css();
+    $html .= '<h2 style="margin-top:0">' . e($c['name']) . ' — Kreuzspiele / Platzierungen</h2>';
+    if ($t) $html .= '<div class="meta">' . e($t['name']) . '</div>';
+
+    // Endplatzierung
+    $finals = placement_final_places($cid);
+    if ($finals) {
+        $html .= '<h3>Endplatzierung</h3><table><tr><th style="width:14mm">Platz</th><th>Teilnehmer</th></tr>';
+        foreach ($finals as $place => $pid) {
+            $html .= '<tr><td style="text-align:center">' . (int)$place . '</td><td>' . e($nameById[(int)$pid] ?? '?') . '</td></tr>';
+        }
+        $html .= '</table>';
+    }
+
+    foreach ($byblock as $tag => $ms) {
+        $S = 2 * count(array_filter($ms, fn($x) => (int)$x['ko_round'] === 1));
+        if ($S < 2) continue;
+        $r1 = array_values(array_filter($ms, fn($x) => (int)$x['ko_round'] === 1));
+        $blockLo = (int)$r1[0]['place_lo'];
+        $real = 0; foreach ($r1 as $x) { if (!empty($x['p1id'])) $real++; if (!empty($x['p2id'])) $real++; }
+        $hi = $blockLo + max(1, $real) - 1;
+        $html .= '<h3 style="page-break-before:always">' . ($real > 1 ? "Plätze {$blockLo}–{$hi}" : "Platz {$blockLo}") . '</h3>';
+
+        $rounds = [];
+        foreach ($ms as $m) { $rounds[(int)$m['ko_round']][] = $m; }
+        ksort($rounds);
+        foreach ($rounds as $r => $rms) {
+            $ps = $S >> ($r - 1);
+            $html .= '<h4 style="font-size:9pt;color:#374151;margin:3mm 0 1mm">Runde ' . (int)$r . '</h4>';
+            $html .= '<table style="font-size:9pt"><tr><th style="width:22mm">Plätze</th><th style="width:40%;text-align:right">Teilnehmer 1</th><th style="width:16mm;text-align:center">Erg.</th><th>Teilnehmer 2</th></tr>';
+            foreach ($rms as $m) {
+                $h1 = !empty($m['p1id']); $h2 = !empty($m['p2id']);
+                if (!$h1 && !$h2) continue;
+                $lo = (int)$m['place_lo']; $ph = $lo + $ps - 1;
+                $rng = $ps <= 2 ? "{$lo}/{$ph}" : "{$lo}–{$ph}";
+                $sc  = $m['played'] ? (int)$m['score1'] . ' : ' . (int)$m['score2'] : '— : —';
+                $n1  = $h1 ? e($m['p1name']) : '—';
+                $n2  = $h2 ? e($m['p2name']) : 'Freilos';
+                $html .= "<tr><td style='text-align:center'>$rng</td><td style='text-align:right'>$n1</td><td style='text-align:center'>$sc</td><td>$n2</td></tr>";
+            }
+            $html .= '</table>';
+        }
+    }
+
+    $pdf = mpdf();
+    $pdf->WriteHTML($html);
+    $pdf->Output('Platzierungen.pdf', \Mpdf\Output\Destination::INLINE);
+    exit;
+}
+
 // ── Match-Cards (zum Ausdrucken) ──────────────────────────────────────────────
 
 function generate_match_cards_pdf(int $cid, ?int $gid = null): void {
@@ -801,6 +894,11 @@ function generate_match_cards_pdf(int $cid, ?int $gid = null): void {
     if (!$matches) {
         $html .= '<p style="color:#6b7280">Keine offenen Spiele gefunden.</p>';
     }
+    // Blockgrößen für Platzierungsspiele (Modus groups_cross)
+    $cross_S = [];
+    foreach (db_fetchall("SELECT bracket, COUNT(*) n FROM `match` WHERE competition_id=? AND group_id IS NULL AND bracket LIKE 'C%' AND ko_round=1 GROUP BY bracket", [$cid]) as $row) {
+        $cross_S[$row['bracket']] = 2 * (int)$row['n'];
+    }
     $group_counters = [];
     foreach ($matches as $i => $m) {
         if ($m['group_name']) {
@@ -808,6 +906,12 @@ function generate_match_cards_pdf(int $cid, ?int $gid = null): void {
             $group_counters[$key] = ($group_counters[$key] ?? 0) + 1;
             $label = e($m['group_name']);
             $game_nr = $group_counters[$key];
+        } elseif (!empty($m['bracket']) && $m['bracket'][0] === 'C') {
+            $S  = $cross_S[$m['bracket']] ?? 0;
+            $ps = $S > 0 ? ($S >> ((int)$m['ko_round'] - 1)) : 2;
+            $lo = (int)$m['place_lo']; $hi = $lo + $ps - 1;
+            $label   = $ps <= 2 ? ('Platz ' . $lo . '/' . $hi) : ('Plätze ' . $lo . '–' . $hi);
+            $game_nr = (int)$m['ko_position'] + 1;
         } elseif ($is_dko && isset($dko_labels[$m['id']])) {
             $label   = e($dko_labels[$m['id']]);
             $game_nr = $dko_seq[$m['id']] ?? ((int)$m['ko_position'] + 1);

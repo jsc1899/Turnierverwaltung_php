@@ -14,6 +14,18 @@ ob_start(); ?>
   </ol>
 </nav>
 
+<?php if (can_edit() && !$locked): ?>
+<!-- Test-Hilfe: füllt offene Ergebnisfelder zufällig aus -->
+<div class="mb-3 d-flex flex-wrap align-items-center gap-2">
+  <button type="button" class="btn btn-outline-warning btn-sm" onclick="fillTestResults(false)">
+    <i class="bi bi-dice-5 me-1"></i>Testergebnisse eintragen
+  </button>
+  <button type="button" class="btn btn-outline-warning btn-sm" onclick="fillTestResults(true)">
+    <i class="bi bi-dice-5 me-1"></i>Testergebnisse eintragen &amp; speichern
+  </button>
+</div>
+<?php endif; ?>
+
 <!-- Header -->
 <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
   <h2 class="mb-0"><i class="bi bi-diagram-3 me-2"></i><?= e($c['name']) ?></h2>
@@ -52,10 +64,11 @@ ob_start(); ?>
     </form>
     <?php endif; ?>
     <?php if (!$locked && $c['phase'] === 'ko'): ?>
+    <?php $reset_ko_lbl = $c['mode'] === 'groups_cross' ? 'Kreuzspiele zurücksetzen' : 'KO zurücksetzen'; ?>
     <form method="post" action="<?= url('competition/'.$c['id'].'/reset/ko') ?>"
-          data-confirm="KO-Phase zurücksetzen?">
+          data-confirm="<?= e($reset_ko_lbl) ?>?">
       <?= csrf_field() ?>
-      <button class="btn btn-outline-warning btn-sm"><i class="bi bi-arrow-counterclockwise me-1"></i>KO zurücksetzen</button>
+      <button class="btn btn-outline-warning btn-sm"><i class="bi bi-arrow-counterclockwise me-1"></i><?= e($reset_ko_lbl) ?></button>
     </form>
     <?php endif; ?>
     <?php if (!$locked): ?>
@@ -153,6 +166,13 @@ ob_start(); ?>
         <input type="hidden" name="team_size" value="<?= (int)($c['team_size'] ?? 0) ?>">
         <?php endif; ?>
       </div>
+      <div class="col-auto" id="field-team-result"<?= $comp_type !== 'team' ? ' style="display:none"' : '' ?>>
+        <label class="form-label">Begegnungsergebnis</label>
+        <select name="team_result_mode" class="form-select form-select-sm">
+          <option value="wins"<?= ($c['team_result_mode'] ?? 'wins') === 'wins' ? ' selected' : '' ?>>Je Einzelsieg 1 Punkt</option>
+          <option value="sum" <?= ($c['team_result_mode'] ?? 'wins') === 'sum'  ? ' selected' : '' ?>>Einzelergebnisse aufsummieren</option>
+        </select>
+      </div>
       <?php if (!$is_team): ?>
       <div class="col-auto">
         <label class="form-label">Ergebniserfassung</label>
@@ -165,13 +185,18 @@ ob_start(); ?>
       <?php endif; ?>
       <div class="col-auto">
         <label class="form-label">Spielmodus</label>
-        <select name="mode" class="form-select form-select-sm"<?= $c['phase'] !== 'setup' ? ' disabled' : '' ?>>
-          <option value="groups_ko"<?= $c['mode'] === 'groups_ko' ? ' selected' : '' ?>>Gruppen + KO</option>
-          <option value="ko_only"<?= $c['mode'] === 'ko_only'   ? ' selected' : '' ?>>Nur KO</option>
-          <option value="double_ko"<?= $c['mode'] === 'double_ko' ? ' selected' : '' ?>>Doppel-KO</option>
+        <?php
+          $ui_mode    = $c['mode'] === 'groups_cross' ? 'groups_ko' : $c['mode'];
+          $finalrunde = $c['mode'] === 'groups_cross' ? 'cross' : ((int)$c['advance_count'] >= 1 ? 'ko' : 'none');
+        ?>
+        <select name="mode" class="form-select form-select-sm" id="comp-mode-edit"<?= $c['phase'] !== 'setup' ? ' disabled' : '' ?>
+                onchange="editToggleCross()">
+          <option value="groups_ko"<?= $ui_mode === 'groups_ko' ? ' selected' : '' ?>>Gruppenphase</option>
+          <option value="ko_only"<?= $ui_mode === 'ko_only'   ? ' selected' : '' ?>>KO-Modus</option>
+          <option value="double_ko"<?= $ui_mode === 'double_ko' ? ' selected' : '' ?>>Doppel-KO Modus</option>
         </select>
         <?php if ($c['phase'] !== 'setup'): ?>
-        <input type="hidden" name="mode" value="<?= e($c['mode']) ?>">
+        <input type="hidden" name="mode" value="<?= e($ui_mode) ?>">
         <?php endif; ?>
       </div>
       <?php if (!in_array($c['mode'], ['ko_only', 'double_ko'])): ?>
@@ -186,13 +211,19 @@ ob_start(); ?>
         <input type="hidden" name="group_size" value="<?= (int)$c['group_size'] ?>">
         <?php endif; ?>
       </div>
-      <div class="col-auto">
-        <label class="form-label">KO-Aufstieg</label>
-        <select name="advance_count" id="advance_count" class="form-select form-select-sm"
-                onchange="document.getElementById('third_place_wrap').style.display=this.value==='0'?'none':''">
-          <option value="0"<?= (int)$c['advance_count'] === 0 ? ' selected' : '' ?>>Nur Gruppenphase</option>
-          <option value="1"<?= (int)$c['advance_count'] === 1 ? ' selected' : '' ?>>Gruppenerste → KO</option>
-          <option value="2"<?= (int)$c['advance_count'] === 2 ? ' selected' : '' ?>>Erste &amp; Zweite → KO</option>
+      <div class="col-auto" id="finalrunde-wrap">
+        <label class="form-label">Finalrunde</label>
+        <select name="finalrunde" id="finalrunde-edit" class="form-select form-select-sm" onchange="editToggleCross()">
+          <option value="none"<?= $finalrunde === 'none' ? ' selected' : '' ?>>nur Gruppenphase</option>
+          <option value="ko"<?= $finalrunde === 'ko'   ? ' selected' : '' ?>>KO-Runde</option>
+          <option value="cross"<?= $finalrunde === 'cross' ? ' selected' : '' ?>>Kreuzspiele</option>
+        </select>
+      </div>
+      <div class="col-auto" id="advance-wrap-edit" style="display:<?= $finalrunde === 'ko' ? '' : 'none' ?>">
+        <label class="form-label">Aufsteiger</label>
+        <select name="advance_count" id="advance_count" class="form-select form-select-sm">
+          <option value="1"<?= (int)$c['advance_count'] !== 2 ? ' selected' : '' ?>>1 (Gruppenerste)</option>
+          <option value="2"<?= (int)$c['advance_count'] === 2 ? ' selected' : '' ?>>2 (Erste &amp; Zweite)</option>
         </select>
       </div>
       <div class="col-auto d-flex align-items-end pb-1">
@@ -202,9 +233,30 @@ ob_start(); ?>
           <label class="form-check-label" for="show_byes">Spielrunden anzeigen</label>
         </div>
       </div>
+      <?php
+        $gs_cc = (int)$c['group_size']; $ntiers_cc = max(1, (int)ceil($gs_cc / 2));
+        $cfg_cc = ($c['cross_config'] ?? '') !== '' ? explode(',', $c['cross_config']) : [];
+      ?>
+      <div class="col-12" id="cross-config-wrap" style="display:<?= $finalrunde === 'cross' ? '' : 'none' ?>">
+        <label class="form-label">Kreuzspiele – Paarungen je Rang</label>
+        <div class="d-flex flex-wrap gap-3">
+          <?php for ($t = 1; $t <= $ntiers_cc; $t++):
+            $a = 2 * $t - 1; $b = 2 * $t;
+            $rl  = $b <= $gs_cc ? "Rang {$a}+{$b}" : "Rang {$a}";
+            $val = $cfg_cc[$t - 1] ?? 'x'; ?>
+          <div>
+            <div class="small text-muted mb-1"><?= $rl ?></div>
+            <select name="cross_config[]" class="form-select form-select-sm" style="width:auto">
+              <option value="x"<?= $val !== 's' ? ' selected' : '' ?>>über Kreuz</option>
+              <option value="s"<?= $val === 's' ? ' selected' : '' ?>>getrennt</option>
+            </select>
+          </div>
+          <?php endfor; ?>
+        </div>
+      </div>
       <?php endif; ?>
       <div class="col-auto d-flex align-items-end pb-1"
-           id="third_place_wrap"<?= (!in_array($c['mode'], ['ko_only','double_ko']) && (int)$c['advance_count'] === 0) ? ' style="display:none"' : '' ?>>
+           id="third_place_wrap"<?= (in_array($c['mode'], ['ko_only','double_ko'], true) || $finalrunde === 'ko') ? '' : ' style="display:none"' ?>>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" name="third_place" id="third_place"
                  <?= $c['third_place'] ? 'checked' : '' ?>>
@@ -225,7 +277,7 @@ ob_start(); ?>
           <label class="form-check-label" for="show_skill">Spielstärke anzeigen (Gruppe)</label>
         </div>
       </div>
-      <div class="col-auto d-flex align-items-end pb-1">
+      <div class="col-auto d-flex align-items-end pb-1" id="show-seeding-wrap"<?= in_array($c['mode'], ['ko_only','double_ko'], true) ? '' : ' style="display:none"' ?>>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" name="show_seeding" id="show_seeding"
                  <?= ($c['show_seeding'] ?? 1) ? 'checked' : '' ?>>
@@ -698,7 +750,7 @@ ob_start(); ?>
   </div>
   <?php endif; ?>
   <?php endif; ?>
-  <?php if ((can_edit() && !$locked) && $c['phase'] === 'group' && $unplayed_group == 0 && (int)$c['advance_count'] > 0): ?>
+  <?php if ((can_edit() && !$locked) && $c['mode'] !== 'groups_cross' && $c['phase'] === 'group' && $unplayed_group == 0 && (int)$c['advance_count'] > 0): ?>
   <div class="mb-3">
     <?php if ($has_open_tie): ?>
     <div class="d-inline-flex align-items-center gap-2" tabindex="0" data-bs-toggle="tooltip"
@@ -714,6 +766,14 @@ ob_start(); ?>
     <?php endif; ?>
   </div>
   <?php endif; ?>
+  <?php if ((can_edit() && !$locked) && $c['mode'] === 'groups_cross' && $c['phase'] === 'group' && $unplayed_group == 0): ?>
+  <div class="mb-3">
+    <form method="post" action="<?= url('competition/'.$c['id'].'/draw/cross') ?>">
+      <?= csrf_field() ?>
+      <button class="btn btn-primary"><i class="bi bi-trophy me-1"></i>Kreuzspiele auslosen</button>
+    </form>
+  </div>
+  <?php endif; ?>
 
   <?php if ($c['phase'] === 'setup' && $c['mode'] !== 'double_ko'): ?>
   <div class="alert alert-secondary mb-0">
@@ -722,6 +782,7 @@ ob_start(); ?>
   <?php endif; ?>
 
 <!-- ═══ Gruppenphase / KO-Bracket (volle Breite) ════════════════════════════ -->
+<?php ob_start(); // Puffer Gruppenphase (Reihenfolge je nach aktueller Stage) ?>
 <?php if ($groups): ?>
     <!-- Export-Links -->
     <div class="d-flex gap-2 mb-3">
@@ -731,6 +792,10 @@ ob_start(); ?>
       <a href="<?= url('competition/'.$c['id'].'/pdf/match-cards') ?>" class="btn btn-outline-secondary btn-sm" target="_blank">
         <i class="bi bi-card-text me-1"></i>Match-Cards
       </a>
+      <button type="button" id="toggle-results-btn" onclick="toggleAllResults()"
+              class="btn btn-outline-secondary btn-sm ms-auto">
+        <i class="bi bi-chevron-up me-1"></i>Spielergebnisse ausblenden
+      </button>
     </div>
 
     <?php if (can_edit() && (int)($c['num_courts'] ?? 0) > 0): ?>
@@ -782,7 +847,16 @@ ob_start(); ?>
 
     <?php
     $sets_mode_active = in_array($c['score_mode'] ?? 'match', ['sets', 'sets_grp']);
-    $show_einzel = ($is_team && (int)($c['team_size'] ?? 0) >= 2) || $sets_mode_active;
+    // Bei Team-Summenmodus sind die Einzel-Spalten redundant (Gesamtergebnis = Summe).
+    $team_sum_mode = $is_team && ($c['team_result_mode'] ?? 'wins') === 'sum';
+    $show_einzel = ($is_team && (int)($c['team_size'] ?? 0) >= 2 && !$team_sum_mode) || $sets_mode_active;
+    // Farbige Markierung der Top-Plätze in der Gruppentabelle: KO-Modus → advance_count;
+    // Kreuzspiele → Rang-1+2-Konfig (über Kreuz = Plätze 1+2, getrennt = nur Platz 1).
+    $highlight_count = (int)$c['advance_count'];
+    if ($c['mode'] === 'groups_cross') {
+        $cc0 = explode(',', $c['cross_config'] ?? '');
+        $highlight_count = (($cc0[0] ?? 'x') === 's') ? 1 : 2;
+    }
     ?>
     <?php foreach ($groups as $gi): $g = $gi['group']; $standings = $gi['standings']; $matches = $gi['matches']; $tie_ids = $gi['tie_ids'] ?? []; ?>
     <div class="card shadow-sm mb-4">
@@ -807,7 +881,7 @@ ob_start(); ?>
             </thead>
             <tbody>
               <?php foreach ($standings as $i => $pl): ?>
-              <tr<?= $i < (int)$c['advance_count'] ? ' class="row-advance"' : '' ?>>
+              <tr<?= $i < $highlight_count ? ' class="row-advance"' : '' ?>>
                 <td><strong><?= $i+1 ?></strong></td>
                 <td>
                   <?= e($pl['name']) ?>
@@ -884,7 +958,7 @@ ob_start(); ?>
         </div>
         <?php endif; ?>
         <!-- Match results -->
-        <div class="p-3 border-top">
+        <div class="p-3 border-top grp-results">
           <h6 class="text-muted mb-2">Spielergebnisse</h6>
           <?php
           $use_duels = $is_team && (int)($c['team_size'] ?? 0) > 1;
@@ -1144,7 +1218,7 @@ ob_start(); ?>
     </div>
     <?php endforeach; ?>
     <?php endif; ?>
-
+<?php $__groups_html = ob_get_clean(); ob_start(); // Puffer KO-Phase ?>
     <?php if ($ko_rounds || $third_place_match): ?>
     <!-- KO-Phase -->
     <div class="d-flex gap-2 align-items-center mb-3">
@@ -1574,6 +1648,75 @@ ob_start(); ?>
     <?php endif; ?>
     <?php endif; ?>
 
+    <?php if ($cross_blocks): ?>
+    <!-- ═══ Kreuzspiele / Platzierungs-Brackets ═════════════════════════════════ -->
+    <div class="d-flex gap-2 mb-3 align-items-center">
+      <a href="<?= url('competition/'.$c['id'].'/pdf/cross') ?>" class="btn btn-outline-danger btn-sm" target="_blank">
+        <i class="bi bi-file-earmark-pdf me-1"></i>Platzierungs-PDF
+      </a>
+      <a href="<?= url('competition/'.$c['id'].'/pdf/match-cards') ?>" class="btn btn-outline-secondary btn-sm" target="_blank">
+        <i class="bi bi-card-text me-1"></i>Match-Cards
+      </a>
+    </div>
+    <?php $cross_editable = (can_edit() && !$locked); ?>
+    <?php if ($cross_editable): ?>
+    <form id="cross-form" method="post" action="<?= url('competition/'.$c['id'].'/results/bulk') ?>"><?= csrf_field() ?></form>
+    <?php endif; ?>
+    <?php foreach ($cross_blocks as $blk): ?>
+    <div class="card shadow-sm mb-4">
+      <div class="card-header fw-semibold"><i class="bi bi-diagram-3 me-1"></i><?= e($blk['label']) ?></div>
+      <div class="card-body p-2" style="overflow-x:auto">
+        <div style="display:flex; gap:14px; align-items:flex-start">
+          <?php foreach ($blk['rounds'] as $ri => $rd): ?>
+          <div style="display:flex;flex-direction:column;gap:8px;min-width:190px">
+            <div class="small text-muted text-center fw-semibold">Runde <?= $ri + 1 ?></div>
+            <?php foreach ($rd['matches'] as $m):
+              $has1 = !empty($m['player1_id']); $has2 = !empty($m['player2_id']);
+              if (!$has1 && !$has2) continue; ?>
+            <div class="ko-match" style="border:1px solid #dee2e6;border-radius:6px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+              <div style="font-size:.62rem;color:#9e9e9e;padding:1px 6px;border-bottom:1px solid #f5f5f5;background:#fafafa">
+                <?= e($m['place_label']) ?><?php if (!empty($m['court_no'])): ?> · Platz <?= (int)$m['court_no'] ?><?php endif; ?>
+              </div>
+              <div class="d-flex align-items-center gap-1 px-2 <?= ($m['played'] && $m['score1'] > $m['score2']) ? 'bg-success-subtle fw-semibold' : '' ?>"
+                   style="min-height:30px;border-bottom:1px solid #f0f0f0">
+                <span class="flex-grow-1 small text-truncate" style="min-width:0" title="<?= e($m['p1name'] ?? '') ?>"><?= $has1 ? e($m['p1name']) : '<span class="text-muted fst-italic">—</span>' ?></span>
+                <?php if ($cross_editable && $has1 && $has2): ?>
+                <input type="number" name="matches[<?= $m['id'] ?>][score1]" min="0" form="cross-form"
+                       class="form-control form-control-sm text-center" style="width:40px;height:24px;padding:0 2px;font-size:.8rem;flex-shrink:0"
+                       value="<?= $m['played'] ? $m['score1'] : '' ?>">
+                <?php elseif ($m['played']): ?>
+                <span class="fw-bold small" style="flex-shrink:0"><?= $m['score1'] ?></span>
+                <?php endif; ?>
+              </div>
+              <div class="d-flex align-items-center gap-1 px-2 <?= ($m['played'] && $m['score2'] > $m['score1']) ? 'bg-success-subtle fw-semibold' : '' ?>"
+                   style="min-height:30px">
+                <span class="flex-grow-1 small text-truncate" style="min-width:0" title="<?= e($m['p2name'] ?? '') ?>"><?= $has2 ? e($m['p2name']) : '<span class="text-muted fst-italic">Freilos</span>' ?></span>
+                <?php if ($cross_editable && $has1 && $has2): ?>
+                <input type="number" name="matches[<?= $m['id'] ?>][score2]" min="0" form="cross-form"
+                       class="form-control form-control-sm text-center" style="width:40px;height:24px;padding:0 2px;font-size:.8rem;flex-shrink:0"
+                       value="<?= $m['played'] ? $m['score2'] : '' ?>">
+                <?php elseif ($m['played']): ?>
+                <span class="fw-bold small" style="flex-shrink:0"><?= $m['score2'] ?></span>
+                <?php endif; ?>
+              </div>
+            </div>
+            <?php endforeach; ?>
+          </div>
+          <?php endforeach; ?>
+        </div>
+      </div>
+    </div>
+    <?php endforeach; ?>
+    <?php if ($cross_editable): ?>
+    <button form="cross-form" type="submit" class="btn btn-primary btn-sm mb-4"><i class="bi bi-save me-1"></i>Ergebnisse speichern</button>
+    <?php endif; ?>
+    <?php endif; ?>
+<?php
+$__ko_html = ob_get_clean();
+// Aktuelle Bewerbs-Stage immer oben: in der KO-Phase das KO-Bracket über die Gruppenphase stellen.
+echo in_array($c['phase'], ['ko', 'done'], true) ? $__ko_html . $__groups_html : $__groups_html . $__ko_html;
+?>
+
 <?php if ($c['mode'] === 'double_ko' && ($dko_wb || $dko_lb || $dko_gf)): ?>
 <!-- ═══ Doppel-KO-Bracket ════════════════════════════════════════════════════ -->
 <div class="d-flex gap-2 align-items-center mb-3">
@@ -1856,6 +1999,78 @@ function saveGrpReorder() {
   form.submit();
 }
 
+// Spielergebnisse aller Gruppen gemeinsam auf-/zuklappen
+function toggleAllResults() {
+  var els = document.querySelectorAll('.grp-results');
+  if (!els.length) return;
+  var hide = els[0].style.display !== 'none';
+  els.forEach(function(el) { el.style.display = hide ? 'none' : ''; });
+  var btn = document.getElementById('toggle-results-btn');
+  if (btn) btn.innerHTML = hide
+    ? '<i class="bi bi-chevron-down me-1"></i>Spielergebnisse anzeigen'
+    : '<i class="bi bi-chevron-up me-1"></i>Spielergebnisse ausblenden';
+}
+
+// Test-Hilfe: füllt alle offenen (leeren) Ergebnis-Paare mit zufälligen, ungleichen
+// Werten. save=false → nur ins Formular eintragen; save=true → zusätzlich speichern
+// (Bulk-POST der Spielergebnisse, danach Reload). Score-Felder kommen je Spiel/Satz/Duell
+// paarweise (score1 direkt vor score2) in Dokumentreihenfolge.
+function fillTestResults(save) {
+  var inputs = Array.prototype.slice.call(document.querySelectorAll('input[type="number"]'))
+    .filter(function(el) { return /\[score[12]\]$/.test(el.name || ''); });
+  var filled = 0;
+  for (var i = 0; i + 1 < inputs.length; i += 2) {
+    var a = inputs[i], b = inputs[i + 1];
+    if (a.value !== '' || b.value !== '') continue; // bereits (teil-)ausgefüllt → überspringen
+    var s1 = Math.floor(Math.random() * 12);
+    var s2 = Math.floor(Math.random() * 12);
+    if (s1 === s2) s2 = (s2 + 1) % 12; // kein Unentschieden (für KO/Kreuzspiele nötig)
+    a.value = s1; b.value = s2;
+    a.dispatchEvent(new Event('input', { bubbles: true }));
+    b.dispatchEvent(new Event('input', { bubbles: true }));
+    filled++;
+  }
+  if (!save) {
+    if (!filled) alert('Keine offenen Ergebnisfelder gefunden.');
+    return;
+  }
+  // Speichern: alle matches[ID][scoreN] (Gruppen-, KO- und Kreuzspiele) per Bulk-POST senden.
+  // Bulk-URL aus einem vorhandenen Ergebnisformular lesen (NOWDOC → kein PHP hier).
+  var bulkForm = document.querySelector('form[action$="/results/bulk"]');
+  if (!bulkForm) { alert('Kein Speicherformular gefunden.'); return; }
+  var data = new URLSearchParams();
+  document.querySelectorAll('input[type="number"]').forEach(function(el) {
+    if (/^matches\[\d+\]\[score[12]\]$/.test(el.name || '') && el.value !== '') data.append(el.name, el.value);
+  });
+  if (!Array.from(data.keys()).length) { alert('Keine speicherbaren Ergebnisfelder gefunden (Sätze/Duelle bitte manuell speichern).'); return; }
+  var tok = document.querySelector('input[name="csrf_token"]');
+  if (tok) data.append('csrf_token', tok.value);
+  fetch(bulkForm.getAttribute('action'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: data.toString()
+  }).then(function() { location.reload(); })
+    .catch(function() { alert('Speichern fehlgeschlagen.'); });
+}
+
+// Einstellungen: Felder je nach Modus + Finalrunde ein-/ausblenden.
+function editToggleCross() {
+  var sel = document.getElementById('comp-mode-edit');
+  if (!sel) return;
+  var mode = sel.value;
+  var isGroups = (mode === 'groups_ko');
+  var frSel = document.getElementById('finalrunde-edit');
+  var fr = frSel ? frSel.value : 'none';
+  var show = function(id, cond) { var el = document.getElementById(id); if (el) el.style.display = cond ? '' : 'none'; };
+  show('finalrunde-wrap', isGroups);
+  show('advance-wrap-edit', isGroups && fr === 'ko');
+  show('cross-config-wrap', isGroups && fr === 'cross');
+  show('third_place_wrap', (mode === 'ko_only' || mode === 'double_ko') || (isGroups && fr === 'ko'));
+  // Setzungen anzeigen (KO) nur im KO-/Doppel-KO-Modus
+  show('show-seeding-wrap', mode === 'ko_only' || mode === 'double_ko');
+}
+editToggleCross();
+
 // ── KO Drag-and-Drop ─────────────────────────────────────────────
 var koDragEl = null, koEditActive = false;
 function toggleKoEdit() {
@@ -2033,13 +2248,14 @@ function drawAllBrackets() {
 document.addEventListener('DOMContentLoaded', drawAllBrackets);
 window.addEventListener('resize', drawAllBrackets);
 
-// ── Bewerbstyp → team_size-Feld ein-/ausblenden ──────────────────
+// ── Bewerbstyp → team_size- und Begegnungsergebnis-Feld ein-/ausblenden ──────────────────
 (function() {
   var sel = document.querySelector('select[name="comp_type"]');
-  var fld = document.getElementById('field-team-size');
-  if (!sel || !fld) return;
+  var flds = ['field-team-size', 'field-team-result'].map(function(id){ return document.getElementById(id); });
+  if (!sel) return;
   sel.addEventListener('change', function() {
-    fld.style.display = this.value === 'team' ? '' : 'none';
+    var show = this.value === 'team';
+    flds.forEach(function(f){ if (f) f.style.display = show ? '' : 'none'; });
   });
 })();
 

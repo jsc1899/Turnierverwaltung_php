@@ -22,10 +22,15 @@ function _propagate_result(int $cid, array $m): void {
         _maybe_set_done($cid);
         return;
     }
-    if (_is_double_ko($cid)) {
+    $mode = db_fetch("SELECT mode FROM competition WHERE id=?", [$cid])['mode'] ?? '';
+    if ($mode === 'double_ko') {
         require_once __DIR__ . '/../lib/double_ko_bracket.php';
         recompute_double_ko($cid);
         _maybe_set_done_dko($cid);
+    } elseif ($mode === 'groups_cross') {
+        require_once __DIR__ . '/../lib/placement_bracket.php';
+        recompute_placement($cid);
+        _maybe_set_done_placement($cid);
     } else {
         if ((int)$m['ko_round'] !== 3) {
             recompute_ko_from($cid, (int)$m['ko_round']);
@@ -152,9 +157,16 @@ function force_advance_ko(array $p): void {
     }
     require_competition_open((int)$m['competition_id']);
     db_execute("UPDATE `match` SET tiebreak_winner=? WHERE id=?", [$slot, $mid]);
-    require_once __DIR__ . '/../lib/ko_bracket.php';
     $m['tiebreak_winner'] = $slot;
-    advance_ko_winner($m);
+    $mode = db_fetch("SELECT mode FROM competition WHERE id=?", [(int)$m['competition_id']])['mode'] ?? '';
+    if ($mode === 'groups_cross') {
+        require_once __DIR__ . '/../lib/placement_bracket.php';
+        recompute_placement((int)$m['competition_id']);
+        _maybe_set_done_placement((int)$m['competition_id']);
+    } else {
+        require_once __DIR__ . '/../lib/ko_bracket.php';
+        advance_ko_winner($m);
+    }
     redirect('competition/' . $m['competition_id']);
 }
 
@@ -163,11 +175,12 @@ function save_duels(array $p): void {
     csrf_verify();
     $mid = (int)$p['id'];
     $m   = db_fetch(
-        "SELECT m.*, c.team_size, c.id as cid FROM `match` m
+        "SELECT m.*, c.team_size, c.team_result_mode, c.id as cid FROM `match` m
          JOIN competition c ON c.id=m.competition_id WHERE m.id=?",
         [$mid]
     );
     if (!$m || !(int)$m['team_size']) { redirect(''); return; }
+    $result_mode = ($m['team_result_mode'] ?? 'wins') === 'sum' ? 'sum' : 'wins';
     require_competition_open((int)$m['cid']);
 
     if ($m['group_id'] !== null && _group_phase_locked((int)$m['cid'])) {
@@ -205,8 +218,15 @@ function save_duels(array $p): void {
         );
         if ($dplayed) {
             $played_count++;
-            if ($ds1 > $ds2) $s1++;
-            elseif ($ds2 > $ds1) $s2++;
+            if ($result_mode === 'sum') {
+                // Einzelergebnisse aufsummieren
+                $s1 += $ds1;
+                $s2 += $ds2;
+            } else {
+                // je Einzelsieg 1 Punkt
+                if ($ds1 > $ds2) $s1++;
+                elseif ($ds2 > $ds1) $s2++;
+            }
         }
     }
 
