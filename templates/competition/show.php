@@ -203,7 +203,7 @@ ob_start(); ?>
       <div class="col-auto">
         <label class="form-label">Gruppengröße</label>
         <select name="group_size" class="form-select form-select-sm"<?= $c['phase'] !== 'setup' ? ' disabled' : '' ?>>
-          <?php foreach ([3,4,5,6,7,8,9,10] as $s): ?>
+          <?php foreach (range(3, 20) as $s): ?>
           <option value="<?= $s ?>"<?= (int)$c['group_size'] === $s ? ' selected' : '' ?>><?= $s ?> Teilnehmer</option>
           <?php endforeach; ?>
         </select>
@@ -256,7 +256,7 @@ ob_start(); ?>
       </div>
       <?php endif; ?>
       <div class="col-auto d-flex align-items-end pb-1"
-           id="third_place_wrap"<?= (in_array($c['mode'], ['ko_only','double_ko'], true) || $finalrunde === 'ko') ? '' : ' style="display:none"' ?>>
+           id="third_place_wrap"<?= (in_array($c['mode'], ['ko_only','double_ko'], true) || $finalrunde === 'ko') ? '' : ' style="display:none !important"' ?>>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" name="third_place" id="third_place"
                  <?= $c['third_place'] ? 'checked' : '' ?>>
@@ -277,7 +277,7 @@ ob_start(); ?>
           <label class="form-check-label" for="show_skill">Spielstärke anzeigen (Gruppe)</label>
         </div>
       </div>
-      <div class="col-auto d-flex align-items-end pb-1" id="show-seeding-wrap"<?= in_array($c['mode'], ['ko_only','double_ko'], true) ? '' : ' style="display:none"' ?>>
+      <div class="col-auto d-flex align-items-end pb-1" id="show-seeding-wrap"<?= in_array($c['mode'], ['ko_only','double_ko'], true) ? '' : ' style="display:none !important"' ?>>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" name="show_seeding" id="show_seeding"
                  <?= ($c['show_seeding'] ?? 1) ? 'checked' : '' ?>>
@@ -2061,7 +2061,13 @@ function editToggleCross() {
   var isGroups = (mode === 'groups_ko');
   var frSel = document.getElementById('finalrunde-edit');
   var fr = frSel ? frSel.value : 'none';
-  var show = function(id, cond) { var el = document.getElementById(id); if (el) el.style.display = cond ? '' : 'none'; };
+  // Ausblenden mit !important, da manche Wrapper die Klasse d-flex (display:flex !important) tragen.
+  var show = function(id, cond) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (cond) el.style.removeProperty('display');
+    else el.style.setProperty('display', 'none', 'important');
+  };
   show('finalrunde-wrap', isGroups);
   show('advance-wrap-edit', isGroups && fr === 'ko');
   show('cross-config-wrap', isGroups && fr === 'cross');

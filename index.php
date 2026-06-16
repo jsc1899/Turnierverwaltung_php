@@ -31,6 +31,9 @@ header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
 if (str_starts_with(APP_URL, 'https://')) {
     header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
 }
+// Dynamische Seiten nicht cachen — verhindert veraltete Ansichten (Browser-/bfcache).
+// PDF-/Datei-Routen setzen ihre eigenen Cache-Header danach selbst.
+header('Cache-Control: no-store, no-cache, must-revalidate');
 
 // DB initialisieren
 init_db();
