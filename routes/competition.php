@@ -39,7 +39,7 @@ function new_competition(array $p): void {
     csrf_verify();
     require_tournament_open((int)$p['tid']);
     $name          = trim(post('name'));
-    $group_size    = max(3, min(10, (int)post('group_size', 4)));
+    $group_size    = max(3, min(20, (int)post('group_size', 4)));
     [$mode, $advance_count] = _resolve_finalrunde();
     $comp_type          = post('comp_type', 'single');
     $is_team            = $comp_type === 'team'    ? 1 : 0;
@@ -720,7 +720,7 @@ function settings(array $p): void {
 
 
     $name              = trim(post('name', ''));
-    $group_size        = max(3, min(10, (int)post('group_size', 4)));
+    $group_size        = max(3, min(20, (int)post('group_size', 4)));
     [$desired_mode, $advance_count] = _resolve_finalrunde();
     $third_place       = post('third_place') ? 1 : 0;
     $registrations_open = post('registrations_open') ? 1 : 0;
@@ -1060,7 +1060,7 @@ function draw_groups(array $p): void {
     $group_size = (int)$c['group_size'];
     $num_groups = max(1, (int)round($n / $group_size));
     while ($num_groups > 1 && $n / $num_groups < 3) $num_groups--;
-    while ($n / $num_groups > 10) $num_groups++;
+    while ($n / $num_groups > 20) $num_groups++;
 
     $pdo = get_db();
     $pdo->beginTransaction();
