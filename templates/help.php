@@ -25,8 +25,10 @@ ob_start(); ?>
           <a href="#auslosung"       class="list-group-item list-group-item-action">Auslosung</a>
           <a href="#gruppenphase"    class="list-group-item list-group-item-action ps-4">↳ Gruppenphase</a>
           <a href="#ko"              class="list-group-item list-group-item-action ps-4">↳ KO-Runde</a>
+          <a href="#kreuzspiele"     class="list-group-item list-group-item-action ps-4">↳ Kreuzspiele / Platzierung</a>
           <a href="#ko-direkt"       class="list-group-item list-group-item-action ps-4">↳ Nur KO-Runde</a>
           <a href="#doppel-ko"       class="list-group-item list-group-item-action ps-4">↳ Doppel-KO</a>
+          <a href="#spielplaetze"    class="list-group-item list-group-item-action">Spielplätze</a>
           <a href="#ergebnisse"      class="list-group-item list-group-item-action">Ergebnisse erfassen</a>
           <a href="#nennungen"       class="list-group-item list-group-item-action">Nennungen (öffentlich)</a>
           <a href="#exporte"         class="list-group-item list-group-item-action">PDF- &amp; CSV-Export</a>
@@ -56,7 +58,7 @@ ob_start(); ?>
           <div class="card h-100 border-success">
             <div class="card-body">
               <h6 class="card-title"><i class="bi bi-diagram-3 me-1 text-success"></i>Bewerbe</h6>
-              <p class="card-text small text-muted">Gruppenphase, KO-Runde, nur KO oder Doppel-KO — als Einzel-, Doppel- oder Teambewerb konfigurierbar.</p>
+              <p class="card-text small text-muted">Gruppenphase mit KO-Runde, Kreuzspielen oder reiner Platzierungsrunde — sowie reines KO und Doppel-KO. Als Einzel-, Doppel- oder Teambewerb, optional mit Spielplätzen.</p>
             </div>
           </div>
         </div>
@@ -152,16 +154,24 @@ ob_start(); ?>
       <h5 class="mt-3">Bewerbseinstellungen</h5>
       <p>Über den Button <strong>Einstellungen</strong> auf der Bewerbsseite kann konfiguriert werden:</p>
       <ul>
-        <li><strong>Name</strong> — Bezeichnung des Bewerbs (z.B. „Herren Einzel")</li>
-        <li><strong>Bewerbstyp</strong> — Einzelbewerb, Doppelbewerb oder Teambewerb (kann nach dem ersten Auslosen nicht mehr geändert werden)</li>
-        <li><strong>Spiele pro Team</strong> — Nur bei Teambewerb; Anzahl der Einzel-Duelle pro Mannschaftsspiel (0 = direkte Gesamtergebnis-Eingabe, 1 = ein Einzel ohne Spielerauswahl; ab 2 wird pro Duel eine Spielerauswahl eingeblendet; nach dem ersten Auslosen gesperrt)</li>
-        <li><strong>Modus</strong> — Gruppenphase + KO, Nur KO-Runde oder Doppel-KO (nach dem ersten Auslosen gesperrt)</li>
-        <li><strong>Gruppengröße</strong> — Anzahl Spieler pro Gruppe (Gruppenphase), 3–20 Spieler</li>
-        <li><strong>KO-Aufstieg</strong> — Wie viele Spieler pro Gruppe in die KO-Runde aufsteigen (0 = nur Gruppenphase)</li>
-        <li><strong>Platz-3-Spiel</strong> — Ob die Halbfinalverlierer um Platz 3 spielen</li>
+        <li><strong>Bewerbsname</strong> — Bezeichnung des Bewerbs (z.B. „Herren Einzel")</li>
+        <li><strong>Bewerbstyp</strong> — Einzelbewerb, Doppelbewerb oder Teambewerb (kann nach Zuweisung von Teilnehmern bzw. dem Auslosen nicht mehr geändert werden)</li>
+        <li><strong>Spiele pro Team</strong> — Nur bei Teambewerb; Anzahl der Einzel-Duelle pro Mannschaftsspiel (0 = direkte Gesamtergebnis-Eingabe, 1 = ein Einzel ohne Spielerauswahl; ab 2 wird pro Duel eine Spielerauswahl eingeblendet). Änderbar im Setup sowie in der Gruppenphase, solange noch kein Gruppenergebnis erfasst wurde; danach gesperrt</li>
+        <li><strong>Begegnungsergebnis</strong> — Nur bei Teambewerb: <em>Je Einzelsieg 1 Punkt</em> (Summe der gewonnenen Duelle) oder <em>Einzelergebnisse aufsummieren</em> (Punkte aller Duelle addiert; dann entfallen die Einzel-Spalten)</li>
+        <li><strong>Ergebniserfassung</strong> — Nur bei Einzel-/Doppelbewerb: <em>Spielergebnis</em> (ein Endstand), <em>Satzergebnisse</em> (mehrere Sätze) oder <em>Gruppe Sätze, KO Spielergebnis</em></li>
+        <li><strong>Spielmodus</strong> — <em>Gruppenphase</em>, <em>KO-Modus</em> (nur KO) oder <em>Doppel-KO Modus</em> (nach dem ersten Auslosen gesperrt)</li>
+        <li><strong>Gruppengröße</strong> — Anzahl Teilnehmer pro Gruppe (Gruppenphase), 3–20</li>
+        <li><strong>Finalrunde</strong> — Nur im Gruppenmodus: <em>nur Gruppenphase</em>, <em>KO-Runde</em> oder <em>Kreuzspiele</em> (vollständige Platzierungsrunde). Solange die Finalrunde noch nicht ausgelost ist, kann zwischen KO und Kreuzspielen gewechselt werden</li>
+        <li><strong>Aufsteiger</strong> — Bei Finalrunde KO: 1 (Gruppenerste) oder 2 (Erste &amp; Zweite)</li>
+        <li><strong>Kreuzspiele – Paarungen je Rang</strong> — Bei Finalrunde Kreuzspiele: pro Rang-Paar (1+2, 3+4, …) festlegen, ob <em>über Kreuz</em> (1.A–2.B …) oder <em>getrennt</em> ausgespielt wird (siehe <a href="#kreuzspiele">Kreuzspiele</a>)</li>
+        <li><strong>Spielrunden anzeigen</strong> — Zeigt im Gruppen-Spielplan die Runden und spielfreien Teilnehmer (bei ungeraden Gruppen) an</li>
+        <li><strong>Platz-3-Spiel</strong> — Bei KO-Finalrunde: ob die Halbfinalverlierer um Platz 3 spielen</li>
+        <li><strong>Setzungsreihenfolge</strong> — <em>Höhere Stärke = stärker</em> oder <em>Niedrigere Stärke = stärker</em> (Tennis-Modus)</li>
+        <li><strong>Spielstärke anzeigen (Gruppe)</strong> — Zeigt die Spielstärke neben den Teilnehmern in der Gruppenansicht</li>
+        <li><strong>Setzungen anzeigen (KO)</strong> — Nur in KO-/Doppel-KO-Modi: blendet die Setzungslabels (z.B. „5-8") ein</li>
         <li><strong>Max. Teilnehmer</strong> — Obergrenze (0 = unbegrenzt)</li>
-        <li><strong>Anmeldungen offen</strong> — Ob der Bewerb im Anmeldeformular wählbar ist</li>
-        <li><strong>Setzung anzeigen / Setzungsreihenfolge</strong> — Für KO-Modi; höhere oder niedrigere Spielstärke gilt als besser</li>
+        <li><strong>Spielplätze</strong> — Anzahl paralleler Plätze (0 = aus); siehe <a href="#spielplaetze">Spielplätze</a></li>
+        <li><strong>Nennung offen</strong> — Ob der Bewerb im öffentlichen Anmeldeformular wählbar ist</li>
       </ul>
 
       <h5 class="mt-3">Doppelbewerb</h5>
@@ -209,7 +219,16 @@ ob_start(); ?>
       <p>Über den Button <strong>TT RC Abgleich</strong> (rechts in der Toolbar) werden alle Spieler mit hinterlegter RatingsCentral-ID nacheinander abgeglichen. Fortschritt und Ergebnis werden direkt angezeigt.</p>
 
       <h5 class="mt-3">Import per CSV/XLSX</h5>
-      <p>Über <strong>Spieler importieren</strong> können Spieler per Datei massenweise angelegt werden. Die Vorlage ist über den gleichnamigen Button herunterladbar. Spalten: Name, Vorname, Verein, Geschlecht, Lizenznummer, E-Mail, Spielstärke, Spielstärke Tischtennis, Spielstärke Tennis, Spielstärke Fußball, RatingsCentral-ID.</p>
+      <p>Im Spielerregister lassen sich Daten massenweise per Datei (CSV oder XLSX) anlegen. Zu jedem Import gibt es einen Button zum Herunterladen der passenden <strong>Vorlage</strong>. Es gibt drei Importe, je auf dem zugehörigen Tab:</p>
+      <ul>
+        <li><strong>Importieren</strong> (Tab Spieler) — eine Zeile je Spieler. Spalten: Name, Vorname, Verein, Geschlecht, Lizenznummer, E-Mail, Spielstärke, Spielstärke Tischtennis, Spielstärke Tennis, Spielstärke Fußball, RatingsCentral-ID. Dedup über Pass-Nr. oder Nachname+Vorname.</li>
+        <li><strong>Doppel importieren</strong> (Tab Doppel) — eine Zeile je Doppel mit beiden Spielern (je Nachname, Vorname, Pass-Nr.). Noch nicht existierende Spieler werden automatisch angelegt.</li>
+        <li><strong>Teams importieren</strong> (Tab Teams) — Langformat: eine Zeile je Mitglied, gruppiert nach Teamname. Eine Zeile mit nur ausgefülltem Teamnamen legt ein Team ohne Mitglieder an.</li>
+      </ul>
+      <div class="alert alert-info small">
+        <i class="bi bi-info-circle me-1"></i>
+        Beim Mitglieder-Abgleich (Doppel/Teams) hat die Pass-Nr. Vorrang vor dem Namen. Mehrere Namens-Treffer werden als mehrdeutig gemeldet; nicht gefundene Spieler werden neu angelegt.
+      </div>
 
       <h5 class="mt-3">Spielstärke und Setzung</h5>
       <p>Bei der Auslosung werden Spieler nach Spielstärke gereiht:</p>
@@ -269,7 +288,7 @@ ob_start(); ?>
       <h5 class="mt-3">Teambewerb konfigurieren</h5>
       <p>Beim Anlegen oder in den Einstellungen eines Bewerbs den Typ <strong>Teambewerb</strong> wählen. Die wichtigste Einstellung:</p>
       <ul>
-        <li><strong>Spiele pro Team</strong> — Legt fest, wie viele Einzel-Duelle pro Mannschaftsspiel ausgetragen werden (z.B. 4 = vier Einzelspiele). Bei <strong>0</strong> wird das Gesamtergebnis direkt eingegeben (ohne Duelle); bei <strong>1</strong> gibt es ein Duel ohne Spielerauswahl. Diese Einstellung ist nach dem ersten Auslosen gesperrt.</li>
+        <li><strong>Spiele pro Team</strong> — Legt fest, wie viele Einzel-Duelle pro Mannschaftsspiel ausgetragen werden (z.B. 4 = vier Einzelspiele). Bei <strong>0</strong> wird das Gesamtergebnis direkt eingegeben (ohne Duelle); bei <strong>1</strong> gibt es ein Duel ohne Spielerauswahl. Diese Einstellung kann auch nach dem Auslosen der Gruppen noch geändert werden, solange noch kein Gruppenergebnis erfasst wurde — danach ist sie gesperrt.</li>
       </ul>
 
       <h5 class="mt-3">Teams einem Bewerb zuweisen</h5>
@@ -313,13 +332,13 @@ ob_start(); ?>
       <h2 class="h4 border-bottom pb-2">Auslosung</h2>
 
       <h5 id="gruppenphase" class="mt-3">Gruppenphase</h5>
-      <p>Voraussetzung: Modus <em>Gruppenphase + KO</em>, mindestens so viele Teilnehmer wie eine Gruppenanzahl × Gruppengröße (3–20 Spieler/Teams pro Gruppe).</p>
+      <p>Voraussetzung: Modus <em>Gruppenphase</em>, mindestens so viele Teilnehmer wie eine Gruppenanzahl × Gruppengröße (3–20 Spieler/Teams pro Gruppe).</p>
       <ol>
         <li>Klicke auf <strong>Gruppen auslosen</strong> — Teilnehmer werden nach Spielstärke gereiht und gleichmäßig auf die Gruppen verteilt</li>
         <li>Die Gruppenreihenfolge kann per Drag &amp; Drop angepasst werden (<strong>Gruppen neu ordnen</strong>)</li>
-        <li>Alle Gruppenspiele werden automatisch als Round-Robin-Spielplan erzeugt</li>
+        <li>Alle Gruppenspiele werden automatisch als Round-Robin-Spielplan erzeugt (rundenbasiert, möglichst ohne zwei Partien direkt hintereinander)</li>
         <li>Ergebnisse erfassen → Tabelle wird automatisch berechnet</li>
-        <li>Wenn alle Gruppenspiele eingetragen sind, erscheint <strong>KO-Runde auslosen</strong></li>
+        <li>Wenn alle Gruppenspiele eingetragen sind, erscheint je nach Finalrunde <strong>KO-Runde auslosen</strong> bzw. <strong>Kreuzspiele auslosen</strong> (entfällt bei <em>nur Gruppenphase</em>)</li>
       </ol>
       <p>Die Gruppenplatzierung (Sieg=2 Pkt., Unentschieden=1 Pkt., Niederlage=0 Pkt.) bestimmt den Aufstieg. Tiebreaker-Reihenfolge bei Punktegleichstand:</p>
       <ol class="small">
@@ -335,6 +354,20 @@ ob_start(); ?>
 
       <h5 id="ko" class="mt-3">KO-Runde (nach Gruppenphase)</h5>
       <p>Nach Abschluss der Gruppenphase werden die qualifizierten Teilnehmer in ein KO-Bracket ausgelost. Gruppensieger werden gegen Gruppenzweite aus anderen Gruppen gesetzt.</p>
+
+      <h5 id="kreuzspiele" class="mt-3">Kreuzspiele / Platzierungsrunde</h5>
+      <p>Im Modus <em>Gruppenphase</em> mit Finalrunde <strong>Kreuzspiele</strong> wird nach der Gruppenphase <strong>jeder Platz</strong> ausgespielt — es gibt also eine vollständige Endplatzierung statt nur einer KO-Runde der Aufsteiger.</p>
+      <ul>
+        <li>Pro Rang-Paar (1+2, 3+4, …) wird in den Einstellungen gewählt, ob es <strong>über Kreuz</strong> oder <strong>getrennt</strong> ausgespielt wird:
+          <ul>
+            <li><strong>über Kreuz</strong> — z.B. 1.A–2.B und 1.B–2.A, mit Finale und Spiel um Platz 3 — ergibt einen Platzblock (z.B. „Plätze 1-4")</li>
+            <li><strong>getrennt</strong> — die Gruppenersten spielen unter sich, die Gruppenzweiten unter sich</li>
+          </ul>
+        </li>
+        <li>Jeder Platzblock wird intern komplett ausgespielt: pro Runde spielen alle Aktiven, Sieger steigen auf, Verlierer ab — bis jeder Teilnehmer einen eindeutigen Platz hat. Freilose lösen sich automatisch auf.</li>
+        <li>Auslösen über <strong>Kreuzspiele auslosen</strong>; die Platzblöcke erscheinen oberhalb der Gruppen. Die Endplatzierung wird laufend aktualisiert.</li>
+        <li>Eigener Export: <strong>Kreuzspiele-PDF</strong>.</li>
+      </ul>
 
       <h5 id="ko-direkt" class="mt-3">Nur KO-Runde</h5>
       <p>Im Modus <em>Nur KO-Runde</em> entfällt die Gruppenphase. Alle zugewiesenen Teilnehmer kommen direkt in ein gesetztes KO-Bracket; Freilose werden automatisch weitergerückt.</p>
@@ -352,6 +385,19 @@ ob_start(); ?>
       </div>
     </section>
 
+    <!-- Spielplätze -->
+    <section id="spielplaetze" class="mb-5">
+      <h2 class="h4 border-bottom pb-2">Spielplätze</h2>
+      <p>Optional kann jedem Bewerb eine Anzahl paralleler <strong>Spielplätze</strong> zugewiesen werden. Mit <em>Spielplätze = 0</em> (Standard) ist die Funktion deaktiviert.</p>
+      <ul>
+        <li>Die Anzahl der Plätze wird in den <strong>Bewerbseinstellungen</strong> gesetzt (Feld <em>Spielplätze</em>).</li>
+        <li>In der Gruppenphase sind die Plätze an Gruppen gebunden: beim Auslosen erhält jede Gruppe automatisch einen gleichmäßigen Block (z.B. bei 6 Plätzen und 3 Gruppen → 1+2, 3+4, 5+6). Die Begegnungen rotieren über die Plätze ihrer Gruppe.</li>
+        <li>Die Platzzuordnung je Gruppe ist manuell editierbar — über das Feld <strong>Plätze</strong> bei jeder Gruppe (komma-separiert, z.B. „1,2"). Nach dem Speichern werden die Plätze neu verteilt.</li>
+        <li>KO- und Kreuzspiele nutzen den gesamten Platz-Pool; das Finale erhält Platz 1.</li>
+        <li>Der zugewiesene Platz („Platz X") erscheint in der Web-Ansicht (Gruppe und KO) sowie in allen Spielplan- und Spielkarten-PDFs.</li>
+      </ul>
+    </section>
+
     <!-- Ergebnisse -->
     <section id="ergebnisse" class="mb-5">
       <h2 class="h4 border-bottom pb-2">Ergebnisse erfassen</h2>
@@ -360,6 +406,7 @@ ob_start(); ?>
       <ul>
         <li><strong>Gruppenspiele</strong> — Score-Felder neben jedem Spiel; mit <kbd>Enter</kbd> oder Klick auf <strong>Speichern</strong> bestätigen. Mehrere Ergebnisse können per <strong>Alle speichern</strong> gleichzeitig übermittelt werden.</li>
         <li><strong>KO-Spiele</strong> — Score-Felder im KO-Raster; nach dem Speichern rückt der Gewinner automatisch vor.</li>
+        <li><strong>Satzergebnisse</strong> — Ist in den Einstellungen die <em>Ergebniserfassung</em> auf <em>Satzergebnisse</em> gestellt, werden statt eines Endstands die einzelnen Sätze erfasst. Mit <em>Gruppe Sätze, KO Spielergebnis</em> gilt das nur für die Gruppenphase.</li>
         <li><strong>Ergebnis korrigieren</strong> — Mit dem ✕-Button kann ein eingetragenes Ergebnis gelöscht werden; abhängige Runden werden zurückgesetzt.</li>
       </ul>
 
@@ -459,6 +506,11 @@ ob_start(); ?>
               <td>KO-Bracket PDF</td>
               <td>Bewerbsseite</td>
               <td>KO-Raster (Querformat)</td>
+            </tr>
+            <tr>
+              <td>Kreuzspiele PDF</td>
+              <td>Bewerbsseite</td>
+              <td>Platzblöcke der Platzierungsrunde (Modus Kreuzspiele)</td>
             </tr>
             <tr>
               <td>Spielkarten PDF</td>

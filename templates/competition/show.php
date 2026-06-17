@@ -158,11 +158,12 @@ ob_start(); ?>
         <input type="hidden" name="comp_type" value="<?= $comp_type ?>">
         <?php endif; ?>
       </div>
+      <?php $ts_editable = ($c['phase'] === 'setup') || !empty($group_no_results); ?>
       <div class="col-auto" id="field-team-size"<?= $comp_type !== 'team' ? ' style="display:none"' : '' ?>>
         <label class="form-label">Spiele pro Team</label>
         <input type="number" name="team_size" class="form-control form-control-sm" style="width:90px"
-               min="0" max="20" value="<?= (int)($c['team_size'] ?? 0) ?>"<?= $c['phase'] !== 'setup' ? ' disabled' : '' ?>>
-        <?php if ($c['phase'] !== 'setup'): ?>
+               min="0" max="20" value="<?= (int)($c['team_size'] ?? 0) ?>"<?= !$ts_editable ? ' disabled' : '' ?>>
+        <?php if (!$ts_editable): ?>
         <input type="hidden" name="team_size" value="<?= (int)($c['team_size'] ?? 0) ?>">
         <?php endif; ?>
       </div>

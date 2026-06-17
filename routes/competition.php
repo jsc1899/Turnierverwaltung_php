@@ -735,9 +735,23 @@ function settings(array $p): void {
     $team_result_mode  = post('team_result_mode') === 'sum' ? 'sum' : 'wins';
     $cross_config      = _cross_config_from_post($group_size);
 
-    $c = db_fetch("SELECT phase, mode, is_doubles, is_team FROM competition WHERE id=?", [$cid]);
+    $c = db_fetch("SELECT phase, mode, is_doubles, is_team, team_size FROM competition WHERE id=?", [$cid]);
     if (!$c) { redirect('competition/' . $cid); return; }
     if ($name) db_execute("UPDATE competition SET name=? WHERE id=?", [$name, $cid]);
+
+    // "Spiele pro Team" nur in Setup-Phase oder in der Gruppenphase ändern, solange noch
+    // kein Gruppenergebnis erfasst wurde — danach die Begegnungsstruktur sperren.
+    $ts_editable = ($c['phase'] === 'setup');
+    if (!$ts_editable && !empty($c['is_team']) && $c['phase'] === 'group') {
+        $played_grp = (int)db_fetch(
+            "SELECT COUNT(*) as n FROM `match` WHERE competition_id=? AND group_id IS NOT NULL AND played=1",
+            [$cid]
+        )['n'];
+        $ts_editable = ($played_grp === 0);
+    }
+    if (!$ts_editable) {
+        $team_size = (int)$c['team_size'];   // unverändert lassen
+    }
 
     // Modus (aus mode + finalrunde abgeleitet) speichern:
     //  - in Setup-Phase: beliebiger Moduswechsel
@@ -779,6 +793,15 @@ function settings(array $p): void {
     } else {
         db_execute("UPDATE competition SET advance_count=?, third_place=?, registrations_open=?, max_players=?, show_skill=?, seeding_order=?, team_size=?, score_mode=?, show_byes=?, num_courts=?, team_result_mode=?, cross_config=? WHERE id=?",
             [$advance_count, $third_place, $registrations_open, $max_players, $show_skill, $seeding_order, $team_size, $score_mode, $show_byes, $num_courts, $team_result_mode, $cross_config, $cid]);
+    }
+    // Bei verkleinertem team_size in der Gruppenphase verwaiste Aufstellungs-Zeilen entfernen.
+    if ($ts_editable && $c['phase'] === 'group' && !empty($c['is_team'])) {
+        db_execute(
+            "DELETE d FROM team_match_duel d
+             JOIN `match` m ON m.id = d.match_id
+             WHERE m.competition_id=? AND d.duel_order >= ?",
+            [$cid, $team_size]
+        );
     }
     assign_courts($cid);
     flash('success', 'Einstellungen gespeichert.');
