@@ -793,10 +793,20 @@ ob_start(); ?>
       <a href="<?= url('competition/'.$c['id'].'/pdf/match-cards') ?>" class="btn btn-outline-secondary btn-sm" target="_blank">
         <i class="bi bi-card-text me-1"></i>Match-Cards
       </a>
+      <?php if ($is_team && (int)($c['team_size'] ?? 0) > 1): ?>
+      <button type="button" class="btn btn-outline-secondary btn-sm ms-auto toggle-duels-btn" onclick="toggleAllDuels()">
+        <i class="bi bi-list-ol me-1"></i><span class="toggle-duels-label">Einzelspiele ausblenden</span>
+      </button>
+      <button type="button" id="toggle-results-btn" onclick="toggleAllResults()"
+              class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-chevron-up me-1"></i>Spielergebnisse ausblenden
+      </button>
+      <?php else: ?>
       <button type="button" id="toggle-results-btn" onclick="toggleAllResults()"
               class="btn btn-outline-secondary btn-sm ms-auto">
         <i class="bi bi-chevron-up me-1"></i>Spielergebnisse ausblenden
       </button>
+      <?php endif; ?>
     </div>
 
     <?php if (can_edit() && (int)($c['num_courts'] ?? 0) > 0): ?>
@@ -1022,9 +1032,21 @@ ob_start(); ?>
           <div class="mb-3 border rounded overflow-hidden">
             <div class="d-flex align-items-center px-2 py-2 bg-light border-bottom">
               <span class="text-truncate fw-semibold" style="min-width:0;flex:1;text-align:right"><?= e($m['p1name']) ?></span>
+              <?php if ($grp_editable): ?>
+              <span class="d-flex align-items-center justify-content-center gap-1 flex-shrink-0" style="width:110px">
+                <input type="number" name="total_score1" min="0" form="duel-form-<?= $m['id'] ?>"
+                       class="form-control form-control-sm text-center duel-total-input" style="width:48px;font-size:.82rem"
+                       value="<?= $m['played'] ? (int)$m['score1'] : '' ?>" title="Gesamtergebnis (optional)">
+                <span class="text-muted">:</span>
+                <input type="number" name="total_score2" min="0" form="duel-form-<?= $m['id'] ?>"
+                       class="form-control form-control-sm text-center duel-total-input" style="width:48px;font-size:.82rem"
+                       value="<?= $m['played'] ? (int)$m['score2'] : '' ?>" title="Gesamtergebnis (optional)">
+              </span>
+              <?php else: ?>
               <span class="fw-bold fs-6 text-center flex-shrink-0" style="width:110px">
                 <?= $m['played'] ? (int)$m['score1'].':'.(int)$m['score2'] : '—:—' ?>
               </span>
+              <?php endif; ?>
               <span class="text-truncate fw-semibold" style="min-width:0;flex:1"><?= e($m['p2name']) ?></span>
               <?php if ($m['played'] && $grp_editable): ?>
               <form method="post" action="<?= url('match/'.$m['id'].'/result/clear') ?>" class="flex-shrink-0 ms-1"
@@ -1037,9 +1059,9 @@ ob_start(); ?>
               <?php endif; ?>
             </div>
             <?php if ($grp_editable): ?>
-            <form class="duel-form" method="post" action="<?= url('match/'.$m['id'].'/duels') ?>">
+            <form class="duel-form" id="duel-form-<?= $m['id'] ?>" method="post" action="<?= url('match/'.$m['id'].'/duels') ?>">
               <?= csrf_field() ?>
-              <table class="table table-sm align-middle mb-0" style="table-layout:fixed;font-size:.82rem">
+              <table class="table table-sm align-middle mb-0 duel-rows" style="table-layout:fixed;font-size:.82rem">
                 <colgroup><col><col style="width:110px"><col></colgroup>
                 <tbody>
                 <?php for ($i = 0; $i < $team_size_val; $i++):
@@ -1083,7 +1105,7 @@ ob_start(); ?>
               </div>
             </form>
             <?php elseif (!empty($duel_rows)): ?>
-            <table class="table table-sm align-middle mb-0" style="table-layout:fixed">
+            <table class="table table-sm align-middle mb-0 duel-rows" style="table-layout:fixed">
               <colgroup><col><col style="width:80px"><col></colgroup>
               <tbody>
                 <?php foreach ($duel_rows as $d): ?>
@@ -1229,9 +1251,14 @@ ob_start(); ?>
       <a href="<?= url('competition/'.$c['id'].'/pdf/match-cards') ?>" class="btn btn-outline-secondary btn-sm" target="_blank">
         <i class="bi bi-card-text me-1"></i>Match-Cards
       </a>
+      <?php if ($is_team && (int)($c['team_size'] ?? 0) > 1): ?>
+      <button type="button" class="btn btn-outline-secondary btn-sm ms-auto toggle-duels-btn" onclick="toggleAllDuels()">
+        <i class="bi bi-list-ol me-1"></i><span class="toggle-duels-label">Einzelspiele ausblenden</span>
+      </button>
+      <?php endif; ?>
       <?php if ((can_edit() && !$locked) && $ko_no_results): ?>
       <button type="button" id="ko-edit-btn" onclick="toggleKoEdit()"
-              class="btn btn-outline-secondary btn-sm ms-auto">
+              class="btn btn-outline-secondary btn-sm<?= ($is_team && (int)($c['team_size'] ?? 0) > 1) ? '' : ' ms-auto' ?>">
         <i class="bi bi-arrows-move me-1"></i>Umstellen
       </button>
       <?php endif; ?>
@@ -1352,9 +1379,9 @@ ob_start(); ?>
                   &#9656; <?= $m['played'] ? $m['score1'].':'.$m['score2'].' (Duelle)' : 'Duelle' ?>
                 </summary>
                 <?php if ((can_edit() && !$locked)): ?>
-                <form class="duel-form" method="post" action="<?= url('match/'.$m['id'].'/duels') ?>" style="margin-top:4px">
+                <form class="duel-form" id="duel-form-<?= $m['id'] ?>" method="post" action="<?= url('match/'.$m['id'].'/duels') ?>" style="margin-top:4px">
                   <?= csrf_field() ?>
-                  <table class="table table-sm align-middle mb-1" style="font-size:.72rem;table-layout:fixed">
+                  <table class="table table-sm align-middle mb-1 duel-rows" style="font-size:.72rem;table-layout:fixed">
                     <colgroup><col><col style="width:76px"><col></colgroup>
                     <tbody>
                     <?php for ($i = 0; $i < $ko_ts; $i++):
@@ -1393,7 +1420,17 @@ ob_start(); ?>
                     <?php endfor; ?>
                     </tbody>
                   </table>
-                  <div class="text-end mb-1">
+                  <div class="d-flex align-items-center justify-content-between mb-1" style="font-size:.72rem">
+                    <span class="d-flex align-items-center gap-1">
+                      <span class="text-muted">Gesamt:</span>
+                      <input type="number" name="total_score1" min="0"
+                             class="form-control form-control-sm text-center duel-total-input" style="width:32px;height:22px;font-size:.7rem;padding:0 2px"
+                             value="<?= $m['played'] ? (int)$m['score1'] : '' ?>" title="Gesamtergebnis (optional)">
+                      <span>:</span>
+                      <input type="number" name="total_score2" min="0"
+                             class="form-control form-control-sm text-center duel-total-input" style="width:32px;height:22px;font-size:.7rem;padding:0 2px"
+                             value="<?= $m['played'] ? (int)$m['score2'] : '' ?>" title="Gesamtergebnis (optional)">
+                    </span>
                     <button type="submit" class="btn btn-primary btn-sm py-0 px-2" style="font-size:.72rem">Speichern</button>
                   </div>
                 </form>
@@ -1431,7 +1468,7 @@ ob_start(); ?>
                 </div>
                 <?php endif; ?>
                 <?php elseif (!empty($ko_duel_rows)): ?>
-                <table class="table table-sm align-middle mb-0 mt-1" style="font-size:.72rem;table-layout:fixed">
+                <table class="table table-sm align-middle mb-0 mt-1 duel-rows" style="font-size:.72rem;table-layout:fixed">
                   <colgroup><col><col style="width:60px"><col></colgroup>
                   <tbody>
                     <?php foreach ($ko_duel_rows as $d): ?>
@@ -2011,6 +2048,29 @@ function toggleAllResults() {
     ? '<i class="bi bi-chevron-down me-1"></i>Spielergebnisse anzeigen'
     : '<i class="bi bi-chevron-up me-1"></i>Spielergebnisse ausblenden';
 }
+
+// Einzelspiel-Zeilen (Duelle) aller Team-Begegnungen gemeinsam aus-/einblenden.
+// Globaler Schalter; Zustand pro Bewerb in localStorage gespeichert.
+function _duelStorageKey() {
+  var m = location.pathname.match(/competition\/(\d+)/);
+  return 'hideDuels:' + (m ? m[1] : 'x');
+}
+function _applyDuelVisibility(hide) {
+  document.querySelectorAll('.duel-rows').forEach(function(el) {
+    el.style.display = hide ? 'none' : '';
+  });
+  document.querySelectorAll('.toggle-duels-label').forEach(function(lbl) {
+    lbl.textContent = hide ? 'Einzelspiele anzeigen' : 'Einzelspiele ausblenden';
+  });
+}
+function toggleAllDuels() {
+  var hide = localStorage.getItem(_duelStorageKey()) !== '1';
+  localStorage.setItem(_duelStorageKey(), hide ? '1' : '0');
+  _applyDuelVisibility(hide);
+}
+document.addEventListener('DOMContentLoaded', function() {
+  if (localStorage.getItem(_duelStorageKey()) === '1') _applyDuelVisibility(true);
+});
 
 // Test-Hilfe: füllt alle offenen (leeren) Ergebnis-Paare mit zufälligen, ungleichen
 // Werten. save=false → nur ins Formular eintragen; save=true → zusätzlich speichern

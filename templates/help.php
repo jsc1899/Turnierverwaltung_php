@@ -299,8 +299,9 @@ ob_start(); ?>
       <ul>
         <li>Direkt unter jedem Spiel erscheint eine Eingabetabelle: links die Spielerauswahl aus Team 1 (rechtsbündig), in der Mitte das Ergebnis des Duells, rechts die Spielerauswahl aus Team 2</li>
         <li>Ab <em>Spiele pro Team ≥ 2</em> wird pro Zeile eine Spielerauswahl eingeblendet; zusätzlich steht der Eintrag <strong>Doppel</strong> zur Verfügung — für Doppelspiele innerhalb eines Mannschaftskampfs. Doppel kann in mehreren Zeilen gleichzeitig gewählt werden.</li>
-        <li>Das <strong>Gesamtergebnis</strong> (Anzahl gewonnener Duelle) wird in der Kopfzeile des Spiels angezeigt — als <code>—:—</code> solange noch nichts gespeichert ist</li>
-        <li>Nach dem Speichern wird das Gesamtergebnis automatisch aus den Duel-Ergebnissen berechnet</li>
+        <li>In der Kopfzeile des Spiels stehen zwei Eingabefelder für das <strong>Gesamtergebnis</strong>. Lässt man sie leer, wird das Gesamtergebnis nach dem Speichern automatisch aus den Einzelspielen berechnet (bzw. <code>—:—</code> solange nichts gespeichert ist)</li>
+        <li><strong>Optionales Gesamtergebnis</strong> (ab <em>Spiele pro Team ≥ 2</em>): Trägt man beide Felder von Hand ein, gilt dieser Wert als Mannschaftsergebnis — auch wenn einzelne Duelle erfasst sind. Praktisch, wenn nur das Endergebnis bekannt ist oder die Einzelspiele nicht gepflegt werden. Die Einzelwerte bleiben gespeichert und fließen weiter in die Einzel-Statistik ein.</li>
+        <li><strong>Einzelspiele ausblenden</strong>: Über die Schaltfläche in der Werkzeugleiste lassen sich die Einzelergebnis-Zeilen für alle Spiele gemeinsam ein-/ausblenden (z.B. wenn nur Gesamtergebnisse erfasst werden). Der Zustand bleibt pro Bewerb erhalten. Auf den Spielkarten-PDFs sind die Einzelzeilen unabhängig davon immer enthalten.</li>
         <li>Gäste und Viewer sehen die Einzel-Ergebnisse unterhalb der Gruppenstand-Tabelle als read-only Ansicht</li>
       </ul>
 
@@ -415,7 +416,8 @@ ob_start(); ?>
       <ul>
         <li>Pro Zeile: Spielerauswahl Team 1 (links) — Ergebnis des Duells (Mitte) — Spielerauswahl Team 2 (rechts)</li>
         <li>Ab <em>Spiele pro Team ≥ 2</em> steht zusätzlich der Eintrag <strong>Doppel</strong> zur Verfügung (für Doppelspiele); Doppel kann in mehreren Zeilen gleichzeitig gewählt werden</li>
-        <li>Das <strong>Gesamtergebnis</strong> (Anzahl gewonnener Duelle) ergibt sich automatisch und wird in der Kopfzeile des Spiels angezeigt</li>
+        <li>In der Kopfzeile des Spiels stehen zwei Felder für das <strong>Gesamtergebnis</strong>: leer lassen → es wird automatisch aus den Einzelspielen berechnet; manuell ausfüllen → der eingetragene Wert gilt (Vorrang vor den Einzelergebnissen)</li>
+        <li>Mit der Schaltfläche <strong>Einzelspiele ausblenden</strong> in der Werkzeugleiste lassen sich die Einzelergebnis-Zeilen gemeinsam aus-/einblenden (Zustand bleibt pro Bewerb erhalten)</li>
         <li>Bei KO-Spielen ist die Duel-Tabelle über das <strong>Duelle</strong>-Element ausklappbar</li>
         <li>Bei <em>Spiele pro Team = 0</em> wird nur das Gesamtergebnis direkt eingetragen (wie bei Einzelbewerben)</li>
       </ul>

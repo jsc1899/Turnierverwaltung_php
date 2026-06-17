@@ -192,6 +192,11 @@ function save_duels(array $p): void {
     $duels      = $_POST['duels'] ?? [];
     $team_size  = (int)$m['team_size'];
 
+    // Optionales Gesamtergebnis (hat Vorrang vor den berechneten Einzelergebnissen)
+    $tot1_raw = $_POST['total_score1'] ?? '';
+    $tot2_raw = $_POST['total_score2'] ?? '';
+    $has_total = ($tot1_raw !== '' && $tot2_raw !== '');
+
     db_execute("DELETE FROM team_match_duel WHERE match_id=?", [$mid]);
 
     $s1 = 0; $s2 = 0; $played_count = 0;
@@ -230,7 +235,17 @@ function save_duels(array $p): void {
         }
     }
 
-    if ($played_count > 0) {
+    if ($has_total) {
+        // Manuelles Gesamtergebnis: zählt unabhängig von den Einzel-Duellen.
+        $s1 = (int)$tot1_raw;
+        $s2 = (int)$tot2_raw;
+        db_execute(
+            "UPDATE `match` SET score1=?, score2=?, played=1 WHERE id=?",
+            [$s1, $s2, $mid]
+        );
+        if ($m['group_id'] !== null) _reset_group_tiebreak((int)$m['group_id']);
+        _propagate_result((int)$m['competition_id'], $m);
+    } elseif ($played_count > 0) {
         $all_played = ($played_count >= $team_size) ? 1 : 0;
         db_execute(
             "UPDATE `match` SET score1=?, score2=?, played=? WHERE id=?",
