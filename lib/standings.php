@@ -278,6 +278,28 @@ function team_standings(int $group_id, string $seeding_order = 'desc', string $s
     return _apply_h2h_tiebreaker($result, $matches, 'team1_id', 'team2_id', $duels);
 }
 
+/**
+ * Vergibt jedem Team einer Gruppe eine Start-Nr. (1..N), sortiert nach Setzung/Spielstärke
+ * (skill DESC, dann team_id). Rückgabe: [team_id => Nummer].
+ */
+function team_start_numbers(int $group_id): array {
+    $rows = db_fetchall(
+        "SELECT t.id
+         FROM `team` t
+         JOIN group_team gt ON gt.team_id = t.id AND gt.group_id = ?
+         LEFT JOIN competition_team ct ON ct.team_id = t.id
+           AND ct.competition_id = (SELECT competition_id FROM grp WHERE id = ?)
+         ORDER BY COALESCE(ct.skill, 0) DESC, t.id",
+        [$group_id, $group_id]
+    );
+    $map = [];
+    $n = 0;
+    foreach ($rows as $r) {
+        $map[(int)$r['id']] = ++$n;
+    }
+    return $map;
+}
+
 function double_standings(int $group_id, string $seeding_order = 'desc', string $score_mode = 'match'): array {
     $doubles = db_fetchall(
         "SELECT d.id,

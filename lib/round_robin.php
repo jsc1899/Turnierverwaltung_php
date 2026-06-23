@@ -22,8 +22,8 @@
 /**
  * Liefert die Spielreihenfolge als flache Paarliste [[p1,p2], …] (Rückwärtskompatibel).
  */
-function round_robin_schedule(array $player_ids): array {
-    $r = round_robin_schedule_rounds($player_ids);
+function round_robin_schedule(array $player_ids, bool $force_bye = false): array {
+    $r = round_robin_schedule_rounds($player_ids, $force_bye);
     return array_map(fn($m) => [$m['p1'], $m['p2']], $r['matches']);
 }
 
@@ -33,10 +33,10 @@ function round_robin_schedule(array $player_ids): array {
  *     'byes'    => [ rundenNr => spielfreie_ID|null, … ] ]
  * 'byes' enthält bei ungerader Teilnehmerzahl je Runde den spielfreien Teilnehmer.
  */
-function round_robin_schedule_rounds(array $player_ids): array {
+function round_robin_schedule_rounds(array $player_ids, bool $force_bye = false): array {
     $n = count($player_ids);
     if ($n < 2) return ['matches' => [], 'byes' => []];
-    if ($n === 2) {
+    if ($n === 2 && !$force_bye) {
         return ['matches' => [['p1' => $player_ids[0], 'p2' => $player_ids[1], 'round' => 1]],
                 'byes' => [1 => null]];
     }
@@ -44,7 +44,7 @@ function round_robin_schedule_rounds(array $player_ids): array {
     $best = null;
     $best_conf = PHP_INT_MAX;
     for ($t = 0; $t < 400; $t++) {
-        $cand = rr_flatten(rr_build_once($player_ids));
+        $cand = rr_flatten(rr_build_once($player_ids, $force_bye));
         if ($cand['b2b'] < $best_conf) {
             $best = $cand;
             $best_conf = $cand['b2b'];
@@ -58,10 +58,17 @@ function round_robin_schedule_rounds(array $player_ids): array {
  * Ein zufälliger, rundenbasierter Spielplan-Kandidat (Kreismethode).
  * Rückgabe: Liste von Runden, je Runde ['matches' => [[p1,p2], …], 'bye' => id|null].
  */
-function rr_build_once(array $player_ids): array {
+function rr_build_once(array $player_ids, bool $force_bye = false): array {
     $players = $player_ids;
     shuffle($players);                                // Zufalls-Auslosung
-    if (count($players) % 2 === 1) $players[] = null; // BYE bei ungerader Anzahl
+    if (count($players) % 2 === 1) {
+        $players[] = null;                            // BYE bei ungerader Anzahl
+    } elseif ($force_bye) {
+        // Gerade Anzahl + erzwungene Pause: zwei Phantom-Slots (Slot-Zahl bleibt gerade →
+        // Kreismethode gültig). Je Runde bis zu zwei Spielfreie; jedes Team erhält ≥1 Pause.
+        $players[] = null;
+        $players[] = null;
+    }
     $m    = count($players);
     $half = intdiv($m, 2);
 

@@ -39,6 +39,14 @@ function match_cards(array $p): void {
     generate_match_cards_pdf((int)$p['id'], isset($p['gid']) ? (int)$p['gid'] : null);
 }
 
+function team_strips(array $p): void {
+    $c = db_fetch("SELECT t.is_public FROM competition c JOIN tournament t ON t.id=c.tournament_id WHERE c.id=?", [(int)$p['id']]);
+    if (!$c) { http_response_code(404); exit; }
+    if (!$c['is_public'] && !can_edit()) { http_response_code(403); exit; }
+    require_once __DIR__ . '/../lib/standings.php';
+    generate_team_strips_pdf((int)$p['id'], isset($p['gid']) ? (int)$p['gid'] : null);
+}
+
 function registrations_pdf(array $p): void {
     require_edit();
     generate_registrations_pdf((int)$p['id']);

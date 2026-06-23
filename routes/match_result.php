@@ -170,32 +170,14 @@ function force_advance_ko(array $p): void {
     redirect('competition/' . $m['competition_id']);
 }
 
-function save_duels(array $p): void {
-    require_edit();
-    csrf_verify();
-    $mid = (int)$p['id'];
-    $m   = db_fetch(
-        "SELECT m.*, c.team_size, c.team_result_mode, c.id as cid FROM `match` m
-         JOIN competition c ON c.id=m.competition_id WHERE m.id=?",
-        [$mid]
-    );
-    if (!$m || !(int)$m['team_size']) { redirect(''); return; }
+// Speichert die Einzelspiele (Duelle) EINER Team-Begegnung. Erwartet das Match inkl.
+// team_size/team_result_mode/group_id/competition_id. Keine Auth/CSRF/Redirect/Lock-Prüfung
+// (Aufrufer zuständig) → in Einzel- und Bulk-Speicherung wiederverwendbar.
+function _apply_duels(array $m, array $duels, string $tot1_raw, string $tot2_raw): void {
+    $mid         = (int)$m['id'];
+    $team_size   = (int)$m['team_size'];
     $result_mode = ($m['team_result_mode'] ?? 'wins') === 'sum' ? 'sum' : 'wins';
-    require_competition_open((int)$m['cid']);
-
-    if ($m['group_id'] !== null && _group_phase_locked((int)$m['cid'])) {
-        flash('danger', 'Gruppenspielergebnisse können nach dem KO-Auslosen nicht mehr geändert werden.');
-        redirect('competition/' . $m['cid']);
-        return;
-    }
-
-    $duels      = $_POST['duels'] ?? [];
-    $team_size  = (int)$m['team_size'];
-
-    // Optionales Gesamtergebnis (hat Vorrang vor den berechneten Einzelergebnissen)
-    $tot1_raw = $_POST['total_score1'] ?? '';
-    $tot2_raw = $_POST['total_score2'] ?? '';
-    $has_total = ($tot1_raw !== '' && $tot2_raw !== '');
+    $has_total   = ($tot1_raw !== '' && $tot2_raw !== '');
 
     db_execute("DELETE FROM team_match_duel WHERE match_id=?", [$mid]);
 
@@ -224,11 +206,9 @@ function save_duels(array $p): void {
         if ($dplayed) {
             $played_count++;
             if ($result_mode === 'sum') {
-                // Einzelergebnisse aufsummieren
                 $s1 += $ds1;
                 $s2 += $ds2;
             } else {
-                // je Einzelsieg 1 Punkt
                 if ($ds1 > $ds2) $s1++;
                 elseif ($ds2 > $ds1) $s2++;
             }
@@ -239,24 +219,74 @@ function save_duels(array $p): void {
         // Manuelles Gesamtergebnis: zählt unabhängig von den Einzel-Duellen.
         $s1 = (int)$tot1_raw;
         $s2 = (int)$tot2_raw;
-        db_execute(
-            "UPDATE `match` SET score1=?, score2=?, played=1 WHERE id=?",
-            [$s1, $s2, $mid]
-        );
+        db_execute("UPDATE `match` SET score1=?, score2=?, played=1 WHERE id=?", [$s1, $s2, $mid]);
         if ($m['group_id'] !== null) _reset_group_tiebreak((int)$m['group_id']);
         _propagate_result((int)$m['competition_id'], $m);
     } elseif ($played_count > 0) {
         $all_played = ($played_count >= $team_size) ? 1 : 0;
-        db_execute(
-            "UPDATE `match` SET score1=?, score2=?, played=? WHERE id=?",
-            [$s1, $s2, $all_played, $mid]
-        );
+        db_execute("UPDATE `match` SET score1=?, score2=?, played=? WHERE id=?", [$s1, $s2, $all_played, $mid]);
         if ($m['group_id'] !== null) _reset_group_tiebreak((int)$m['group_id']);
-        if ($all_played) {
-            _propagate_result((int)$m['competition_id'], $m);
-        }
+        if ($all_played) _propagate_result((int)$m['competition_id'], $m);
     }
+}
+
+function save_duels(array $p): void {
+    require_edit();
+    csrf_verify();
+    $mid = (int)$p['id'];
+    $m   = db_fetch(
+        "SELECT m.*, c.team_size, c.team_result_mode, c.id as cid FROM `match` m
+         JOIN competition c ON c.id=m.competition_id WHERE m.id=?",
+        [$mid]
+    );
+    if (!$m || !(int)$m['team_size']) { redirect(''); return; }
+    require_competition_open((int)$m['cid']);
+
+    if ($m['group_id'] !== null && _group_phase_locked((int)$m['cid'])) {
+        flash('danger', 'Gruppenspielergebnisse können nach dem KO-Auslosen nicht mehr geändert werden.');
+        redirect('competition/' . $m['cid']);
+        return;
+    }
+
+    _apply_duels($m, $_POST['duels'] ?? [], (string)($_POST['total_score1'] ?? ''), (string)($_POST['total_score2'] ?? ''));
     redirect('competition/' . $m['competition_id']);
+}
+
+// Bulk: speichert die Duelle MEHRERER Team-Begegnungen in EINEM Request (Test-Hilfe).
+// Nutzlast als JSON-Body (NICHT als Formularfelder), da viele Begegnungen sonst die
+// PHP-Grenze max_input_vars (Default 1000) überschreiten und stillschweigend verworfen würden.
+// Format: { csrf_token, dm: { matchId: { duels: { i: {score1,score2,player1_id,player2_id} }, total_score1, total_score2 } } }
+function save_duels_bulk(array $p): void {
+    require_edit();
+    $data = json_decode(file_get_contents('php://input'), true);
+    if (!is_array($data)) { http_response_code(400); exit; }
+    $_POST['csrf_token'] = (string)($data['csrf_token'] ?? '');  // csrf_verify liest aus $_POST
+    csrf_verify();
+    $cid = (int)$p['id'];
+    require_competition_open($cid);
+    $locked = null;   // _group_phase_locked nur einmal auswerten
+    foreach ((array)($data['dm'] ?? []) as $mid => $payload) {
+        if (!is_array($payload)) continue;
+        $mid = (int)$mid;
+        $m = db_fetch(
+            "SELECT m.*, c.team_size, c.team_result_mode, c.id as cid FROM `match` m
+             JOIN competition c ON c.id=m.competition_id WHERE m.id=?",
+            [$mid]
+        );
+        if (!$m || (int)$m['competition_id'] !== $cid || !(int)$m['team_size']) continue;
+        if ($m['group_id'] !== null) {
+            if ($locked === null) $locked = _group_phase_locked($cid);
+            if ($locked) continue;
+        }
+        _apply_duels(
+            $m,
+            (array)($payload['duels'] ?? []),
+            (string)($payload['total_score1'] ?? ''),
+            (string)($payload['total_score2'] ?? '')
+        );
+    }
+    http_response_code(204);   // AJAX-Aufruf (JSON) → kein Redirect, JS lädt selbst neu
+    exit;
 }
 
 function save_sets(array $p): void {

@@ -392,6 +392,12 @@ $nennung_badge = $pending_count + $change_count;
                 <label class="form-check-label" for="new_show_byes">Spielrunden anzeigen</label>
               </div>
             </div>
+            <div class="col-sm-3 d-flex align-items-end pb-1" id="new-forcebyes-wrap">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="force_byes" id="new_force_byes">
+                <label class="form-check-label" for="new_force_byes">Spielfreie Runde garantieren</label>
+              </div>
+            </div>
             <div class="col-sm-3" id="new-finalrunde-wrap">
               <label class="form-label">Finalrunde</label>
               <select name="finalrunde" id="new-finalrunde" class="form-select"
@@ -541,7 +547,7 @@ function toggleGroupSettings() {
   var mode = sel ? sel.value : 'groups_ko';
   var isGroups = (mode === 'groups_ko');
   // Gruppen-bezogene Felder (Größe, Spielrunden, Finalrunde) nur im Gruppenphase-Modus
-  ['new-group-size-wrap', 'new-byes-wrap', 'new-finalrunde-wrap'].forEach(function(id) {
+  ['new-group-size-wrap', 'new-byes-wrap', 'new-forcebyes-wrap', 'new-finalrunde-wrap'].forEach(function(id) {
     _setVis(document.getElementById(id), isGroups);
   });
   // Setzungen anzeigen (KO) nur im KO-/Doppel-KO-Modus

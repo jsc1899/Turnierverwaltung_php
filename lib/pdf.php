@@ -352,8 +352,9 @@ function generate_groups_pdf(int $cid, ?int $gid = null): void {
                        . '<th style="width:14%;text-align:center">' . $score_col_lbl . '</th>'
                        . '<th style="width:44%">Spieler 2</th>'
                        . '</tr>';
-                // Spielfreie (Bye) je Runde: Gruppenmitglied, das in der Runde fehlt.
-                $show_byes  = !empty($c['show_byes']);
+                // Spielfreie (Bye) je Runde: Gruppenmitglieder, die in der Runde fehlen
+                // (bei garantierten Pausen / gerader Anzahl ggf. zwei).
+                $show_byes  = !empty($c['show_byes']) || !empty($c['force_byes']);
                 $round_byes = [];
                 if ($show_byes) {
                     $bmembers = [];
@@ -368,11 +369,17 @@ function generate_groups_pdf(int $cid, ?int $gid = null): void {
                         $bpres[$br][$p2] = true;
                     }
                     foreach ($bpres as $br => $pres) {
-                        foreach ($bmembers as $bid => $bnm) { if (!isset($pres[$bid])) $round_byes[$br] = $bnm; }
+                        foreach ($bmembers as $bid => $bnm) { if (!isset($pres[$bid])) $round_byes[$br][] = $bnm; }
                     }
                 }
                 $bye_prev  = null;
-                $bye_row   = fn($nm) => "<tr><td colspan='3' style='text-align:center;font-size:8pt;color:#6b7280;font-style:italic;padding:0.6mm 2mm'>" . e($nm) . ' &mdash; spielfrei</td></tr>';
+                $bye_row   = function ($names) {
+                    $h = '';
+                    foreach ((array)$names as $nm) {
+                        $h .= "<tr><td colspan='3' style='text-align:center;font-size:8pt;color:#6b7280;font-style:italic;padding:0.6mm 2mm'>" . e($nm) . ' &mdash; spielfrei</td></tr>';
+                    }
+                    return $h;
+                };
                 $round_row = fn($r) => "<tr><td colspan='3' style='text-align:center;font-size:8pt;font-weight:bold;color:#374151;background:#f3f4f6;padding:0.8mm 2mm'>Runde " . (int)$r . '</td></tr>';
                 foreach ($gmatches as $i => $gm) {
                     $cur_round = (int)($gm['round_no'] ?? 0);
@@ -411,6 +418,164 @@ function generate_groups_pdf(int $cid, ?int $gid = null): void {
     $pdf->WriteHTML($html);
     $fname = $single_grp ? 'Gruppenstand_' . _pdf_slug($single_grp) . '.pdf' : 'Gruppenstand.pdf';
     $pdf->Output($fname, \Mpdf\Output\Destination::INLINE);
+    exit;
+}
+
+// ── Teampläne (pro Team eigener Spielplan zum Ausfüllen) ──────────────────────
+
+function generate_team_strips_pdf(int $cid, ?int $gid = null): void {
+    $c = db_fetch("SELECT * FROM competition WHERE id=?", [$cid]);
+    if (!$c) { http_response_code(404); exit; }
+    if (empty($c['is_team'])) {
+        // Nur für Mannschaftsbewerbe sinnvoll.
+        $pdf = mpdf();
+        $pdf->WriteHTML(pdf_css() . '<h2>Teampläne</h2><p>Nur für Mannschaftsbewerbe verfügbar.</p>');
+        $pdf->Output('Teamplaene.pdf', \Mpdf\Output\Destination::INLINE);
+        exit;
+    }
+    $t         = db_fetch("SELECT name FROM tournament WHERE id=?", [$c['tournament_id']]);
+    $tname     = $t ? $t['name'] : '';
+    $team_size = max(0, (int)($c['team_size'] ?? 0));
+    $grps      = $gid
+        ? db_fetchall("SELECT * FROM grp WHERE competition_id=? AND id=?", [$cid, $gid])
+        : db_fetchall("SELECT * FROM grp WHERE competition_id=? ORDER BY name", [$cid]);
+    $datum = date('d.m.Y');
+
+    // Anzahl Einzelspiel-Spalten (1..n); mindestens 1 für die Optik.
+    $ncols = max(1, $team_size);
+
+    $html  = pdf_css();
+    $html .= '<style>
+        .strip-lbl { font-size:8pt; color:#1e40af; margin:0; }
+        .strip-hd  { font-size:14pt; font-weight:bold; margin:0 0 3mm; color:#111827; }
+        .stbl { width:100%; border-collapse:collapse; font-size:9.5pt; margin:0; }
+        .stbl th, .stbl td { border:0.4pt solid #6b7280; padding:2mm 1mm; text-align:center; }
+        .stbl th { background:#f3f4f6; font-weight:bold; }
+        .stbl tr.alt td { background:#eceff3; }
+        .stbl td.opp  { text-align:left; padding-left:3mm; font-weight:600; white-space:nowrap; }
+        .stbl td.pause { text-align:left; padding-left:3mm; font-weight:bold; color:#374151; }
+        .sfoot { width:100%; margin-top:5mm; font-size:9.5pt; color:#1e40af; border-collapse:collapse; }
+        .sfoot td { border:none; padding:0; }
+    </style>';
+
+    // Wiederverwendbare Kopfzeile (Einzelspiel-Spalten + Su/Pu).
+    $score_head = '';
+    for ($i = 1; $i <= $ncols; $i++) $score_head .= '<th style="width:9mm">' . $i . '</th>';
+    $score_head .= '<th style="width:11mm">Su</th><th style="width:11mm">Pu</th>';
+    // Leere Score-Zellen (zum Ausfüllen).
+    $score_cells = str_repeat('<td>&nbsp;</td>', $ncols + 2);
+
+    $first = true;
+    foreach ($grps as $g) {
+        $numbers = team_start_numbers($g['id']);  // [team_id => 1..N]
+        if (!$numbers) continue;
+        $names = [];
+        foreach (db_fetchall("SELECT t.id, t.name FROM `team` t JOIN group_team gt ON gt.team_id=t.id WHERE gt.group_id=?", [$g['id']]) as $r) {
+            $names[(int)$r['id']] = $r['name'];
+        }
+        // Alle Team-Begegnungen der Gruppe.
+        $matches = db_fetchall(
+            "SELECT id, team1_id, team2_id, round_no, court_no, kickoff_team_id
+             FROM `match`
+             WHERE group_id=? AND team1_id IS NOT NULL AND team2_id IS NOT NULL
+             ORDER BY round_no, match_order, id",
+            [$g['id']]
+        );
+        // Pro Team alle Begegnungen sammeln + maximale Rundenzahl bestimmen.
+        // Mit Rundeninfo (round_no) werden Spielfrei-Runden als „Pause" eingefügt; ohne
+        // Rundeninfo (alte Daten) werden die Begegnungen einfach der Reihe nach gelistet.
+        $teamMatches = [];
+        $maxRound = 0;
+        foreach ($matches as $m) {
+            $r = (int)$m['round_no'];
+            if ($r > $maxRound) $maxRound = $r;
+            $teamMatches[(int)$m['team1_id']][] = $m;
+            $teamMatches[(int)$m['team2_id']][] = $m;
+        }
+        $useRounds = $maxRound > 0;
+
+        // Teams in Start-Nr.-Reihenfolge.
+        asort($numbers);
+        foreach ($numbers as $tid => $nr) {
+            if (!$first) $html .= '<pagebreak />';
+            $first = false;
+
+            $html .= '<p class="strip-lbl">Start-Nr.</p>';
+            $html .= '<p class="strip-hd">#' . $nr . ' &ndash; ' . e($names[$tid] ?? ('Team ' . $nr)) . '</p>';
+
+            $html .= '<table class="stbl"><thead><tr>'
+                   . '<th style="width:9mm">Dg</th>'
+                   . '<th style="width:9mm">B</th>'
+                   . '<th style="width:9mm">Ge</th>'
+                   . '<th style="width:9mm">An</th>'
+                   . $score_head
+                   . '<th>Mannschaft</th>'
+                   . $score_head
+                   . '</tr></thead><tbody>';
+
+            // Zeilen bestimmen: ['dg' => int|'', 'm' => Begegnung|null (Pause)].
+            $rows = [];
+            if ($useRounds) {
+                $byRound = [];
+                foreach ($teamMatches[$tid] ?? [] as $tm) $byRound[(int)$tm['round_no']] = $tm;
+                for ($r = 1; $r <= $maxRound; $r++) {
+                    $rows[] = ['dg' => $r, 'm' => $byRound[$r] ?? null];
+                }
+            } else {
+                foreach ($teamMatches[$tid] ?? [] as $tm) {
+                    $rows[] = ['dg' => '', 'm' => $tm];
+                }
+            }
+
+            $rowi = 0;
+            foreach ($rows as $row) {
+                $alt = ($rowi % 2 === 1) ? ' class="alt"' : '';
+                $rowi++;
+                $dg = $row['dg'] !== '' ? $row['dg'] : '&nbsp;';
+                $m  = $row['m'];
+                if (!$m) {
+                    // Spielfrei in dieser Runde.
+                    $html .= '<tr' . $alt . '>'
+                           . '<td>' . $dg . '</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>'
+                           . $score_cells
+                           . '<td class="pause">Pause</td>'
+                           . $score_cells
+                           . '</tr>';
+                    continue;
+                }
+                $opp   = ((int)$m['team1_id'] === $tid) ? (int)$m['team2_id'] : (int)$m['team1_id'];
+                $geNr  = $numbers[$opp] ?? '';
+                $koNr  = !empty($m['kickoff_team_id']) ? ($numbers[(int)$m['kickoff_team_id']] ?? '') : '';
+                $court = !empty($m['court_no']) ? (int)$m['court_no'] : '';
+                $oppLabel = 'T' . $geNr . ' &ndash; ' . e($names[$opp] ?? '');
+                $html .= '<tr' . $alt . '>'
+                       . '<td>' . $dg . '</td>'
+                       . '<td>' . ($court !== '' ? $court : '&nbsp;') . '</td>'
+                       . '<td>' . ($geNr !== '' ? $geNr : '&nbsp;') . '</td>'
+                       . '<td>' . ($koNr !== '' ? $koNr : '&nbsp;') . '</td>'
+                       . $score_cells
+                       . '<td class="opp">' . $oppLabel . '</td>'
+                       . $score_cells
+                       . '</tr>';
+            }
+            $html .= '</tbody></table>';
+
+            $html .= '<table class="sfoot"><tr>'
+                   . '<td style="text-align:left">Veranstaltung: ' . e($tname) . ' &ndash; ' . e($g['name']) . '</td>'
+                   . '<td style="text-align:right">Datum: ' . $datum . '</td>'
+                   . '</tr></table>';
+        }
+    }
+
+    if ($first) {
+        // Keine Teams/Gruppen vorhanden.
+        $html .= '<h2>Teampläne</h2><p>Keine ausgelosten Gruppen vorhanden.</p>';
+    }
+
+    $pdf = mpdf(['format' => 'A4-L', 'margin_top' => 8, 'margin_bottom' => 8, 'margin_left' => 10, 'margin_right' => 10]);
+    $pdf->SetTitle('Teampläne: ' . $c['name']);
+    $pdf->WriteHTML($html);
+    $pdf->Output('Teamplaene.pdf', \Mpdf\Output\Destination::INLINE);
     exit;
 }
 

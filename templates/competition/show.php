@@ -16,7 +16,8 @@ ob_start(); ?>
 
 <?php if (can_edit() && !$locked): ?>
 <!-- Test-Hilfe: füllt offene Ergebnisfelder zufällig aus -->
-<div class="mb-3 d-flex flex-wrap align-items-center gap-2">
+<div class="mb-3 d-flex flex-wrap align-items-center gap-2" id="test-tools"
+     data-duels-bulk-url="<?= e(url('competition/'.$c['id'].'/duels/bulk')) ?>">
   <button type="button" class="btn btn-outline-warning btn-sm" onclick="fillTestResults(false)">
     <i class="bi bi-dice-5 me-1"></i>Testergebnisse eintragen
   </button>
@@ -174,6 +175,13 @@ ob_start(); ?>
           <option value="sum" <?= ($c['team_result_mode'] ?? 'wins') === 'sum'  ? ' selected' : '' ?>>Einzelergebnisse aufsummieren</option>
         </select>
       </div>
+      <div class="col-auto d-flex align-items-end pb-1" id="field-kickoff"<?= $comp_type !== 'team' ? ' style="display:none"' : '' ?>>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="kickoff_enabled" id="kickoff_enabled"
+                 <?= !empty($c['kickoff_enabled']) ? 'checked' : '' ?>>
+          <label class="form-check-label" for="kickoff_enabled">Anstoß auslosen</label>
+        </div>
+      </div>
       <?php if (!$is_team): ?>
       <div class="col-auto">
         <label class="form-label">Ergebniserfassung</label>
@@ -232,6 +240,13 @@ ob_start(); ?>
           <input class="form-check-input" type="checkbox" name="show_byes" id="show_byes"
                  <?= !empty($c['show_byes']) ? 'checked' : '' ?>>
           <label class="form-check-label" for="show_byes">Spielrunden anzeigen</label>
+        </div>
+      </div>
+      <div class="col-auto d-flex align-items-end pb-1">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="force_byes" id="force_byes"
+                 <?= !empty($c['force_byes']) ? 'checked' : '' ?>>
+          <label class="form-check-label" for="force_byes" title="Wirkt erst bei der nächsten Auslosung. Bei gerader Anzahl wird der Spielplan um eine Runde länger.">Spielfreie Runde garantieren</label>
         </div>
       </div>
       <?php
@@ -793,6 +808,11 @@ ob_start(); ?>
       <a href="<?= url('competition/'.$c['id'].'/pdf/match-cards') ?>" class="btn btn-outline-secondary btn-sm" target="_blank">
         <i class="bi bi-card-text me-1"></i>Match-Cards
       </a>
+      <?php if ($is_team): ?>
+      <a href="<?= url('competition/'.$c['id'].'/pdf/team-strips') ?>" class="btn btn-outline-secondary btn-sm" target="_blank">
+        <i class="bi bi-list-task me-1"></i>Teampläne
+      </a>
+      <?php endif; ?>
       <?php if ($is_team && (int)($c['team_size'] ?? 0) > 1): ?>
       <button type="button" class="btn btn-outline-secondary btn-sm ms-auto toggle-duels-btn" onclick="toggleAllDuels()">
         <i class="bi bi-list-ol me-1"></i><span class="toggle-duels-label">Einzelspiele ausblenden</span>
@@ -975,8 +995,9 @@ ob_start(); ?>
           $use_duels = $is_team && (int)($c['team_size'] ?? 0) > 1;
           $use_sets  = in_array($c['score_mode'] ?? 'match', ['sets', 'sets_grp']);
           $grp_editable = (can_edit() && !$locked) && $c['phase'] === 'group';
-          // Spielfreie (Bye) je Runde ermitteln: Gruppenmitglied, das in der Runde fehlt.
-          $show_byes  = !empty($c['show_byes']);
+          // Spielfreie (Bye) je Runde ermitteln: Gruppenmitglieder, die in der Runde fehlen.
+          // (Bei garantierten Pausen / gerader Anzahl können es zwei pro Runde sein.)
+          $show_byes  = !empty($c['show_byes']) || !empty($c['force_byes']);
           $round_byes = [];
           if ($show_byes) {
               $bye_members = [];
@@ -990,14 +1011,18 @@ ob_start(); ?>
               }
               foreach ($bye_present as $br => $pres) {
                   foreach ($bye_members as $bpid => $bpname) {
-                      if (!isset($pres[$bpid])) $round_byes[$br] = $bpname;
+                      if (!isset($pres[$bpid])) $round_byes[$br][] = $bpname;
                   }
               }
           }
           $bye_prev_round = null;
-          $render_bye = function ($name) {
-              return '<div class="mb-1 small text-muted fst-italic text-center">'
-                   . '<i class="bi bi-slash-circle me-1"></i>' . e($name) . ' — spielfrei</div>';
+          $render_bye = function ($names) {
+              $h = '';
+              foreach ((array)$names as $name) {
+                  $h .= '<div class="mb-1 small text-muted fst-italic text-center">'
+                      . '<i class="bi bi-slash-circle me-1"></i>' . e($name) . ' — spielfrei</div>';
+              }
+              return $h;
           };
           $render_round = function ($r) {
               return '<div class="text-center small fw-semibold text-secondary mt-2 mb-1 pt-1 border-top">Runde ' . (int)$r . '</div>';
@@ -1020,6 +1045,13 @@ ob_start(); ?>
             if (!$has_p1 || !$has_p2) continue;
             if (!empty($m['court_no'])): ?>
           <div class="small text-secondary fw-semibold mt-2 mb-0"><i class="bi bi-geo-alt me-1"></i>Platz <?= (int)$m['court_no'] ?></div>
+          <?php endif;
+            if ($is_team && !empty($c['kickoff_enabled']) && !empty($m['kickoff_team_id'])):
+              $ko_tid  = (int)$m['kickoff_team_id'];
+              $ko_name = $ko_tid === (int)($m['team1_id'] ?? 0) ? $m['p1name']
+                       : ($ko_tid === (int)($m['team2_id'] ?? 0) ? $m['p2name'] : '');
+          ?>
+          <div class="small text-secondary fw-semibold mb-0"><i class="bi bi-flag me-1"></i>Anstoß: <?= e($ko_name) ?></div>
           <?php endif;
             if ($use_duels):
               $t1id = (int)($m['team1_id'] ?? 0);
@@ -2098,7 +2130,41 @@ function fillTestResults(save) {
   // Speichern: alle matches[ID][scoreN] (Gruppen-, KO- und Kreuzspiele) per Bulk-POST senden.
   // Bulk-URL aus einem vorhandenen Ergebnisformular lesen (NOWDOC → kein PHP hier).
   var bulkForm = document.querySelector('form[action$="/results/bulk"]');
-  if (!bulkForm) { alert('Kein Speicherformular gefunden.'); return; }
+  if (!bulkForm) {
+    // Team-Bewerbe speichern Begegnungen über die Einzelspiel-Formulare (Duelle). Alle in EINEM
+    // Bulk-Request bündeln (sonst je Begegnung ein eigener Request → bei vielen Begegnungen langsam).
+    // Als JSON-Body senden, NICHT als Formularfelder: viele Begegnungen sprengen sonst
+    // PHP's max_input_vars (Default 1000) und die Daten würden stillschweigend verworfen.
+    var tools = document.getElementById('test-tools');
+    var duelsUrl = tools ? tools.getAttribute('data-duels-bulk-url') : '';
+    var duelForms = document.querySelectorAll('form.duel-form');
+    if (duelsUrl && duelForms.length) {
+      var tok0 = document.querySelector('input[name="csrf_token"]');
+      var payload = { csrf_token: tok0 ? tok0.value : '', dm: {} };
+      Array.prototype.forEach.call(duelForms, function(f) {
+        var mid = f.id.replace('duel-form-', '');
+        var entry = { duels: {}, total_score1: '', total_score2: '' };
+        new FormData(f).forEach(function(val, key) {
+          var mm = key.match(/^duels\[(\d+)\]\[(\w+)\]$/);
+          if (mm) {
+            if (!entry.duels[mm[1]]) entry.duels[mm[1]] = {};
+            entry.duels[mm[1]][mm[2]] = val;
+          } else if (key === 'total_score1' || key === 'total_score2') {
+            entry[key] = val;
+          }
+        });
+        payload.dm[mid] = entry;
+      });
+      fetch(duelsUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(function() { location.reload(); })
+        .catch(function() { alert('Speichern fehlgeschlagen.'); });
+      return;
+    }
+    alert('Kein Speicherformular gefunden.'); return;
+  }
   var data = new URLSearchParams();
   document.querySelectorAll('input[type="number"]').forEach(function(el) {
     if (/^matches\[\d+\]\[score[12]\]$/.test(el.name || '') && el.value !== '') data.append(el.name, el.value);
@@ -2318,7 +2384,7 @@ window.addEventListener('resize', drawAllBrackets);
 // ── Bewerbstyp → team_size- und Begegnungsergebnis-Feld ein-/ausblenden ──────────────────
 (function() {
   var sel = document.querySelector('select[name="comp_type"]');
-  var flds = ['field-team-size', 'field-team-result'].map(function(id){ return document.getElementById(id); });
+  var flds = ['field-team-size', 'field-team-result', 'field-kickoff'].map(function(id){ return document.getElementById(id); });
   if (!sel) return;
   sel.addEventListener('change', function() {
     var show = this.value === 'team';

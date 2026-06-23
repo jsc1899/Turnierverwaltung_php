@@ -337,6 +337,9 @@ function init_db(): void {
         "ALTER TABLE competition ADD COLUMN team_result_mode VARCHAR(10) NOT NULL DEFAULT 'wins'",
         "ALTER TABLE competition ADD COLUMN cross_config VARCHAR(64) NOT NULL DEFAULT ''",
         "ALTER TABLE `match` ADD COLUMN place_lo INT NULL DEFAULT NULL",
+        "ALTER TABLE competition ADD COLUMN kickoff_enabled TINYINT(1) NOT NULL DEFAULT 0",
+        "ALTER TABLE `match` ADD COLUMN kickoff_team_id INT NULL DEFAULT NULL",
+        "ALTER TABLE competition ADD COLUMN force_byes TINYINT(1) NOT NULL DEFAULT 0",
     ];
     foreach ($migrations as $sql) {
         try { $pdo->exec($sql); } catch (\PDOException $e) { /* Spalte/Typ bereits korrekt */ }

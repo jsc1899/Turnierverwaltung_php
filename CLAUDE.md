@@ -156,8 +156,9 @@ oder **getrennt** (1. untereinander, 2. untereinander). Daraus entstehen Platzbl
 Gruppengröße: 3–20 Teilnehmer. Rundenbasierte Auslosung (Kreismethode): Der Plan wird in Runden gegliedert, in denen jeder Teilnehmer genau einmal spielt → gleichmäßige Verteilung über den gesamten Spielplan (kein „Front-Loading"). Zur Vermeidung von Back-to-Back (zwei Partien direkt hintereinander, v.a. an Rundenübergängen) werden mehrere zufällige Kandidaten erzeugt und der mit den wenigsten Back-to-Back-Übergängen gewählt (`rr_count_back_to_back`-frei ab 5 Teilnehmern immer möglich; bei 3/4 sind einzelne unvermeidbar). Zufall (wechselnde Spielpläne) durch Mischen von Teilnehmern, Runden, Spielreihenfolge und Seitenwahl.
 
 - `round_robin_schedule(player_ids)` → flache Paarliste `[[p1,p2], …]` (rückwärtskompatibel).
-- `round_robin_schedule_rounds(player_ids)` → `['matches' => [['p1','p2','round'], …], 'byes' => [rundenNr => spielfreie_ID|null]]`. `draw_groups()` speichert `round_no` je `match`; die Spielfreien werden bei der Anzeige aus `round_no` + Gruppenmitglieder berechnet (nicht als Match-Zeile gespeichert).
+- `round_robin_schedule_rounds(player_ids, force_bye=false)` → `['matches' => [['p1','p2','round'], …], 'byes' => [rundenNr => spielfreie_ID|null]]`. `draw_groups()` speichert `round_no` je `match`; die Spielfreien werden bei der Anzeige aus `round_no` + Gruppenmitglieder berechnet (nicht als Match-Zeile gespeichert). Der `byes`-Rückgabewert ist bei mehreren Spielfreien je Runde unvollständig und wird daher nicht genutzt.
 - Bewerbsoption `competition.show_byes`: zeigt spielfreie Teilnehmer (ungerade Gruppen) als Inline-Zeile je Runde im Spielplan an — in der Web-Ansicht (`templates/competition/show.php`) und im Gruppen-PDF (`generate_groups_pdf`).
+- Bewerbsoption `competition.force_byes` (alle Gruppen-Bewerbe): garantiert jedem Teilnehmer ≥1 spielfreie Runde. Bei gerader Anzahl fügt `rr_build_once` zwei Phantom-/Bye-Slots ein (Slot-Zahl bleibt gerade) → jedes Team i.d.R. 2 Pausen, Spielplan +1 Runde; bei ungerader Anzahl ohne Effekt (bereits 1 Pause). Wirkt nur bei `draw_groups()`/`groups_reorder()`. Web- und Gruppen-PDF-Anzeige unterstützen **mehrere** Spielfreie je Runde und werden bei `show_byes` **oder** `force_byes` angezeigt.
 
 ### Spielplätze / Courts (`lib/courts.php`)
 
@@ -172,6 +173,21 @@ gesamten Pool (`court = ko_position % num_courts + 1`, Finale = Platz 1).
   `save_courts()` / `POST /competition/{id}/courts`). Anzeige „Platz X" in Web (Gruppe + KO) und
   in allen Match-PDFs inkl. Match-Cards.
 
+### Anstoß-Auslosung (`lib/kickoff.php`, nur Team-Bewerbe)
+
+Bewerbsoption `competition.kickoff_enabled` (0 = aus): legt je Gruppen-Begegnung zufällig,
+aber über den gesamten Spielplan **ausgeglichen** fest, welches Team Anstoß hat
+(`match.kickoff_team_id`). Pro Gruppe werden mehrere Kandidaten erzeugt und der beste gewählt
+(`_kickoff_candidate`): streak-bewusster Greedy in Rundenreihenfolge (Anstoß bevorzugt an das
+Team ohne Anstoß in der Vorrunde), Bewertung = benachbart gleiche Anstoß-Zustände je Team
+(Abwechslung) + Ungleichgewicht. Ergebnis: jedes Team `floor/ceil((Spiele)/2)`-mal Anstoß und
+max. Serie 2 (bei ungerader Spielzahl das Minimum).
+- `assign_kickoff(cid)` schreibt/leert `match.kickoff_team_id`; nach `draw_groups()` und in
+  `settings()` aufrufen (idempotent; bei Option aus oder Nicht-Team → alle auf NULL).
+- Anzeige „Anstoß: <Team>" im Web-Spielplan; Spalte **An** (Gegner-Start-Nr.) im Teampläne-PDF.
+- Team-Start-Nr.: `team_start_numbers(group_id)` in `lib/standings.php` → `[team_id => 1..N]`,
+  sortiert nach `skill DESC, team_id` (pro Gruppe).
+
 ### PDF- & CSV-Exporte (`lib/pdf.php`)
 
 `mpdf()` Factory setzt immer `tempDir = sys_get_temp_dir() . '/mpdf_tmp'` — unter Windows erforderlich.
@@ -183,6 +199,8 @@ Querformat-PDFs verwenden Format `'A4-L'` (nicht `'A4 landscape'`).
 Export-Funktionen:
 - `generate_aushang_pdf(tid)` — Turnierübersicht mit QR-Code (öffentlich)
 - `generate_groups_pdf(cid)` / `generate_ko_pdf(cid)` / `generate_match_cards_pdf(cid)`
+- `generate_team_strips_pdf(cid, ?gid)` — Teampläne (Querformat): pro Team eigener
+  Spielplan zum Ausfüllen (Spalten Dg/B/Ge/An/1..team_size/Su/Pu/Mannschaft + gespiegelter Block)
 - `generate_registrations_pdf(tid)` / `generate_registrations_csv(tid)` — inkl. Änderungsanträge
 - `generate_tournament_players_pdf(tid)` / `generate_tournament_players_csv(tid)`
 - `generate_players_registry_pdf()` / `generate_players_registry_csv()` — globales Spielerregister
@@ -219,13 +237,13 @@ angelegt (`created=true`). Dedup: Doppel über Paar (beide Reihenfolgen), Team �
 | Tabelle | Zweck |
 |---------|-------|
 | `tournament` | Oberste Ebene |
-| `competition` | Disziplin innerhalb eines Turniers; `phase`: setup→group→ko→done; `mode`: groups_ko/groups_cross/ko_only/double_ko; `show_seeding`, `seeding_order` ('asc'/'desc') für KO-Modi; `show_byes` (spielfreie Teilnehmer im Gruppen-Spielplan anzeigen); `num_courts` (Anzahl Spielplätze, 0 = aus); `team_result_mode` (Team-Begegnungsergebnis: 'wins' = je Einzelsieg 1 Punkt, 'sum' = Einzelergebnisse aufsummieren — bei 'sum' entfallen die Einzel-Spalten); `cross_config` (Modus groups_cross: pro Rang-Paar 'x'=Kreuz/'s'=getrennt, CSV) |
+| `competition` | Disziplin innerhalb eines Turniers; `phase`: setup→group→ko→done; `mode`: groups_ko/groups_cross/ko_only/double_ko; `show_seeding`, `seeding_order` ('asc'/'desc') für KO-Modi; `show_byes` (spielfreie Teilnehmer im Gruppen-Spielplan anzeigen); `force_byes` (jedem Teilnehmer ≥1 spielfreie Runde garantieren, auch bei gerader Anzahl — Phantom-Slot, wirkt bei Auslosung); `num_courts` (Anzahl Spielplätze, 0 = aus); `team_result_mode` (Team-Begegnungsergebnis: 'wins' = je Einzelsieg 1 Punkt, 'sum' = Einzelergebnisse aufsummieren — bei 'sum' entfallen die Einzel-Spalten); `cross_config` (Modus groups_cross: pro Rang-Paar 'x'=Kreuz/'s'=getrennt, CSV); `kickoff_enabled` (Team: Anstoß je Gruppen-Begegnung zufällig & ausgeglichen auslosen) |
 | `player` | Globales Spielerregister |
 | `player_skill` | Spielstärke pro Sport (PK: player_id + sport) |
 | `competition_player` | Einem Bewerb zugeordnete Spieler (mit bewerbs-spezifischer Spielstärke) |
 | `grp` | Benannte Gruppen (A, B, C…) innerhalb eines Bewerbs; `courts` = komma-separierte Platzliste der Gruppe |
 | `group_player` | Spieler in einer Gruppe |
-| `match` | Gruppenspiele (`group_id IS NOT NULL`, `round_no` = Runde der Kreismethode) und KO-Spiele (`group_id IS NULL`, `ko_round` gesetzt); `bracket`-Spalte: NULL=Einzel-KO, 'W'/'L'/'GF'=Doppel-KO, 'C0'/'C1'…=Platzierungs-Block (groups_cross); `court_no` = zugewiesener Spielplatz; `place_lo` = unterster Platz des Sub-Pools (Platzierungs-Bracket) |
+| `match` | Gruppenspiele (`group_id IS NOT NULL`, `round_no` = Runde der Kreismethode) und KO-Spiele (`group_id IS NULL`, `ko_round` gesetzt); `bracket`-Spalte: NULL=Einzel-KO, 'W'/'L'/'GF'=Doppel-KO, 'C0'/'C1'…=Platzierungs-Block (groups_cross); `court_no` = zugewiesener Spielplatz; `kickoff_team_id` = Team mit Anstoß (Team-Gruppenspiele, NULL = keins); `place_lo` = unterster Platz des Sub-Pools (Platzierungs-Bracket) |
 | `registration` | Öffentliche Anmeldung (status: pending/confirmed/rejected) |
 | `registration_competition` | Welche Bewerbe eine Anmeldung umfasst |
 | `registration_change_request` | Abmelde- oder Änderungsantrag des Spielers |

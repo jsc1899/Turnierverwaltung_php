@@ -165,6 +165,7 @@ $routes = [
     ['POST',     '/match/{id}/sets',                 'match_result', 'save_sets'],
     ['POST',     '/ko-match/{id}/result',             'match_result', 'save_ko'],
     ['POST',     '/competition/{id}/results/bulk',    'match_result', 'save_bulk'],
+    ['POST',     '/competition/{id}/duels/bulk',      'match_result', 'save_duels_bulk'],
 
     // Players
     ['GET',      '/players',                        'player', 'index'],
@@ -199,6 +200,8 @@ $routes = [
     ['GET', '/competition/{id}/pdf/cross',        'pdf', 'cross_pdf'],
     ['GET', '/competition/{id}/pdf/match-cards',  'pdf', 'match_cards'],
     ['GET', '/competition/{id}/pdf/match-cards/{gid}', 'pdf', 'match_cards'],
+    ['GET', '/competition/{id}/pdf/team-strips',       'pdf', 'team_strips'],
+    ['GET', '/competition/{id}/pdf/team-strips/{gid}', 'pdf', 'team_strips'],
     ['GET', '/tournament/{id}/players/pdf',       'pdf', 'players_pdf'],
     ['GET', '/tournament/{id}/players/csv',       'pdf', 'players_csv'],
     ['GET', '/tournament/{id}/registrations/pdf', 'pdf', 'registrations_pdf'],
