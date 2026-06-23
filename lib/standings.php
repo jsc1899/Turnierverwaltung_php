@@ -83,7 +83,15 @@ function _has_open_tie(array $standings, int $advance_count = 0): bool {
     return !empty(tied_ids_at_boundary($standings, $advance_count));
 }
 
-function _apply_h2h_tiebreaker(array $standings, array $matches, string $p1_col, string $p2_col, array $duels = []): array {
+// Tabellenreihungs-Modus des Bewerbs (Bewerbsoption): 'diff' oder 'h2h' (Default).
+function _standings_order(int $group_id): string {
+    $r = db_fetch("SELECT standings_order FROM competition WHERE id=(SELECT competition_id FROM grp WHERE id=?)", [$group_id]);
+    return ($r && ($r['standings_order'] ?? '') === 'diff') ? 'diff' : 'h2h';
+}
+
+// $order_mode: 'h2h'  → Punkte → Direktvergleich → Gesamt-Differenz (Standard)
+//              'diff' → Punkte → Gesamt-Differenz → Direktvergleich (Direktduell zuletzt)
+function _apply_h2h_tiebreaker(array $standings, array $matches, string $p1_col, string $p2_col, array $duels = [], string $order_mode = 'h2h'): array {
     $by_points = [];
     foreach ($standings as $row) {
         $by_points[$row['points']][] = $row;
@@ -117,21 +125,28 @@ function _apply_h2h_tiebreaker(array $standings, array $matches, string $p1_col,
             $mini[$p2]['einzel_for'] += $s2; $mini[$p2]['einzel_diff'] += $s2 - $s1;
         }
 
-        // h2h-Punkte → h2h-Diff → h2h-Einzel-Diff → h2h-Plus → h2h-Einzel-Plus
-        // → Gesamt-Diff → Gesamt-Einzel-Diff → Gesamt-Plus → Gesamt-Einzel-Plus → Losentscheid
-        usort($group, function($a, $b) use ($mini) {
+        // Zwei Kriterien-Blöcke: Direktvergleich (h2h, Mini-Tabelle der Gleichpunktigen) und
+        // Gesamt-Differenz (alle Gruppenspiele). Reihenfolge je nach $order_mode; danach Los/manuell.
+        $diff_first = ($order_mode === 'diff');
+        usort($group, function($a, $b) use ($mini, $diff_first) {
             $ma = $mini[$a['id']]; $mb = $mini[$b['id']];
-            if ($mb['points']      !== $ma['points'])      return $mb['points']      - $ma['points'];
-            if ($mb['goal_diff']   !== $ma['goal_diff'])   return $mb['goal_diff']   - $ma['goal_diff'];
-            if ($mb['einzel_diff'] !== $ma['einzel_diff']) return $mb['einzel_diff'] - $ma['einzel_diff'];
-            if ($mb['goals_for']   !== $ma['goals_for'])   return $mb['goals_for']   - $ma['goals_for'];
-            if ($mb['einzel_for']  !== $ma['einzel_for'])  return $mb['einzel_for']  - $ma['einzel_for'];
-            if ($b['goal_diff']    !== $a['goal_diff'])    return $b['goal_diff']    - $a['goal_diff'];
-            $ed = ($b['einzel_diff'] ?? 0) - ($a['einzel_diff'] ?? 0);
-            if ($ed !== 0) return $ed;
-            if ($b['goals_for']    !== $a['goals_for'])    return $b['goals_for']    - $a['goals_for'];
-            $ef = ($b['einzel_for'] ?? 0) - ($a['einzel_for'] ?? 0);
-            if ($ef !== 0) return $ef;
+            // Direktvergleich: Punkte → Tordiff → Einzeldiff → Tore → Einzel
+            $h2h = [
+                $mb['points']      - $ma['points'],
+                $mb['goal_diff']   - $ma['goal_diff'],
+                $mb['einzel_diff'] - $ma['einzel_diff'],
+                $mb['goals_for']   - $ma['goals_for'],
+                $mb['einzel_for']  - $ma['einzel_for'],
+            ];
+            // Gesamt: Tordiff → Einzeldiff → Tore → Einzel
+            $overall = [
+                $b['goal_diff']          - $a['goal_diff'],
+                ($b['einzel_diff'] ?? 0) - ($a['einzel_diff'] ?? 0),
+                $b['goals_for']          - $a['goals_for'],
+                ($b['einzel_for']  ?? 0) - ($a['einzel_for']  ?? 0),
+            ];
+            $cascade = $diff_first ? array_merge($overall, $h2h) : array_merge($h2h, $overall);
+            foreach ($cascade as $cmp) if ($cmp !== 0) return $cmp;
             return ($a['tiebreak_order'] ?? 9999) <=> ($b['tiebreak_order'] ?? 9999);
         });
 
@@ -207,7 +222,7 @@ function group_standings(int $group_id, string $seeding_order = 'desc', string $
         $r['einzel_diff'] = $r['einzel_for'] - $r['einzel_against'];
     }
     usort($result, fn($a, $b) => $b['points'] - $a['points']);
-    return _apply_h2h_tiebreaker($result, $matches, 'player1_id', 'player2_id');
+    return _apply_h2h_tiebreaker($result, $matches, 'player1_id', 'player2_id', [], _standings_order($group_id));
 }
 
 function team_standings(int $group_id, string $seeding_order = 'desc', string $score_mode = 'match'): array {
@@ -275,7 +290,7 @@ function team_standings(int $group_id, string $seeding_order = 'desc', string $s
         $r['einzel_diff'] = $r['einzel_for'] - $r['einzel_against'];
     }
     usort($result, fn($a, $b) => $b['points'] - $a['points']);
-    return _apply_h2h_tiebreaker($result, $matches, 'team1_id', 'team2_id', $duels);
+    return _apply_h2h_tiebreaker($result, $matches, 'team1_id', 'team2_id', $duels, _standings_order($group_id));
 }
 
 /**
@@ -387,5 +402,5 @@ function double_standings(int $group_id, string $seeding_order = 'desc', string 
         $r['einzel_diff'] = $r['einzel_for'] - $r['einzel_against'];
     }
     usort($result, fn($a, $b) => $b['points'] - $a['points']);
-    return _apply_h2h_tiebreaker($result, $matches, 'double1_id', 'double2_id');
+    return _apply_h2h_tiebreaker($result, $matches, 'double1_id', 'double2_id', [], _standings_order($group_id));
 }

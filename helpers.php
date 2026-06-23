@@ -148,6 +148,25 @@ function upload_file(string $field, array $allowed_exts = ['pdf', 'jpg', 'jpeg',
     return $filename;
 }
 
+// ── Spielplatz-Bezeichnung je Sportart ─────────────────────────────────────────
+// Tischtennis=Tisch, Tennis=Tennisplatz, Fußball=Spielfeld, Cornhole=Bahn, sonst Platz.
+
+function court_label(string $sport = '', bool $plural = false): string {
+    $map = [
+        'tischtennis' => ['Tisch',       'Tische'],
+        'tennis'      => ['Tennisplatz', 'Tennisplätze'],
+        'fussball'    => ['Spielfeld',   'Spielfelder'],
+        'cornhole'    => ['Bahn',        'Bahnen'],
+    ];
+    $pair = $map[$sport] ?? ['Platz', 'Plätze'];
+    return $plural ? $pair[1] : $pair[0];
+}
+
+// Kurzform (1–2 Zeichen) für schmale Spaltenköpfe (z.B. Teampläne-PDF).
+function court_abbr(string $sport = ''): string {
+    return ['tischtennis' => 'Ti', 'tennis' => 'Te', 'fussball' => 'Fe', 'cornhole' => 'B'][$sport] ?? 'Pl';
+}
+
 // ── Spielstärke-Helper ─────────────────────────────────────────────────────────
 
 function player_sport_skill(int $pid, string $sport): float {

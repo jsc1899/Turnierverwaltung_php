@@ -37,6 +37,10 @@ function _propagate_result(int $cid, array $m): void {
         }
         _maybe_set_done($cid);
     }
+    // Durch den Aufstieg neu bestimmte KO-/Kreuz-Begegnungen ggf. mit Anwurf-Team versehen
+    // (idempotent: bestehende Anstöße bleiben, no-op wenn Option/Bewerbstyp es nicht erfordert).
+    require_once __DIR__ . '/../lib/kickoff.php';
+    assign_kickoff($cid);
 }
 
 function save(array $p): void {

@@ -57,6 +57,7 @@ function new_competition(array $p): void {
     $force_byes         = post('force_byes') ? 1 : 0;
     $num_courts         = max(0, min(20, (int)post('num_courts', 0)));
     $team_result_mode   = post('team_result_mode') === 'sum' ? 'sum' : 'wins';
+    $standings_order    = post('standings_order') === 'diff' ? 'diff' : 'h2h';
     $cross_config       = _cross_config_from_post($group_size);
 
     if (!$name) {
@@ -67,10 +68,10 @@ function new_competition(array $p): void {
     db_insert(
         "INSERT INTO competition
          (tournament_id, name, group_size, advance_count, mode, is_doubles, is_team,
-          third_place, show_seeding, show_skill, registrations_open, max_players, seeding_order, team_size, score_mode, show_byes, force_byes, num_courts, team_result_mode, cross_config)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+          third_place, show_seeding, show_skill, registrations_open, max_players, seeding_order, team_size, score_mode, show_byes, force_byes, num_courts, team_result_mode, standings_order, cross_config)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         [$p['tid'], $name, $group_size, $advance_count, $mode, $is_doubles, $is_team,
-         $third_place, $show_seeding, $show_skill, $registrations_open, $max_players, $seeding_order, $team_size, $score_mode, $show_byes, $force_byes, $num_courts, $team_result_mode, $cross_config]
+         $third_place, $show_seeding, $show_skill, $registrations_open, $max_players, $seeding_order, $team_size, $score_mode, $show_byes, $force_byes, $num_courts, $team_result_mode, $standings_order, $cross_config]
     );
     redirect('tournament/' . $p['tid']);
 }
@@ -737,6 +738,7 @@ function settings(array $p): void {
     $num_courts        = max(0, min(20, (int)post('num_courts', 0)));
     $team_result_mode  = post('team_result_mode') === 'sum' ? 'sum' : 'wins';
     $kickoff_enabled   = post('kickoff_enabled') ? 1 : 0;
+    $standings_order   = post('standings_order') === 'diff' ? 'diff' : 'h2h';
     $cross_config      = _cross_config_from_post($group_size);
 
     $c = db_fetch("SELECT phase, mode, is_doubles, is_team, team_size, kickoff_enabled FROM competition WHERE id=?", [$cid]);
@@ -793,11 +795,11 @@ function settings(array $p): void {
         db_execute("UPDATE competition SET third_place=?, registrations_open=?, max_players=?, show_seeding=?, show_skill=?, seeding_order=?, team_size=?, score_mode=?, num_courts=?, team_result_mode=?, kickoff_enabled=? WHERE id=?",
             [$third_place, $registrations_open, $max_players, $show_seeding, $show_skill, $seeding_order, $team_size, $score_mode, $num_courts, $team_result_mode, $kickoff_enabled, $cid]);
     } elseif ($c && $c['phase'] === 'setup') {
-        db_execute("UPDATE competition SET group_size=?, advance_count=?, third_place=?, registrations_open=?, max_players=?, show_skill=?, seeding_order=?, team_size=?, score_mode=?, show_byes=?, force_byes=?, num_courts=?, team_result_mode=?, kickoff_enabled=?, cross_config=? WHERE id=?",
-            [$group_size, $advance_count, $third_place, $registrations_open, $max_players, $show_skill, $seeding_order, $team_size, $score_mode, $show_byes, $force_byes, $num_courts, $team_result_mode, $kickoff_enabled, $cross_config, $cid]);
+        db_execute("UPDATE competition SET group_size=?, advance_count=?, third_place=?, registrations_open=?, max_players=?, show_skill=?, seeding_order=?, team_size=?, score_mode=?, show_byes=?, force_byes=?, num_courts=?, team_result_mode=?, kickoff_enabled=?, standings_order=?, cross_config=? WHERE id=?",
+            [$group_size, $advance_count, $third_place, $registrations_open, $max_players, $show_skill, $seeding_order, $team_size, $score_mode, $show_byes, $force_byes, $num_courts, $team_result_mode, $kickoff_enabled, $standings_order, $cross_config, $cid]);
     } else {
-        db_execute("UPDATE competition SET advance_count=?, third_place=?, registrations_open=?, max_players=?, show_skill=?, seeding_order=?, team_size=?, score_mode=?, show_byes=?, force_byes=?, num_courts=?, team_result_mode=?, kickoff_enabled=?, cross_config=? WHERE id=?",
-            [$advance_count, $third_place, $registrations_open, $max_players, $show_skill, $seeding_order, $team_size, $score_mode, $show_byes, $force_byes, $num_courts, $team_result_mode, $kickoff_enabled, $cross_config, $cid]);
+        db_execute("UPDATE competition SET advance_count=?, third_place=?, registrations_open=?, max_players=?, show_skill=?, seeding_order=?, team_size=?, score_mode=?, show_byes=?, force_byes=?, num_courts=?, team_result_mode=?, kickoff_enabled=?, standings_order=?, cross_config=? WHERE id=?",
+            [$advance_count, $third_place, $registrations_open, $max_players, $show_skill, $seeding_order, $team_size, $score_mode, $show_byes, $force_byes, $num_courts, $team_result_mode, $kickoff_enabled, $standings_order, $cross_config, $cid]);
     }
     // Bei verkleinertem team_size in der Gruppenphase verwaiste Aufstellungs-Zeilen entfernen.
     if ($ts_editable && $c['phase'] === 'group' && !empty($c['is_team'])) {
@@ -809,9 +811,9 @@ function settings(array $p): void {
         );
     }
     assign_courts($cid);
-    // Anstoß nur bei einer kompletten Auslosung neu vergeben — hier daher nur, wenn die Option
+    // Anwurf nur bei einer kompletten Auslosung neu vergeben — hier daher nur, wenn die Option
     // selbst umgeschaltet wurde (an → erzeugen, aus → löschen). Bleibt der Schalter unverändert,
-    // bleibt eine bestehende Anstoß-Auslosung erhalten.
+    // bleibt eine bestehende Anwurf-Auslosung erhalten.
     if ($kickoff_was !== $kickoff_enabled) {
         assign_kickoff($cid);
     }
@@ -1229,6 +1231,7 @@ function draw_cross(array $p): void {
     }
     draw_placement($cid, $blocks, $is_doubles, $is_team);
     assign_courts($cid);
+    assign_kickoff($cid);
     flash('success', 'Kreuzspiele wurden ausgelost!');
     redirect('competition/' . $cid);
 }
@@ -1334,6 +1337,7 @@ function draw_ko(array $p): void {
 
     _build_ko_bracket($cid, $bracket, (bool)$c['third_place'], $is_doubles, $is_team);
     assign_courts($cid);
+    assign_kickoff($cid);
     flash('success', 'KO-Bracket wurde ausgelost!');
     redirect('competition/' . $cid);
 }
@@ -1392,6 +1396,7 @@ function draw_ko_direct(array $p): void {
         require_once __DIR__ . '/../lib/double_ko_bracket.php';
         draw_double_ko($cid, $participants, $is_doubles, $is_team);
         assign_courts($cid);
+        assign_kickoff($cid);
         flash('success', 'Doppel-KO-Bracket wurde ausgelost!');
         redirect('competition/' . $cid);
         return;
@@ -1414,6 +1419,7 @@ function draw_ko_direct(array $p): void {
 
     _build_ko_bracket($cid, $bracket, (bool)$c['third_place'], $is_doubles, $is_team);
     assign_courts($cid);
+    assign_kickoff($cid);
     flash('success', 'KO-Bracket wurde ausgelost!');
     redirect('competition/' . $cid);
 }

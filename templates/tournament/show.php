@@ -428,6 +428,13 @@ $nennung_badge = $pending_count + $change_count;
                 <option value="random">Zufällig (keine Setzung)</option>
               </select>
             </div>
+            <div class="col-sm-6">
+              <label class="form-label">Tabellenreihung</label>
+              <select name="standings_order" class="form-select">
+                <option value="h2h" selected>Punkte – Direktes Duell – Differenz</option>
+                <option value="diff">Punkte – Differenz – Direktes Duell</option>
+              </select>
+            </div>
             <div class="col-sm-3 d-flex align-items-end pb-1">
               <div class="form-check">
                 <input class="form-check-input" type="checkbox" name="show_skill" id="new_show_skill">
@@ -445,7 +452,7 @@ $nennung_badge = $pending_count + $change_count;
               <input type="number" name="max_players" class="form-control" value="0" min="0">
             </div>
             <div class="col-sm-3">
-              <label class="form-label">Spielplätze <span class="text-muted small">(0 = aus)</span></label>
+              <label class="form-label"><?= e(court_label($t['sport'] ?? '', true)) ?> <span class="text-muted small">(0 = aus)</span></label>
               <input type="number" name="num_courts" class="form-control" value="0" min="0" max="20">
             </div>
             <div class="col-sm-6 d-flex align-items-end pb-1">
