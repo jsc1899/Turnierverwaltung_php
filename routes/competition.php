@@ -50,7 +50,7 @@ function new_competition(array $p): void {
     $show_skill         = post('show_skill')         ? 1 : 0;
     $registrations_open = post('registrations_open') ? 1 : 0;
     $max_players        = max(0, (int)post('max_players', 0));
-    $seeding_order      = post('seeding_order') === 'asc' ? 'asc' : 'desc';
+    $seeding_order      = in_array(post('seeding_order'), ['asc', 'random'], true) ? post('seeding_order') : 'desc';
     $team_size          = $is_team ? max(0, min(20, (int)post('team_size', 0))) : 0;
     $score_mode         = in_array(post('score_mode'), ['sets', 'sets_grp']) ? post('score_mode') : 'match';
     $show_byes          = post('show_byes') ? 1 : 0;
@@ -729,7 +729,7 @@ function settings(array $p): void {
     $max_players       = max(0, (int)post('max_players', 0));
     $show_seeding      = post('show_seeding') ? 1 : 0;
     $show_skill        = post('show_skill')   ? 1 : 0;
-    $seeding_order     = post('seeding_order') === 'asc' ? 'asc' : 'desc';
+    $seeding_order     = in_array(post('seeding_order'), ['asc', 'random'], true) ? post('seeding_order') : 'desc';
     $team_size         = max(0, (int)post('team_size', 0));
     $score_mode        = in_array(post('score_mode'), ['sets', 'sets_grp']) ? post('score_mode') : 'match';
     $show_byes         = post('show_byes') ? 1 : 0;
@@ -1118,20 +1118,29 @@ function draw_groups(array $p): void {
         }
 
         $participant_ids = array_column($rows, 'participant_id');
+        // Setzungsreihenfolge "random" → komplett zufällige Gruppeneinteilung (keine
+        // Stärke-Setzung): Teilnehmerliste UND Gruppenreihenfolge mischen. Das Mischen der
+        // Gruppen sorgt dafür, dass bei nicht teilbarer Teilnehmerzahl der "Rest" in einer
+        // zufälligen Gruppe landet (sonst bekäme immer Gruppe A einen Teilnehmer mehr).
+        $dist_groups = $group_ids;
+        if (($c['seeding_order'] ?? 'desc') === 'random') {
+            shuffle($participant_ids);
+            shuffle($dist_groups);
+        }
         for ($start = 0; $start < $n; $start += $num_groups) {
             $bucket = array_slice($participant_ids, $start, $num_groups);
             shuffle($bucket);
             foreach ($bucket as $j => $pid) {
-                if (isset($group_ids[$j])) {
+                if (isset($dist_groups[$j])) {
                     if ($is_team) {
                         db_execute("INSERT INTO group_team (group_id, team_id) VALUES (?,?)",
-                            [$group_ids[$j], $pid]);
+                            [$dist_groups[$j], $pid]);
                     } elseif ($is_doubles) {
                         db_execute("INSERT INTO group_double (group_id, double_id) VALUES (?,?)",
-                            [$group_ids[$j], $pid]);
+                            [$dist_groups[$j], $pid]);
                     } else {
                         db_execute("INSERT INTO group_player (group_id, player_id) VALUES (?,?)",
-                            [$group_ids[$j], $pid]);
+                            [$dist_groups[$j], $pid]);
                     }
                 }
             }
@@ -1372,6 +1381,8 @@ function draw_ko_direct(array $p): void {
         );
         $participants = array_column($rows, 'player_id');
     }
+    // Setzungsreihenfolge "random" → KO-Bracket komplett zufällig setzen (keine Stärke-Setzung).
+    if (($c['seeding_order'] ?? 'desc') === 'random') shuffle($participants);
     $n = count($participants);
     $kind = $is_team ? 'Teams' : ($is_doubles ? 'Doppel' : 'Spieler');
     if ($n < 2) { flash('danger', "Mindestens 2 $kind erforderlich."); redirect('competition/'.$cid); return; }

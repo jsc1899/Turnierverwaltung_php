@@ -425,6 +425,7 @@ $nennung_badge = $pending_count + $change_count;
               <select name="seeding_order" class="form-select">
                 <option value="desc" selected>Höhere Stärke = stärker</option>
                 <option value="asc">Niedrigere Stärke = stärker (Tennis)</option>
+                <option value="random">Zufällig (keine Setzung)</option>
               </select>
             </div>
             <div class="col-sm-3 d-flex align-items-end pb-1">

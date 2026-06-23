@@ -284,6 +284,7 @@ ob_start(); ?>
         <select name="seeding_order" class="form-select form-select-sm">
           <option value="desc"<?= ($c['seeding_order'] ?? 'desc') === 'desc' ? ' selected' : '' ?>>Höhere Stärke = stärker</option>
           <option value="asc"<?= ($c['seeding_order'] ?? 'desc') === 'asc'  ? ' selected' : '' ?>>Niedrigere Stärke = stärker (Tennis)</option>
+          <option value="random"<?= ($c['seeding_order'] ?? 'desc') === 'random' ? ' selected' : '' ?>>Zufällig (keine Setzung)</option>
         </select>
       </div>
       <div class="col-auto d-flex align-items-end pb-1">
