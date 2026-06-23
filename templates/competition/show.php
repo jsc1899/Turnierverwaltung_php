@@ -1252,10 +1252,10 @@ ob_start(); ?>
             <div></div>
             <?php endif; ?>
           </div>
-          <?php elseif ($m['played']): ?>
+          <?php else: ?>
           <div class="mb-1 d-flex align-items-center gap-2 small">
             <span class="text-end text-truncate" style="min-width:0;flex:1"><?= e($m['p1name']) ?></span>
-            <span class="badge bg-secondary"><?= $m['score1'] ?>:<?= $m['score2'] ?></span>
+            <span class="badge <?= $m['played'] ? 'bg-secondary' : 'bg-light text-muted border' ?>"><?= $m['played'] ? $m['score1'].':'.$m['score2'] : '—:—' ?></span>
             <span class="text-truncate" style="min-width:0;flex:1"><?= e($m['p2name']) ?></span>
           </div>
           <?php endif; ?>
