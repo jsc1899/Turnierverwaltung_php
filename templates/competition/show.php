@@ -175,6 +175,7 @@ ob_start(); ?>
         <select name="team_result_mode" class="form-select form-select-sm">
           <option value="wins"<?= ($c['team_result_mode'] ?? 'wins') === 'wins' ? ' selected' : '' ?>>Je Einzelsieg 1 Punkt</option>
           <option value="sum" <?= ($c['team_result_mode'] ?? 'wins') === 'sum'  ? ' selected' : '' ?>>Einzelergebnisse aufsummieren</option>
+          <option value="total"<?= ($c['team_result_mode'] ?? 'wins') === 'total' ? ' selected' : '' ?>>Nur Gesamtergebnis eingeben</option>
         </select>
       </div>
       <div class="col-auto d-flex align-items-end pb-1" id="field-kickoff"<?= $comp_type !== 'team' ? ' style="display:none"' : '' ?>>
@@ -331,6 +332,29 @@ ob_start(); ?>
         <button class="btn btn-primary btn-sm">Speichern</button>
       </div>
     </form>
+    <?php if ((int)($c['num_courts'] ?? 0) > 0 && !empty($groups)): ?>
+    <div class="card shadow-sm mt-3">
+      <div class="card-header fw-semibold py-2">
+        <i class="bi bi-geo-alt me-1"></i><?= e($court_pl) ?> pro Gruppe
+        <span class="text-muted small fw-normal">(<?= (int)$c['num_courts'] ?> <?= e($court_pl) ?> · z.B. „1,2")</span>
+      </div>
+      <div class="card-body py-2">
+        <form method="post" action="<?= url('competition/'.$c['id'].'/courts') ?>" class="row g-2 align-items-end">
+          <?= csrf_field() ?>
+          <?php foreach ($groups as $gi2): $g2 = $gi2['group']; ?>
+          <div class="col-auto">
+            <label class="form-label small mb-0"><?= e($g2['name']) ?></label>
+            <input type="text" name="courts[<?= (int)$g2['id'] ?>]" class="form-control form-control-sm" style="width:110px"
+                   value="<?= e($g2['courts'] ?? '') ?>" placeholder="z.B. 1,2">
+          </div>
+          <?php endforeach; ?>
+          <div class="col-auto">
+            <button class="btn btn-primary btn-sm"><?= e($court_pl) ?> speichern</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <?php endif; ?>
   </div><!-- /tab-settings -->
   <?php endif; ?>
 
@@ -823,7 +847,7 @@ ob_start(); ?>
         <i class="bi bi-list-task me-1"></i>Teampläne
       </a>
       <?php endif; ?>
-      <?php if ($is_team && (int)($c['team_size'] ?? 0) > 1): ?>
+      <?php if ($is_team && (int)($c['team_size'] ?? 0) > 1 && ($c['team_result_mode'] ?? 'wins') !== 'total'): ?>
       <button type="button" class="btn btn-outline-secondary btn-sm ms-auto toggle-duels-btn" onclick="toggleAllDuels()">
         <i class="bi bi-list-ol me-1"></i><span class="toggle-duels-label">Einzelspiele ausblenden</span>
       </button>
@@ -838,30 +862,6 @@ ob_start(); ?>
       </button>
       <?php endif; ?>
     </div>
-
-    <?php if (can_edit() && (int)($c['num_courts'] ?? 0) > 0): ?>
-    <div class="card shadow-sm mb-3">
-      <div class="card-header fw-semibold py-2">
-        <i class="bi bi-geo-alt me-1"></i><?= e($court_pl) ?> pro Gruppe
-        <span class="text-muted small fw-normal">(<?= (int)$c['num_courts'] ?> <?= e($court_pl) ?> · z.B. „1,2")</span>
-      </div>
-      <div class="card-body py-2">
-        <form method="post" action="<?= url('competition/'.$c['id'].'/courts') ?>" class="row g-2 align-items-end">
-          <?= csrf_field() ?>
-          <?php foreach ($groups as $gi2): $g2 = $gi2['group']; ?>
-          <div class="col-auto">
-            <label class="form-label small mb-0"><?= e($g2['name']) ?></label>
-            <input type="text" name="courts[<?= (int)$g2['id'] ?>]" class="form-control form-control-sm" style="width:110px"
-                   value="<?= e($g2['courts'] ?? '') ?>" placeholder="z.B. 1,2">
-          </div>
-          <?php endforeach; ?>
-          <div class="col-auto">
-            <button class="btn btn-primary btn-sm"><?= e($court_pl) ?> speichern</button>
-          </div>
-        </form>
-      </div>
-    </div>
-    <?php endif; ?>
 
     <?php if ((can_edit() && !$locked) && ($group_no_results ?? false)): ?>
     <div class="d-flex align-items-center mb-3">
@@ -888,9 +888,9 @@ ob_start(); ?>
 
     <?php
     $sets_mode_active = in_array($c['score_mode'] ?? 'match', ['sets', 'sets_grp']);
-    // Bei Team-Summenmodus sind die Einzel-Spalten redundant (Gesamtergebnis = Summe).
-    $team_sum_mode = $is_team && ($c['team_result_mode'] ?? 'wins') === 'sum';
-    $show_einzel = ($is_team && (int)($c['team_size'] ?? 0) >= 2 && !$team_sum_mode) || $sets_mode_active;
+    // Einzel-Spalten nur im "wins"-Modus sinnvoll: bei "sum" = Gesamtergebnis, bei "total" keine Einzelspiele.
+    $team_no_einzel = $is_team && in_array($c['team_result_mode'] ?? 'wins', ['sum', 'total'], true);
+    $show_einzel = ($is_team && (int)($c['team_size'] ?? 0) >= 2 && !$team_no_einzel) || $sets_mode_active;
     // Farbige Markierung der Top-Plätze in der Gruppentabelle: KO-Modus → advance_count;
     // Kreuzspiele → Rang-1+2-Konfig (über Kreuz = Plätze 1+2, getrennt = nur Platz 1).
     $highlight_count = (int)$c['advance_count'];
@@ -899,8 +899,16 @@ ob_start(); ?>
         $highlight_count = (($cc0[0] ?? 'x') === 's') ? 1 : 2;
     }
     ?>
+    <?php if (count($groups) > 1): ?>
+    <div class="d-flex flex-wrap align-items-center gap-1 mb-3">
+      <span class="small text-muted me-1"><i class="bi bi-link-45deg"></i> Zu Gruppe:</span>
+      <?php foreach ($groups as $gnav): ?>
+      <a href="#grp-<?= (int)$gnav['group']['id'] ?>" class="btn btn-outline-secondary btn-sm py-0 px-2"><?= e($gnav['group']['name']) ?></a>
+      <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
     <?php foreach ($groups as $gi): $g = $gi['group']; $standings = $gi['standings']; $matches = $gi['matches']; $tie_ids = $gi['tie_ids'] ?? []; ?>
-    <div class="card shadow-sm mb-4">
+    <div class="card shadow-sm mb-4" id="grp-<?= (int)$g['id'] ?>" style="scroll-margin-top:1rem">
       <div class="card-header fw-semibold d-flex align-items-center">
         <span><i class="bi bi-people me-1"></i><?= e($g['name']) ?></span>
         <span class="ms-auto btn-group btn-group-sm">
@@ -1002,7 +1010,7 @@ ob_start(); ?>
         <div class="p-3 border-top grp-results">
           <h6 class="text-muted mb-2">Spielergebnisse</h6>
           <?php
-          $use_duels = $is_team && (int)($c['team_size'] ?? 0) > 1;
+          $use_duels = $is_team && (int)($c['team_size'] ?? 0) > 1 && ($c['team_result_mode'] ?? 'wins') !== 'total';
           $use_sets  = in_array($c['score_mode'] ?? 'match', ['sets', 'sets_grp']);
           $grp_editable = (can_edit() && !$locked) && $c['phase'] === 'group';
           // Spielfreie (Bye) je Runde ermitteln: Gruppenmitglieder, die in der Runde fehlen.
@@ -1053,16 +1061,13 @@ ob_start(); ?>
             $has_p1 = $is_team ? !empty($m['team1_id']) : !empty($m['player1_id']);
             $has_p2 = $is_team ? !empty($m['team2_id']) : !empty($m['player2_id']);
             if (!$has_p1 || !$has_p2) continue;
-            if (!empty($m['court_no'])): ?>
-          <div class="small text-secondary fw-semibold mt-2 mb-0"><i class="bi bi-geo-alt me-1"></i><?= e($court_sg) ?> <?= (int)$m['court_no'] ?></div>
-          <?php endif;
-            if ($is_team && !empty($c['kickoff_enabled']) && !empty($m['kickoff_team_id'])):
-              $ko_tid  = (int)$m['kickoff_team_id'];
-              $ko_name = $ko_tid === (int)($m['team1_id'] ?? 0) ? $m['p1name']
-                       : ($ko_tid === (int)($m['team2_id'] ?? 0) ? $m['p2name'] : '');
+            // Spielplatz kompakt links neben der Begegnungszeile (gleiche Zeile wie Teams/Felder).
+            $court_pre = !empty($m['court_no'])
+              ? '<span class="badge bg-light text-secondary border flex-shrink-0" style="white-space:nowrap;margin-top:3px"><i class="bi bi-geo-alt"></i> ' . e($court_sg) . ' ' . (int)$m['court_no'] . '</span>'
+              : '';
           ?>
-          <div class="small text-secondary fw-semibold mb-0"><i class="bi bi-flag me-1"></i>Anwurf: <?= e($ko_name) ?></div>
-          <?php endif;
+          <div class="d-flex align-items-start gap-2"><?= $court_pre ?><div class="flex-grow-1" style="min-width:0">
+          <?php
             if ($use_duels):
               $t1id = (int)($m['team1_id'] ?? 0);
               $t2id = (int)($m['team2_id'] ?? 0);
@@ -1254,7 +1259,9 @@ ob_start(); ?>
             <span class="text-truncate" style="min-width:0;flex:1"><?= e($m['p2name']) ?></span>
           </div>
           <?php endif; ?>
-          <?php endif; endforeach; ?>
+          <?php endif; ?>
+          </div></div>
+          <?php endforeach; ?>
           <?php if ($show_byes && $bye_prev_round !== null && isset($round_byes[$bye_prev_round])) echo $render_bye($round_byes[$bye_prev_round]); ?>
           <?php if ($grp_editable && !$use_duels && !$use_sets): ?>
           <button form="grp-form-<?= $g['id'] ?>" type="submit"
@@ -1298,7 +1305,7 @@ ob_start(); ?>
         <i class="bi bi-list-task me-1"></i>Teampläne
       </a>
       <?php endif; ?>
-      <?php if ($is_team && (int)($c['team_size'] ?? 0) > 1): ?>
+      <?php if ($is_team && (int)($c['team_size'] ?? 0) > 1 && ($c['team_result_mode'] ?? 'wins') !== 'total'): ?>
       <button type="button" class="btn btn-outline-secondary btn-sm ms-auto toggle-duels-btn" onclick="toggleAllDuels()">
         <i class="bi bi-list-ol me-1"></i><span class="toggle-duels-label">Einzelspiele ausblenden</span>
       </button>
@@ -1333,7 +1340,7 @@ ob_start(); ?>
       $bracket_h = $first_count * $slot_h;
       $ko_col_w  = $is_team ? 405 : 270;
       $bracket_w = count($ko_rounds) * $ko_col_w;
-      $ko_use_duels = $is_team && (int)($c['team_size'] ?? 0) > 1;
+      $ko_use_duels = $is_team && (int)($c['team_size'] ?? 0) > 1 && ($c['team_result_mode'] ?? 'wins') !== 'total';
       $ko_use_sets  = ($c['score_mode'] ?? 'match') === 'sets';
     ?>
 

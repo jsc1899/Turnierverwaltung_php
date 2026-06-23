@@ -155,6 +155,150 @@ function generate_aushang_pdf(int $tid): void {
     exit;
 }
 
+// ── Aushang je Bewerb: alle Teilnehmer je Gruppe auf EINER Seite, QR → Bewerbsseite ─
+function generate_competition_aushang_pdf(int $cid): void {
+    $c = db_fetch("SELECT * FROM competition WHERE id=?", [$cid]);
+    if (!$c) { http_response_code(404); exit; }
+    $t = db_fetch("SELECT * FROM tournament WHERE id=?", [$c['tournament_id']]);
+
+    $is_team    = !empty($c['is_team']);
+    $is_doubles = !$is_team && !empty($c['is_doubles']);
+
+    // Gruppen + Teilnehmer je nach Bewerbstyp
+    $groups = db_fetchall("SELECT id, name FROM grp WHERE competition_id=? ORDER BY name", [$cid]);
+    $total = 0;
+    foreach ($groups as &$g) {
+        $gid = (int)$g['id'];
+        if ($is_team) {
+            $g['members'] = array_column(db_fetchall(
+                "SELECT t.name FROM group_team gt JOIN `team` t ON t.id=gt.team_id
+                 WHERE gt.group_id=? ORDER BY t.name", [$gid]), 'name');
+        } elseif ($is_doubles) {
+            $g['members'] = array_column(db_fetchall(
+                "SELECT TRIM(CONCAT(
+                    COALESCE(p1.firstname,''), IF(COALESCE(p1.firstname,'')!='',' ',''), p1.name, ' / ',
+                    COALESCE(p2.firstname,''), IF(COALESCE(p2.firstname,'')!='',' ',''), p2.name)) AS name
+                 FROM group_double gd JOIN `double` dd ON dd.id=gd.double_id
+                 LEFT JOIN player p1 ON p1.id=dd.player1_id LEFT JOIN player p2 ON p2.id=dd.player2_id
+                 WHERE gd.group_id=? ORDER BY name", [$gid]), 'name');
+        } else {
+            $g['members'] = array_column(db_fetchall(
+                "SELECT TRIM(CONCAT(p.name, IF(COALESCE(p.firstname,'')!='', CONCAT(' ', p.firstname), ''))) AS name
+                 FROM group_player gp JOIN player p ON p.id=gp.player_id
+                 WHERE gp.group_id=? ORDER BY p.name, p.firstname", [$gid]), 'name');
+        }
+        $total += count($g['members']);
+    }
+    unset($g);
+
+    // QR-Code → Bewerbsseite
+    $comp_url = APP_URL . '/competition/' . $cid;
+    $qr_src   = '';
+    try {
+        $qr_opts = new \chillerlan\QRCode\QROptions([
+            'outputType' => 'svg', 'outputBase64' => false,
+            'eccLevel'   => \chillerlan\QRCode\Common\EccLevel::M,
+        ]);
+        $svg    = (new \chillerlan\QRCode\QRCode($qr_opts))->render($comp_url);
+        $qr_tmp = sys_get_temp_dir() . '/qr_comp_aushang_' . $cid . '.svg';
+        file_put_contents($qr_tmp, $svg);
+        $qr_src = $qr_tmp;
+    } catch (\Throwable) {
+        $qr_src = '';
+    }
+
+    // Listen-Schriftgröße abhängig von der Gesamtanzahl (Ziel: eine Seite)
+    $list_fs = $total > 80 ? '7pt' : ($total > 55 ? '8pt' : ($total > 35 ? '9pt' : '10pt'));
+
+    // Datum (Turnier)
+    $datum = '';
+    if (!empty($t['event_date'])) {
+        $wt = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+        $ts = strtotime($t['event_date']);
+        $datum = $wt[(int)date('w', $ts)] . ', ' . date('d.m.Y', $ts);
+    }
+    $sub = e($t['name'] ?? '');
+    if (!empty($t['organizer'])) $sub .= ' &middot; ' . e($t['organizer']);
+    if ($datum) $sub .= ' &middot; ' . $datum;
+
+    $html  = pdf_css();
+    $html .= '<style>
+        .header { background:#1a56db; color:#fff; padding:4mm 8mm; margin:-5mm -5mm 5mm -5mm; }
+        .header h1 { color:#fff; font-size:17pt; margin:0 0 1mm; }
+        .header .sub { color:#bfdbfe; font-size:10pt; }
+        .grp-name { font-weight:bold; color:#1e40af; font-size:12pt; margin:0 0 1mm; }
+        .grp-cnt  { color:#6b7280; font-weight:normal; font-size:9pt; }
+        .grp-list { font-size:' . $list_fs . '; line-height:1.5; color:#111827; }
+        .qr-wrap { text-align:center; margin-top:4mm; }
+        .qr-box  { background:#eff6ff; border:0.5pt solid #bfdbfe; border-radius:3mm; padding:4mm 8mm; text-align:center; }
+        .qr-box .label { font-size:10.5pt; font-weight:bold; color:#1e40af; margin-bottom:2mm; }
+        .qr-box img { width:36mm; height:36mm; }
+        .qr-box .u { font-size:7.5pt; color:#374151; margin-top:1.5mm; word-break:break-all; }
+        .footer-red { background:#fee2e2; color:#dc2626; font-weight:bold; font-size:10pt;
+                      text-align:center; padding:3mm; margin:5mm -5mm -5mm -5mm; border-top:1pt solid #fca5a5; }
+    </style>';
+
+    // Logo (Turnier-Banner) rechts oben, falls vorhanden
+    $logo_cell = '';
+    if (!empty($t['banner_image'])) {
+        $img_path = UPLOAD_DIR . $t['banner_image'];
+        if (is_file($img_path)) {
+            $logo_cell = '<img src="' . $img_path . '" style="max-width:55mm;max-height:32mm;">';
+        }
+    }
+
+    // Header: Bewerbsname + Untertitel links, Logo rechts oben
+    $html .= '<div class="header"><table style="width:100%;border-collapse:collapse;background:transparent"><tr>'
+        . '<td style="border:none;background:transparent;vertical-align:middle;padding:0">'
+        .   '<h1>' . e($c['name']) . '</h1><div class="sub">' . $sub . '</div>'
+        . '</td>'
+        . '<td style="border:none;background:transparent;vertical-align:middle;padding:0;width:57mm;text-align:right">'
+        .   $logo_cell
+        . '</td>'
+        . '</tr></table></div>';
+
+    // Gruppen mit Teilnehmern — zwei nebeneinander, ohne Linien und ohne Nummerierung
+    if ($groups) {
+        $html .= '<table style="width:100%;border-collapse:separate;border-spacing:6mm 0">';
+        for ($i = 0; $i < count($groups); $i += 2) {
+            $html .= '<tr>';
+            foreach ([$groups[$i] ?? null, $groups[$i + 1] ?? null] as $g) {
+                $html .= '<td style="border:none;background:transparent;vertical-align:top;padding:0 0 3mm;width:50%">';
+                if ($g) {
+                    $html .= '<div class="grp-name">' . e($g['name'])
+                           . ' <span class="grp-cnt">(' . count($g['members']) . ')</span></div>';
+                    if ($g['members']) {
+                        $html .= '<div class="grp-list">' . implode('<br>', array_map('e', $g['members'])) . '</div>';
+                    } else {
+                        $html .= '<div style="color:#6b7280;font-size:9pt">— noch keine Teilnehmer —</div>';
+                    }
+                }
+                $html .= '</td>';
+            }
+            $html .= '</tr>';
+        }
+        $html .= '</table>';
+    } else {
+        $html .= '<p style="color:#6b7280">Noch keine Gruppen ausgelost.</p>';
+    }
+
+    // QR-Code unterhalb der Gruppen
+    $html .= '<div class="qr-wrap"><div class="qr-box">'
+        . '<div class="label">QR-Code scannen – Ergebnisse verfolgen</div>'
+        . ($qr_src ? '<img src="' . $qr_src . '">' : '')
+        . '<div class="u">' . e($comp_url) . '</div>'
+        . '</div></div>';
+
+    $html .= '<div class="footer-red">Bitte Ergebnisse unverzüglich dem Organisationsteam melden!</div>';
+
+    $pdf = mpdf(['margin_top' => 5, 'margin_bottom' => 5]);
+    $pdf->SetTitle('Aushang: ' . $c['name']);
+    $pdf->WriteHTML($html);
+    $safe = preg_replace('/[^\w\-]/', '_', $c['name'] ?: 'Bewerb');
+    $pdf->Output('Aushang_' . $safe . '.pdf', \Mpdf\Output\Destination::INLINE);
+    exit;
+}
+
 // ── Gruppenstand ──────────────────────────────────────────────────────────────
 
 function generate_groups_pdf(int $cid, ?int $gid = null): void {
@@ -170,8 +314,9 @@ function generate_groups_pdf(int $cid, ?int $gid = null): void {
     $team_size  = (int)($c['team_size'] ?? 0);
     $score_mode = $c['score_mode'] ?? 'match';
     $sets_mode_active = in_array($score_mode, ['sets', 'sets_grp']);
-    $team_sum_mode = $is_team && ($c['team_result_mode'] ?? 'wins') === 'sum';
-    $show_einzel = ($is_team && $team_size >= 2 && !$team_sum_mode) || $sets_mode_active;
+    $team_total_mode = $is_team && ($c['team_result_mode'] ?? 'wins') === 'total';  // nur Gesamtergebnis
+    $team_no_einzel  = $is_team && in_array($c['team_result_mode'] ?? 'wins', ['sum', 'total'], true);
+    $show_einzel = ($is_team && $team_size >= 2 && !$team_no_einzel) || $sets_mode_active;
     $grp_score_mode = $sets_mode_active ? 'sets' : 'match';
     $col_v   = $sets_mode_active ? 'V (Sätze)'    : 'V';
     $col_pm  = $sets_mode_active ? '+/- (Sätze)'  : '+/-';
@@ -240,7 +385,7 @@ function generate_groups_pdf(int $cid, ?int $gid = null): void {
         }
         $html .= '</table>';
 
-        if ($is_team && $team_size > 0) {
+        if ($is_team && $team_size > 0 && !$team_total_mode) {
             $gmatches = db_fetchall(
                 "SELECT m.*, t1.name as p1name, t2.name as p2name
                  FROM `match` m

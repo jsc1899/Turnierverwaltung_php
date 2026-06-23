@@ -194,6 +194,7 @@ $routes = [
 
     // PDFs & Exporte
     ['GET', '/tournament/{id}/aushang',           'pdf', 'aushang'],
+    ['GET', '/competition/{id}/aushang',          'pdf', 'comp_aushang'],
     ['GET', '/competition/{id}/pdf/groups',       'pdf', 'groups'],
     ['GET', '/competition/{id}/pdf/groups/{gid}',      'pdf', 'groups'],
     ['GET', '/competition/{id}/pdf/ko',           'pdf', 'ko'],

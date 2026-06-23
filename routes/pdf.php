@@ -9,6 +9,13 @@ function aushang(array $p): void {
     generate_aushang_pdf((int)$p['id']);
 }
 
+function comp_aushang(array $p): void {
+    $c = db_fetch("SELECT t.is_public FROM competition c JOIN tournament t ON t.id=c.tournament_id WHERE c.id=?", [(int)$p['id']]);
+    if (!$c) { http_response_code(404); exit; }
+    if (!$c['is_public'] && !can_edit()) { http_response_code(403); exit; }
+    generate_competition_aushang_pdf((int)$p['id']);
+}
+
 function groups(array $p): void {
     $c = db_fetch("SELECT t.is_public FROM competition c JOIN tournament t ON t.id=c.tournament_id WHERE c.id=?", [(int)$p['id']]);
     if (!$c) { http_response_code(404); exit; }

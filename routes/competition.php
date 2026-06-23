@@ -56,7 +56,7 @@ function new_competition(array $p): void {
     $show_byes          = post('show_byes') ? 1 : 0;
     $force_byes         = post('force_byes') ? 1 : 0;
     $num_courts         = max(0, min(20, (int)post('num_courts', 0)));
-    $team_result_mode   = post('team_result_mode') === 'sum' ? 'sum' : 'wins';
+    $team_result_mode   = in_array(post('team_result_mode'), ['sum', 'total'], true) ? post('team_result_mode') : 'wins';
     $standings_order    = post('standings_order') === 'diff' ? 'diff' : 'h2h';
     $cross_config       = _cross_config_from_post($group_size);
 
@@ -736,7 +736,7 @@ function settings(array $p): void {
     $show_byes         = post('show_byes') ? 1 : 0;
     $force_byes        = post('force_byes') ? 1 : 0;
     $num_courts        = max(0, min(20, (int)post('num_courts', 0)));
-    $team_result_mode  = post('team_result_mode') === 'sum' ? 'sum' : 'wins';
+    $team_result_mode  = in_array(post('team_result_mode'), ['sum', 'total'], true) ? post('team_result_mode') : 'wins';
     $kickoff_enabled   = post('kickoff_enabled') ? 1 : 0;
     $standings_order   = post('standings_order') === 'diff' ? 'diff' : 'h2h';
     $cross_config      = _cross_config_from_post($group_size);

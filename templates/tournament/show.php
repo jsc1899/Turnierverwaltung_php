@@ -186,6 +186,10 @@ $nennung_badge = $pending_count + $change_count;
               <a href="<?= url('competition/' . $c['id']) ?>" class="btn btn-primary btn-sm flex-grow-1">
                 <i class="bi bi-arrow-right-circle me-1"></i>Öffnen
               </a>
+              <a href="<?= url('competition/' . $c['id'] . '/aushang') ?>" target="_blank"
+                 class="btn btn-outline-secondary btn-sm" title="Aushang (PDF mit QR-Code)">
+                <i class="bi bi-printer"></i>
+              </a>
               <?php if (can_edit() && !$locked): ?>
               <form method="post" action="<?= url('competition/' . $c['id'] . '/delete') ?>"
                     data-confirm="Bewerb wirklich löschen?">
