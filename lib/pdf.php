@@ -874,9 +874,10 @@ function generate_team_strips_pdf(int $cid, ?int $gid = null): void {
 
 // ── Bahnpläne (pro Spielplatz die Spielreihenfolge mit Teilnehmern) ───────────
 
-function generate_court_plans_pdf(int $cid): void {
+function generate_court_plans_pdf(int $cid, ?int $gid = null): void {
     $c = db_fetch("SELECT * FROM competition WHERE id=?", [$cid]);
     if (!$c) { http_response_code(404); exit; }
+    $gid_name = $gid ? (db_fetch("SELECT name FROM grp WHERE id=? AND competition_id=?", [$gid, $cid])['name'] ?? null) : null;
     $t          = db_fetch("SELECT name, event_date, sport FROM tournament WHERE id=?", [$c['tournament_id']]);
     $tname      = $t ? $t['name'] : '';
     $court_sg   = court_label($t['sport'] ?? '');          // z.B. „Bahn"
@@ -937,16 +938,23 @@ function generate_court_plans_pdf(int $cid): void {
     }
     // Nur die aktuelle Phase: Finalrunde (KO/Kreuz), sobald ausgelost und in 'ko'/'done';
     // sonst die Gruppenspiele (auch bei reinen Gruppenbewerben, die direkt auf 'done' wechseln).
+    // Bei gesetztem $gid: nur die Begegnungen dieser Gruppe (Gruppenphase).
     $has_finals   = (int)db_fetch("SELECT COUNT(*) n FROM `match` WHERE competition_id=? AND group_id IS NULL", [$cid])['n'] > 0;
     $show_finals  = $has_finals && in_array($c['phase'], ['ko', 'done'], true);
-    $phase_filter = $show_finals ? ' AND m.group_id IS NULL' : ' AND m.group_id IS NOT NULL';
+    if ($gid) {
+        $phase_filter = ' AND m.group_id = ?';
+        $params = [$cid, $gid];
+    } else {
+        $phase_filter = $show_finals ? ' AND m.group_id IS NULL' : ' AND m.group_id IS NOT NULL';
+        $params = [$cid];
+    }
     $matches = db_fetchall(
         "SELECT m.*, g.name AS gname, g.name AS group_name, g.pause_start, g.pause_duration, $name_sel
          FROM `match` m
          LEFT JOIN grp g ON g.id=m.group_id
          $name_join
          WHERE m.competition_id=? AND m.court_no IS NOT NULL" . $phase_filter,
-        [$cid]
+        $params
     );
 
     // Blockgröße S je Kreuzspiel-Block (für die Platzbereichs-Labels).
@@ -1012,7 +1020,7 @@ function generate_court_plans_pdf(int $cid): void {
         if (!$first) $html .= '<pagebreak />';
         $first = false;
 
-        $html .= '<p class="bp-lbl">' . e($c['name']) . '</p>';
+        $html .= '<p class="bp-lbl">' . e($c['name']) . ($gid_name ? ' &middot; ' . e($gid_name) : '') . '</p>';
         $html .= '<p class="bp-hd">' . e($court_sg) . ' ' . $court . '</p>';
         $html .= '<table class="bptbl"><thead><tr>'
                . '<th style="width:16mm">Runde</th>'
@@ -1071,9 +1079,10 @@ function generate_court_plans_pdf(int $cid): void {
     }
 
     $pdf = mpdf(['margin_top' => 10, 'margin_bottom' => 10, 'margin_left' => 12, 'margin_right' => 12]);
-    $pdf->SetTitle($court_pl . '-Pläne: ' . $c['name']);
+    $pdf->SetTitle($court_pl . '-Pläne: ' . $c['name'] . ($gid_name ? ' (' . $gid_name . ')' : ''));
     $pdf->WriteHTML($html);
-    $pdf->Output(_pdf_slug($court_pl) . '_plaene.pdf', \Mpdf\Output\Destination::INLINE);
+    $fname = _pdf_slug($court_pl) . '_plaene' . ($gid_name ? '_' . _pdf_slug($gid_name) : '') . '.pdf';
+    $pdf->Output($fname, \Mpdf\Output\Destination::INLINE);
     exit;
 }
 

@@ -1005,6 +1005,16 @@ ob_start(); ?>
           <a href="<?= url('competition/'.$c['id'].'/pdf/match-cards/'.$g['id']) ?>" class="btn btn-outline-secondary" target="_blank" title="Match-Cards dieser Gruppe">
             <i class="bi bi-card-text"></i>
           </a>
+          <?php if ($is_team): ?>
+          <a href="<?= url('competition/'.$c['id'].'/pdf/team-strips/'.$g['id']) ?>" class="btn btn-outline-secondary" target="_blank" title="Teampläne dieser Gruppe">
+            <i class="bi bi-list-task"></i>
+          </a>
+          <?php endif; ?>
+          <?php if ((int)($c['num_courts'] ?? 0) > 0): ?>
+          <a href="<?= url('competition/'.$c['id'].'/pdf/court-plans/'.$g['id']) ?>" class="btn btn-outline-secondary" target="_blank" title="<?= e($court_sg) ?>pläne dieser Gruppe">
+            <i class="bi bi-geo-alt"></i>
+          </a>
+          <?php endif; ?>
         </span>
       </div>
       <div class="card-body p-0">

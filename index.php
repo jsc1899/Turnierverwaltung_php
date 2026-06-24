@@ -205,6 +205,7 @@ $routes = [
     ['GET', '/competition/{id}/pdf/team-strips',       'pdf', 'team_strips'],
     ['GET', '/competition/{id}/pdf/team-strips/{gid}', 'pdf', 'team_strips'],
     ['GET', '/competition/{id}/pdf/court-plans',       'pdf', 'court_plans'],
+    ['GET', '/competition/{id}/pdf/court-plans/{gid}',  'pdf', 'court_plans'],
     ['GET', '/tournament/{id}/players/pdf',       'pdf', 'players_pdf'],
     ['GET', '/tournament/{id}/players/csv',       'pdf', 'players_csv'],
     ['GET', '/tournament/{id}/registrations/pdf', 'pdf', 'registrations_pdf'],
