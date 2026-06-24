@@ -6,3 +6,6 @@ vendor/
 composer.phar
 php-server.log
 .claude/
+
+# Visual brainstorming companion
+.superpowers/

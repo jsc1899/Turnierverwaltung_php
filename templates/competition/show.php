@@ -85,13 +85,13 @@ ob_start(); ?>
   <?php endif; ?>
 </div>
 
-<?php if ($places): ?>
-<!-- Endplatzierung -->
+<?php if ($places && !empty($comp_complete)): ?>
+<!-- Endplatzierung (erst wenn kein offenes Spiel mehr im gesamten Bewerb) -->
 <div class="card border-0 shadow-sm mb-4" style="background:linear-gradient(135deg,#fff9db,#fff);">
   <div class="card-body">
     <h5 class="card-title mb-3"><i class="bi bi-trophy-fill text-warning me-2"></i>Endplatzierung</h5>
     <div class="d-flex flex-wrap gap-3">
-      <?php foreach ($places as $pl): ?>
+      <?php foreach ($places as $pl): if ($pl['rank'] > 4) continue; ?>
       <div class="text-center p-3 border rounded bg-white">
         <div class="fs-2"><?= match($pl['rank']) { 1=>'🥇', 2=>'🥈', 3=>'🥉', default=>$pl['rank'].'.' } ?></div>
         <div class="fw-bold"><?= e($pl['name']) ?></div>
@@ -99,6 +99,31 @@ ob_start(); ?>
       </div>
       <?php endforeach; ?>
     </div>
+    <?php $rest_places = array_filter($places, fn($p) => $p['rank'] > 4); ?>
+    <?php if ($rest_places): ?>
+    <style>
+      .more-places-btn .lbl-hide { display:none; }
+      .more-places-btn:not(.collapsed) .lbl-show { display:none; }
+      .more-places-btn:not(.collapsed) .lbl-hide { display:inline; }
+    </style>
+    <button class="btn btn-sm btn-outline-secondary mt-3 collapsed more-places-btn" type="button"
+            data-bs-toggle="collapse" data-bs-target="#more-places-<?= $c['id'] ?>"
+            aria-expanded="false" aria-controls="more-places-<?= $c['id'] ?>">
+      <span class="lbl-show"><i class="bi bi-chevron-down me-1"></i>Weitere Plätze anzeigen (<?= count($rest_places) ?>)</span>
+      <span class="lbl-hide"><i class="bi bi-chevron-up me-1"></i>Weitere Plätze ausblenden</span>
+    </button>
+    <div class="collapse" id="more-places-<?= $c['id'] ?>">
+      <ul class="list-group list-group-flush mt-2 mb-0">
+        <?php foreach ($rest_places as $pl): ?>
+        <li class="list-group-item bg-transparent px-0 py-1 d-flex align-items-baseline">
+          <span class="fw-semibold text-muted text-end me-2" style="min-width:2.4rem"><?= (int)$pl['rank'] ?>.</span>
+          <span class="fw-semibold"><?= e($pl['name']) ?></span>
+          <?php if ($pl['club']): ?><span class="text-muted small ms-2"><?= e($pl['club']) ?></span><?php endif; ?>
+        </li>
+        <?php endforeach; ?>
+      </ul>
+    </div>
+    <?php endif; ?>
   </div>
 </div>
 <?php endif; ?>
@@ -297,6 +322,14 @@ ob_start(); ?>
           <option value="diff"<?= ($c['standings_order'] ?? 'h2h') === 'diff' ? ' selected' : '' ?>>Punkte – Differenz – Direktes Duell</option>
         </select>
       </div>
+      <div class="col-auto">
+        <label class="form-label">Punktevergabe</label>
+        <select name="points_mode" class="form-select form-select-sm">
+          <option value="2-1-0"<?= ($c['points_mode'] ?? '2-1-0') === '2-1-0' ? ' selected' : '' ?>>Sieg 2 – Unentsch. 1 – Niederl. 0</option>
+          <option value="3-1-0"<?= ($c['points_mode'] ?? '2-1-0') === '3-1-0' ? ' selected' : '' ?>>Sieg 3 – Unentsch. 1 – Niederl. 0</option>
+          <option value="3-2-1"<?= ($c['points_mode'] ?? '2-1-0') === '3-2-1' ? ' selected' : '' ?>>Sieg 3 – Unentsch. 2 – Niederl. 1</option>
+        </select>
+      </div>
       <div class="col-auto d-flex align-items-end pb-1">
         <div class="form-check">
           <input class="form-check-input" type="checkbox" name="show_skill" id="show_skill"
@@ -320,6 +353,28 @@ ob_start(); ?>
         <label class="form-label"><?= e($court_pl) ?> <span class="text-muted small">(0 = aus)</span></label>
         <input type="number" name="num_courts" class="form-control form-control-sm" style="width:90px"
                value="<?= (int)($c['num_courts'] ?? 0) ?>" min="0" max="20">
+      </div>
+      <div class="col-auto d-flex align-items-end pb-1">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="schedule_enabled" id="schedule_enabled"
+                 <?= !empty($c['schedule_enabled']) ? 'checked' : '' ?>>
+          <label class="form-check-label" for="schedule_enabled"
+                 title="Nur verfügbar, wenn Spielplätze und Spielrunden aktiv sind.">Zeitplan</label>
+        </div>
+      </div>
+      <div class="col-auto" id="schedule-fields-wrap" style="display:<?= !empty($c['schedule_enabled']) ? '' : 'none' ?>">
+        <div class="row g-2 align-items-end">
+          <div class="col-auto">
+            <label class="form-label">Spieldauer/Runde <span class="text-muted small">(Min.)</span></label>
+            <input type="number" name="schedule_duration" id="schedule_duration" class="form-control form-control-sm" style="width:100px"
+                   value="<?= (int)($c['schedule_duration'] ?? 0) ?: '' ?>" min="1" max="600">
+          </div>
+          <div class="col-auto">
+            <label class="form-label">Startzeit</label>
+            <input type="time" name="schedule_start" id="schedule_start" class="form-control form-control-sm" style="width:110px"
+                   value="<?= e($c['schedule_start'] ?? '') ?>">
+          </div>
+        </div>
       </div>
       <div class="col-auto d-flex align-items-end pb-1">
         <div class="form-check">
@@ -350,6 +405,33 @@ ob_start(); ?>
           <?php endforeach; ?>
           <div class="col-auto">
             <button class="btn btn-primary btn-sm"><?= e($court_pl) ?> speichern</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <?php endif; ?>
+    <?php if (!empty($c['schedule_enabled']) && !empty($c['show_byes']) && !empty($groups)): ?>
+    <div class="card shadow-sm mt-3">
+      <div class="card-header fw-semibold py-2">
+        <i class="bi bi-pause-circle me-1"></i>Pause pro Gruppe
+        <span class="text-muted small fw-normal">(Zeitpunkt + Dauer in Min.; leer = keine Pause)</span>
+      </div>
+      <div class="card-body py-2">
+        <form method="post" action="<?= url('competition/'.$c['id'].'/pauses') ?>" class="row g-2 align-items-end">
+          <?= csrf_field() ?>
+          <?php foreach ($groups as $gi3): $g3 = $gi3['group']; ?>
+          <div class="col-auto">
+            <label class="form-label small mb-0"><?= e($g3['name']) ?></label>
+            <div class="d-flex gap-1">
+              <input type="time" name="pause_start[<?= (int)$g3['id'] ?>]" class="form-control form-control-sm" style="width:105px"
+                     value="<?= e($g3['pause_start'] ?? '') ?>" title="Pausen-Zeitpunkt">
+              <input type="number" name="pause_dur[<?= (int)$g3['id'] ?>]" class="form-control form-control-sm" style="width:78px"
+                     min="0" max="600" value="<?= (int)($g3['pause_duration'] ?? 0) ?: '' ?>" placeholder="Min." title="Pausendauer (Min.)">
+            </div>
+          </div>
+          <?php endforeach; ?>
+          <div class="col-auto">
+            <button class="btn btn-primary btn-sm">Pausen speichern</button>
           </div>
         </form>
       </div>
@@ -847,6 +929,11 @@ ob_start(); ?>
         <i class="bi bi-list-task me-1"></i>Teampläne
       </a>
       <?php endif; ?>
+      <?php if ((int)($c['num_courts'] ?? 0) > 0): ?>
+      <a href="<?= url('competition/'.$c['id'].'/pdf/court-plans') ?>" class="btn btn-outline-secondary btn-sm" target="_blank">
+        <i class="bi bi-geo-alt me-1"></i><?= e($court_sg) ?>pläne
+      </a>
+      <?php endif; ?>
       <?php if ($is_team && (int)($c['team_size'] ?? 0) > 1 && ($c['team_result_mode'] ?? 'wins') !== 'total'): ?>
       <button type="button" class="btn btn-outline-secondary btn-sm ms-auto toggle-duels-btn" onclick="toggleAllDuels()">
         <i class="bi bi-list-ol me-1"></i><span class="toggle-duels-label">Einzelspiele ausblenden</span>
@@ -926,7 +1013,7 @@ ob_start(); ?>
         <div class="table-responsive">
           <table class="table table-sm table-hover align-middle mb-0">
             <thead class="table-light">
-              <tr><th>#</th><th>Spieler</th><th class="text-center">Sp</th><th class="text-center">S</th><th class="text-center">U</th><th class="text-center">N</th><th class="text-center" style="width:72px"><?= $sets_mode_active ? 'V (Sätze)' : 'V' ?></th><th class="text-center" style="width:72px"><?= $sets_mode_active ? '+/- (Sätze)' : '+/-' ?></th><?php if ($show_einzel): ?><th class="text-center" style="width:72px"><?= $sets_mode_active ? 'V (Punkte)' : 'V (Einzel)' ?></th><th class="text-center" style="width:72px"><?= $sets_mode_active ? '+/- (Punkte)' : '+/- (Einzel)' ?></th><?php endif; ?><th class="text-center">Pkt</th></tr>
+              <tr><th>#</th><th><?= $is_team ? 'Team' : 'Spieler' ?></th><th class="text-center">Sp</th><th class="text-center">S</th><th class="text-center">U</th><th class="text-center">N</th><th class="text-center" style="width:72px"><?= $sets_mode_active ? 'V (Sätze)' : 'V' ?></th><th class="text-center" style="width:72px"><?= $sets_mode_active ? '+/- (Sätze)' : '+/-' ?></th><?php if ($show_einzel): ?><th class="text-center" style="width:72px"><?= $sets_mode_active ? 'V (Punkte)' : 'V (Einzel)' ?></th><th class="text-center" style="width:72px"><?= $sets_mode_active ? '+/- (Punkte)' : '+/- (Einzel)' ?></th><?php endif; ?><th class="text-center">Pkt</th></tr>
             </thead>
             <tbody>
               <?php foreach ($standings as $i => $pl): ?>
@@ -1042,8 +1129,15 @@ ob_start(); ?>
               }
               return $h;
           };
-          $render_round = function ($r) {
-              return '<div class="text-center small fw-semibold text-secondary mt-2 mb-1 pt-1 border-top">Runde ' . (int)$r . '</div>';
+          $render_round = function ($r) use ($c, $g) {
+              $rt = group_round_time($c, $g, (int)$r);
+              $time = $rt !== '' ? ' &middot; <span class="text-primary">' . $rt . ' Uhr</span>' : '';
+              return '<div class="text-center small fw-semibold text-secondary mt-2 mb-1 pt-1 border-top">Runde ' . (int)$r . $time . '</div>';
+          };
+          $grp_pause   = group_pause_window($c, $g);
+          $render_pause = function ($pw) {
+              return '<div class="text-center small fw-bold mt-2 mb-1 py-1 rounded" style="background:#fff3cd;color:#856404">'
+                   . '<i class="bi bi-pause-circle me-1"></i>Pause &middot; ' . e($pw['start']) . ' &ndash; ' . e($pw['end']) . ' Uhr</div>';
           };
           if ($grp_editable && !$use_duels && !$use_sets): ?>
           <form id="grp-form-<?= $g['id'] ?>" method="post"
@@ -1055,6 +1149,10 @@ ob_start(); ?>
             $cur_round = (int)($m['round_no'] ?? 0);
             if ($show_byes && $cur_round !== $bye_prev_round) {
                 if ($bye_prev_round !== null && isset($round_byes[$bye_prev_round])) echo $render_bye($round_byes[$bye_prev_round]);
+                // Pause nach Runde P (zwischen Runde P und P+1).
+                if ($grp_pause && $bye_prev_round !== null && $bye_prev_round <= $grp_pause['after_round'] && $cur_round > $grp_pause['after_round']) {
+                    echo $render_pause($grp_pause);
+                }
                 if ($cur_round > 0) echo $render_round($cur_round);
             }
             $bye_prev_round = $cur_round;
@@ -1228,7 +1326,8 @@ ob_start(); ?>
           </div>
           <?php else: ?>
           <?php if ($grp_editable): ?>
-          <div class="mb-2" style="display:grid;grid-template-columns:1fr 56px 1.2rem 56px 1fr 30px;align-items:center;column-gap:4px">
+          <div class="mb-2" style="display:grid;grid-template-columns:64px 1fr 56px 1.2rem 56px 1fr 64px;align-items:center;column-gap:4px">
+            <div></div>
             <span class="text-end small text-truncate"><?= e($m['p1name']) ?></span>
             <input type="number" name="matches[<?= $m['id'] ?>][score1]" min="0"
                    form="grp-form-<?= $g['id'] ?>"
@@ -1240,17 +1339,22 @@ ob_start(); ?>
                    class="form-control form-control-sm text-center"
                    value="<?= $m['played'] ? $m['score2'] : '' ?>">
             <span class="small text-truncate"><?= e($m['p2name']) ?></span>
-            <?php if ($m['played']): ?>
-            <form method="post" action="<?= url('match/'.$m['id'].'/result/clear') ?>"
-                  data-confirm="Ergebnis wirklich löschen?">
-              <?= csrf_field() ?>
-              <button class="btn btn-sm btn-outline-danger p-0" style="width:30px;height:30px" title="Ergebnis löschen">
-                <i class="bi bi-x-circle"></i>
+            <div class="d-flex align-items-center gap-1 justify-content-end">
+              <button type="button" class="btn btn-sm btn-outline-primary p-0 save-one-result" style="width:30px;height:30px"
+                      title="Dieses Ergebnis speichern"
+                      data-mid="<?= $m['id'] ?>" data-url="<?= url('match/'.$m['id'].'/result') ?>" data-csrf="<?= csrf_token() ?>">
+                <i class="bi bi-save"></i>
               </button>
-            </form>
-            <?php else: ?>
-            <div></div>
-            <?php endif; ?>
+              <?php if ($m['played']): ?>
+              <form method="post" action="<?= url('match/'.$m['id'].'/result/clear') ?>"
+                    data-confirm="Ergebnis wirklich löschen?">
+                <?= csrf_field() ?>
+                <button class="btn btn-sm btn-outline-danger p-0" style="width:30px;height:30px" title="Ergebnis löschen">
+                  <i class="bi bi-x-circle"></i>
+                </button>
+              </form>
+              <?php endif; ?>
+            </div>
           </div>
           <?php else: ?>
           <div class="mb-1 d-flex align-items-center gap-2 small">
@@ -1303,6 +1407,11 @@ ob_start(); ?>
       <?php if ($is_team): ?>
       <a href="<?= url('competition/'.$c['id'].'/pdf/team-strips') ?>" class="btn btn-outline-secondary btn-sm" target="_blank">
         <i class="bi bi-list-task me-1"></i>Teampläne
+      </a>
+      <?php endif; ?>
+      <?php if ((int)($c['num_courts'] ?? 0) > 0): ?>
+      <a href="<?= url('competition/'.$c['id'].'/pdf/court-plans') ?>" class="btn btn-outline-secondary btn-sm" target="_blank">
+        <i class="bi bi-geo-alt me-1"></i><?= e($court_sg) ?>pläne
       </a>
       <?php endif; ?>
       <?php if ($is_team && (int)($c['team_size'] ?? 0) > 1 && ($c['team_result_mode'] ?? 'wins') !== 'total'): ?>
@@ -1754,6 +1863,11 @@ ob_start(); ?>
         <i class="bi bi-list-task me-1"></i>Teampläne
       </a>
       <?php endif; ?>
+      <?php if ((int)($c['num_courts'] ?? 0) > 0): ?>
+      <a href="<?= url('competition/'.$c['id'].'/pdf/court-plans') ?>" class="btn btn-outline-secondary btn-sm" target="_blank">
+        <i class="bi bi-geo-alt me-1"></i><?= e($court_sg) ?>pläne
+      </a>
+      <?php endif; ?>
     </div>
     <?php $cross_editable = (can_edit() && !$locked); ?>
     <?php if ($cross_editable): ?>
@@ -1826,6 +1940,11 @@ echo in_array($c['phase'], ['ko', 'done'], true) ? $__ko_html . $__groups_html :
   <?php if ($is_team): ?>
   <a href="<?= url('competition/'.$c['id'].'/pdf/team-strips') ?>" class="btn btn-outline-secondary btn-sm" target="_blank">
     <i class="bi bi-list-task me-1"></i>Teampläne
+  </a>
+  <?php endif; ?>
+  <?php if ((int)($c['num_courts'] ?? 0) > 0): ?>
+  <a href="<?= url('competition/'.$c['id'].'/pdf/court-plans') ?>" class="btn btn-outline-secondary btn-sm" target="_blank">
+    <i class="bi bi-geo-alt me-1"></i><?= e($court_sg) ?>pläne
   </a>
   <?php endif; ?>
 </div>
@@ -2074,6 +2193,30 @@ $extra_js = <<<'JS'
 .add-entry-item:has(input:checked) { background: var(--bs-primary-bg-subtle); }
 </style>
 <script>
+// ── Einzelnes Ergebnis inline speichern ──────────────────────────
+// Liest die Score-Felder einer Begegnung (name="matches[mid][scoreN]") und
+// sendet nur dieses Ergebnis an /match/{id}/result.
+document.addEventListener('click', function(ev) {
+  var btn = ev.target.closest('.save-one-result');
+  if (!btn) return;
+  ev.preventDefault();
+  var mid = btn.dataset.mid;
+  var s1 = document.getElementsByName('matches[' + mid + '][score1]')[0];
+  var s2 = document.getElementsByName('matches[' + mid + '][score2]')[0];
+  if (!s1 || !s2) return;
+  if (s1.value === '' || s2.value === '') { alert('Bitte beide Werte eingeben.'); return; }
+  var f = document.createElement('form');
+  f.method = 'post';
+  f.action = btn.dataset.url;
+  [['csrf_token', btn.dataset.csrf], ['score1', s1.value], ['score2', s2.value]].forEach(function(kv) {
+    var i = document.createElement('input');
+    i.type = 'hidden'; i.name = kv[0]; i.value = kv[1];
+    f.appendChild(i);
+  });
+  document.body.appendChild(f);
+  f.submit();
+});
+
 // ── Group Drag-and-Drop ──────────────────────────────────────────
 var grpDragEl = null, grpEditActive = false;
 function toggleGrpEdit() {
@@ -2422,6 +2565,32 @@ window.addEventListener('resize', drawAllBrackets);
     var show = this.value === 'team';
     flds.forEach(function(f){ if (f) f.style.display = show ? '' : 'none'; });
   });
+})();
+
+// ── Zeitplan: nur aktivierbar bei Spielplätzen + Spielrunden; Felder ein-/ausblenden ─────
+(function() {
+  var cb     = document.getElementById('schedule_enabled');
+  var courts = document.querySelector('input[name="num_courts"]');
+  var byes   = document.getElementById('show_byes');
+  var wrap   = document.getElementById('schedule-fields-wrap');
+  var dur    = document.getElementById('schedule_duration');
+  var st     = document.getElementById('schedule_start');
+  if (!cb || !courts || !byes) return;
+  function prereq() { return (parseInt(courts.value || '0', 10) > 0) && byes.checked; }
+  function sync() {
+    var ok = prereq();
+    cb.disabled = !ok;
+    if (!ok) cb.checked = false;
+    var on = cb.checked && ok;
+    if (wrap) wrap.style.display = on ? '' : 'none';
+    if (dur) dur.required = on;
+    if (st)  st.required  = on;
+  }
+  [courts, byes, cb].forEach(function(el) {
+    el.addEventListener('change', sync);
+    el.addEventListener('input', sync);
+  });
+  sync();
 })();
 
 // ── Duel inline: Live-Gesamtergebnis ─────────────────────────────

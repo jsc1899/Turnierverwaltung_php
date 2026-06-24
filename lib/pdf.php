@@ -358,7 +358,7 @@ function generate_groups_pdf(int $cid, ?int $gid = null): void {
         $html .= '<table>'
                . '<tr>'
                . '<th style="width:3%">#</th>'
-               . '<th style="width:25%">Spieler</th>'
+               . '<th style="width:25%">' . ($is_team ? 'Team' : 'Spieler') . '</th>'
                . ($is_team ? '' : '<th style="width:16%">Verein</th>')
                . "<th $nc>Sp</th><th $nc>S</th><th $nc>U</th><th $nc>N</th>"
                . "<th $vc>" . $col_pm . '</th>';
@@ -413,8 +413,11 @@ function generate_groups_pdf(int $cid, ?int $gid = null): void {
                          ORDER BY d.duel_order",
                         [$gm['id']]
                     );
+                    $mtime = group_round_time($c, $g, (int)($gm['round_no'] ?? 0));
                     $html .= '<div class="mblock">'
-                           . '<div class="mblock-hdr">Spiel ' . ($im + 1) . (!empty($gm['court_no']) ? ' &middot; ' . $court . ' ' . (int)$gm['court_no'] : '') . '</div>'
+                           . '<div class="mblock-hdr">Spiel ' . ($im + 1)
+                             . (!empty($gm['court_no']) ? ' &middot; ' . $court . ' ' . (int)$gm['court_no'] : '')
+                             . ($mtime !== '' ? ' &middot; ' . $mtime . ' Uhr' : '') . '</div>'
                            . '<table class="mtbl">'
                            . '<tr>'
                            . '<td class="mnm-l">' . e($gm['p1name']) . '</td>'
@@ -491,13 +494,21 @@ function generate_groups_pdf(int $cid, ?int $gid = null): void {
             }
             if ($gmatches) {
                 $score_col_lbl = $sets_mode_active ? 'Sätze' : 'Ergebnis';
+                $has_courts    = !empty($c['num_courts']);
+                $court_hdr     = court_label($t['sport'] ?? '');
+                $lbl1          = $is_team ? 'Team 1' : 'Spieler 1';
+                $lbl2          = $is_team ? 'Team 2' : 'Spieler 2';
+                $al1           = $is_team ? 'center' : 'right';
+                $al2           = $is_team ? 'center' : 'left';
                 $html .= '<h4 style="font-size:9pt;color:#374151;margin:3mm 0 2mm">Spielergebnisse</h4>';
                 $html .= '<table style="font-size:8.5pt">'
                        . '<tr>'
-                       . '<th style="width:44%;text-align:right">Spieler 1</th>'
+                       . ($has_courts ? '<th style="width:12%;text-align:center">' . e($court_hdr) . '</th>' : '')
+                       . '<th style="width:' . ($has_courts ? '38' : '44') . '%;text-align:' . $al1 . '">' . $lbl1 . '</th>'
                        . '<th style="width:14%;text-align:center">' . $score_col_lbl . '</th>'
-                       . '<th style="width:44%">Spieler 2</th>'
+                       . '<th style="width:' . ($has_courts ? '36' : '44') . '%;text-align:' . $al2 . '">' . $lbl2 . '</th>'
                        . '</tr>';
+                $colspan = $has_courts ? 4 : 3;
                 // Spielfreie (Bye) je Runde: Gruppenmitglieder, die in der Runde fehlen
                 // (bei garantierten Pausen / gerader Anzahl ggf. zwei).
                 $show_byes  = !empty($c['show_byes']) || !empty($c['force_byes']);
@@ -519,37 +530,52 @@ function generate_groups_pdf(int $cid, ?int $gid = null): void {
                     }
                 }
                 $bye_prev  = null;
-                $bye_row   = function ($names) {
+                $bye_row   = function ($names) use ($colspan) {
                     $h = '';
                     foreach ((array)$names as $nm) {
-                        $h .= "<tr><td colspan='3' style='text-align:center;font-size:8pt;color:#6b7280;font-style:italic;padding:0.6mm 2mm'>" . e($nm) . ' &mdash; spielfrei</td></tr>';
+                        $h .= "<tr><td colspan='$colspan' style='text-align:center;font-size:8pt;color:#6b7280;font-style:italic;padding:0.6mm 2mm'>" . e($nm) . ' &mdash; spielfrei</td></tr>';
                     }
                     return $h;
                 };
-                $round_row = fn($r) => "<tr><td colspan='3' style='text-align:center;font-size:8pt;font-weight:bold;color:#374151;background:#f3f4f6;padding:0.8mm 2mm'>Runde " . (int)$r . '</td></tr>';
+                $round_row = function ($r) use ($has_courts, $c, $g) {
+                    $cell = "style='background:#f3f4f6;padding:0.8mm 2mm'";
+                    $pre  = $has_courts ? "<td $cell></td><td $cell></td>" : "<td $cell></td>";
+                    $rt   = group_round_time($c, $g, (int)$r);
+                    $time = $rt !== '' ? ' &middot; ' . $rt . ' Uhr' : '';
+                    return "<tr>$pre<td style='text-align:center;font-size:8pt;font-weight:bold;color:#374151;background:#f3f4f6;padding:0.8mm 2mm'>Runde " . (int)$r . $time . "</td><td $cell></td></tr>";
+                };
+                $gpause = group_pause_window($c, $g);
+                $pause_row = function ($pw) use ($colspan) {
+                    return "<tr><td colspan='$colspan' style='text-align:center;font-size:8pt;font-weight:bold;color:#856404;background:#fff3cd;padding:0.8mm 2mm'>Pause &middot; "
+                         . e($pw['start']) . ' &ndash; ' . e($pw['end']) . " Uhr</td></tr>";
+                };
                 foreach ($gmatches as $i => $gm) {
                     $cur_round = (int)($gm['round_no'] ?? 0);
                     if ($show_byes && $cur_round !== $bye_prev) {
                         if ($bye_prev !== null && isset($round_byes[$bye_prev])) $html .= $bye_row($round_byes[$bye_prev]);
+                        if ($gpause && $bye_prev !== null && $bye_prev <= $gpause['after_round'] && $cur_round > $gpause['after_round']) $html .= $pause_row($gpause);
                         if ($cur_round > 0) $html .= $round_row($cur_round);
                     }
                     $bye_prev = $cur_round;
                     $odd = $i % 2 === 1 ? ' class="odd"' : '';
-                    $sc  = $gm['played'] ? $gm['score1'] . ' : ' . $gm['score2'] : '— : —';
-                    $court_pdf = !empty($gm['court_no']) ? "<div style='font-size:7pt;color:#6b7280'>" . $court . " " . (int)$gm['court_no'] . "</div>" : '';
+                    $sc  = $gm['played'] ? $gm['score1'] . ' : ' . $gm['score2'] : '&nbsp;:&nbsp;';
+                    $court_cell = $has_courts
+                        ? "<td style='text-align:center;font-size:8pt;color:#6b7280'>" . (!empty($gm['court_no']) ? (int)$gm['court_no'] : '&nbsp;') . '</td>'
+                        : '';
                     $w1  = ($gm['played'] && $gm['score1'] > $gm['score2']) ? ' class="winner"' : '';
                     $w2  = ($gm['played'] && $gm['score2'] > $gm['score1']) ? ' class="winner"' : '';
                     $html .= "<tr$odd>"
-                           . "<td style='text-align:right'$w1>" . e($gm['p1name']) . '</td>'
-                           . "<td style='text-align:center'>$sc$court_pdf</td>"
-                           . "<td$w2>" . e($gm['p2name']) . '</td>'
+                           . $court_cell
+                           . "<td style='text-align:$al1'$w1>" . e($gm['p1name']) . '</td>'
+                           . "<td style='text-align:center'>$sc</td>"
+                           . "<td style='text-align:$al2'$w2>" . e($gm['p2name']) . '</td>'
                            . '</tr>';
                     if ($sets_mode_active && $gm['played'] && !empty($grp_sets[$gm['id']])) {
                         $sets_str = implode('&nbsp;&nbsp;', array_map(
                             fn($sr) => $sr['score1'] . ':' . $sr['score2'],
                             $grp_sets[$gm['id']]
                         ));
-                        $html .= "<tr><td colspan='3' style='text-align:center;font-size:7.5pt;color:#6b7280;padding:0.3mm 2mm'>Punkte: $sets_str</td></tr>";
+                        $html .= "<tr><td colspan='$colspan' style='text-align:center;font-size:7.5pt;color:#6b7280;padding:0.3mm 2mm'>Punkte: $sets_str</td></tr>";
                     }
                 }
                 if ($show_byes && $bye_prev !== null && isset($round_byes[$bye_prev])) {
@@ -622,8 +648,15 @@ function generate_team_strips_pdf(int $cid, ?int $gid = null): void {
     // Leere Score-Zellen (zum Ausfüllen).
     $score_cells = str_repeat('<td>&nbsp;</td>', $ncols + 2);
 
+    // Nur die aktuelle Phase anzeigen. Finalrunde, sobald sie ausgelost ist (es existieren
+    // group_id-NULL-Spiele) UND der Bewerb in 'ko'/'done' ist; sonst die Gruppenphase
+    // (auch bei reinen Gruppenbewerben, die direkt auf 'done' wechseln).
+    $has_finals  = (int)db_fetch("SELECT COUNT(*) n FROM `match` WHERE competition_id=? AND group_id IS NULL", [$cid])['n'] > 0;
+    $show_finals = $has_finals && in_array($c['phase'], ['ko', 'done'], true);
+    $show_groups = !$show_finals;
+
     $first = true;
-    foreach ($grps as $g) {
+    foreach (($show_groups ? $grps : []) as $g) {
         $numbers = team_start_numbers($g['id']);  // [team_id => 1..N]
         if (!$numbers) continue;
         $names = [];
@@ -684,18 +717,29 @@ function generate_team_strips_pdf(int $cid, ?int $gid = null): void {
                 }
             }
 
+            $gpause     = group_pause_window($c, $g);
+            $strip_cols = 2 * $ncols + 9;  // Dg+B+Ge+An + (ncols+2) + Mannschaft + (ncols+2)
             $rowi = 0;
             foreach ($rows as $row) {
+                // Pause-Zeile direkt vor der ersten Runde nach der Pause.
+                if ($gpause && $row['dg'] !== '' && (int)$row['dg'] === $gpause['after_round'] + 1) {
+                    $html .= "<tr><td colspan='$strip_cols' style='text-align:center;font-weight:bold;color:#856404;background:#fff3cd;padding:1.5mm'>Pause &middot; "
+                           . e($gpause['start']) . ' &ndash; ' . e($gpause['end']) . " Uhr</td></tr>";
+                }
                 $alt = ($rowi % 2 === 1) ? ' class="alt"' : '';
                 $rowi++;
                 $dg = $row['dg'] !== '' ? $row['dg'] : '&nbsp;';
+                if ($row['dg'] !== '') {
+                    $dgt = group_round_time($c, $g, (int)$row['dg']);
+                    if ($dgt !== '') $dg .= "<div style='font-size:6.5pt;color:#1e40af;font-weight:normal'>" . $dgt . "</div>";
+                }
                 $m  = $row['m'];
                 if (!$m) {
                     // Spielfrei in dieser Runde.
                     $html .= '<tr' . $alt . '>'
                            . '<td>' . $dg . '</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>'
                            . $score_cells
-                           . '<td class="pause">Pause</td>'
+                           . '<td class="pause">spielfrei</td>'
                            . $score_cells
                            . '</tr>';
                     continue;
@@ -725,7 +769,7 @@ function generate_team_strips_pdf(int $cid, ?int $gid = null): void {
     }
 
     // ── KO-/Kreuzspiel-Begegnungen: kompakte Strips, möglichst viele je Seite ──
-    $kom = db_fetchall(
+    $kom = $show_finals ? db_fetchall(
         "SELECT m.id, m.bracket, m.ko_round, m.ko_position, m.court_no, m.place_lo,
                 t1.name AS p1name, t2.name AS p2name
          FROM `match` m
@@ -734,7 +778,7 @@ function generate_team_strips_pdf(int $cid, ?int $gid = null): void {
          WHERE m.competition_id=? AND m.group_id IS NULL
            AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL",
         [$cid]
-    );
+    ) : [];
     if ($kom) {
         // Blockgröße S je Kreuzspiel-Block (für die Platzbereichs-Labels).
         $blockS = [];
@@ -825,6 +869,211 @@ function generate_team_strips_pdf(int $cid, ?int $gid = null): void {
     $pdf->SetTitle('Teampläne: ' . $c['name']);
     $pdf->WriteHTML($html);
     $pdf->Output('Teamplaene.pdf', \Mpdf\Output\Destination::INLINE);
+    exit;
+}
+
+// ── Bahnpläne (pro Spielplatz die Spielreihenfolge mit Teilnehmern) ───────────
+
+function generate_court_plans_pdf(int $cid): void {
+    $c = db_fetch("SELECT * FROM competition WHERE id=?", [$cid]);
+    if (!$c) { http_response_code(404); exit; }
+    $t          = db_fetch("SELECT name, event_date, sport FROM tournament WHERE id=?", [$c['tournament_id']]);
+    $tname      = $t ? $t['name'] : '';
+    $court_sg   = court_label($t['sport'] ?? '');          // z.B. „Bahn"
+    $court_pl   = court_label($t['sport'] ?? '', true);     // z.B. „Bahnen"
+    $num_courts = (int)($c['num_courts'] ?? 0);
+    $datum      = (!empty($t['event_date'])) ? date('d.m.Y', strtotime($t['event_date'])) : '';
+
+    $is_team    = !empty($c['is_team']);
+    $is_doubles = !$is_team && !empty($c['is_doubles']);
+
+    $html  = pdf_css();
+    $html .= '<style>
+        .bp-lbl { font-size:9pt; color:#1e40af; margin:0; }
+        .bp-hd  { font-size:16pt; font-weight:bold; margin:0 0 3mm; color:#111827; }
+        .bptbl { width:100%; border-collapse:collapse; font-size:10pt; margin:0; }
+        .bptbl th, .bptbl td { border:0.4pt solid #6b7280; padding:1.8mm 2mm; text-align:center; }
+        .bptbl th { background:#f3f4f6; font-weight:bold; }
+        .bptbl tr.alt td { background:#eceff3; }
+        .bptbl td.l, .bptbl th.l { text-align:left; }
+        .bptbl td.p1 { text-align:center; font-weight:600; }
+        .bptbl td.p2 { text-align:center; font-weight:600; }
+        .bptbl td.vs { color:#6b7280; }
+        .bp-none { color:#9ca3af; }
+        .sfoot { width:100%; margin-top:5mm; font-size:9.5pt; color:#1e40af; border-collapse:collapse; }
+        .sfoot td { border:none; padding:0; }
+    </style>';
+
+    if ($num_courts < 1) {
+        $pdf = mpdf();
+        $pdf->WriteHTML($html . '<h2>' . e($court_pl) . '-Pläne</h2><p>Keine ' . e($court_pl) . ' konfiguriert (Einstellung „' . e($court_pl) . '" = 0).</p>');
+        $pdf->Output('Bahnplaene.pdf', \Mpdf\Output\Destination::INLINE);
+        exit;
+    }
+
+    $team_size  = (int)($c['team_size'] ?? 0);
+    $score_mode = $c['score_mode'] ?? 'match';
+    // Card-Styles zusätzlich einbinden (Bahn-Übersicht + angehängte Match-Cards je Bahn).
+    $html .= _match_card_styles(_match_card_min_h($is_team, $team_size, $score_mode));
+
+    // Teilnehmer-Namen + Vereine je Bewerbstyp (Vereine für die Match-Cards).
+    if ($is_team) {
+        $name_sel  = "t1.name AS p1name, t2.name AS p2name, '' AS p1club, '' AS p2club";
+        $name_join = 'LEFT JOIN `team` t1 ON t1.id=m.team1_id LEFT JOIN `team` t2 ON t2.id=m.team2_id';
+    } elseif ($is_doubles) {
+        $name_sel  = "COALESCE(CONCAT(p1a.name,' / ',p1b.name),'') AS p1name, COALESCE(CONCAT(p2a.name,' / ',p2b.name),'') AS p2name,"
+                   . " CASE WHEN COALESCE(p1a.club,'')='' THEN COALESCE(p1b.club,'') WHEN COALESCE(p1b.club,'')='' THEN COALESCE(p1a.club,'')"
+                   . "      WHEN p1a.club=p1b.club THEN p1a.club ELSE CONCAT(p1a.club,' / ',p1b.club) END AS p1club,"
+                   . " CASE WHEN COALESCE(p2a.club,'')='' THEN COALESCE(p2b.club,'') WHEN COALESCE(p2b.club,'')='' THEN COALESCE(p2a.club,'')"
+                   . "      WHEN p2a.club=p2b.club THEN p2a.club ELSE CONCAT(p2a.club,' / ',p2b.club) END AS p2club";
+        $name_join = 'LEFT JOIN `double` dd1 ON dd1.id=m.double1_id LEFT JOIN `double` dd2 ON dd2.id=m.double2_id'
+                   . ' LEFT JOIN player p1a ON p1a.id=dd1.player1_id LEFT JOIN player p1b ON p1b.id=dd1.player2_id'
+                   . ' LEFT JOIN player p2a ON p2a.id=dd2.player1_id LEFT JOIN player p2b ON p2b.id=dd2.player2_id';
+    } else {
+        $name_sel  = "TRIM(CONCAT(p1.name,IF(COALESCE(p1.firstname,'')!='',CONCAT(' ',p1.firstname),''))) AS p1name,"
+                   . " TRIM(CONCAT(p2.name,IF(COALESCE(p2.firstname,'')!='',CONCAT(' ',p2.firstname),''))) AS p2name,"
+                   . " p1.club AS p1club, p2.club AS p2club";
+        $name_join = 'LEFT JOIN player p1 ON p1.id=m.player1_id LEFT JOIN player p2 ON p2.id=m.player2_id';
+    }
+    // Nur die aktuelle Phase: Finalrunde (KO/Kreuz), sobald ausgelost und in 'ko'/'done';
+    // sonst die Gruppenspiele (auch bei reinen Gruppenbewerben, die direkt auf 'done' wechseln).
+    $has_finals   = (int)db_fetch("SELECT COUNT(*) n FROM `match` WHERE competition_id=? AND group_id IS NULL", [$cid])['n'] > 0;
+    $show_finals  = $has_finals && in_array($c['phase'], ['ko', 'done'], true);
+    $phase_filter = $show_finals ? ' AND m.group_id IS NULL' : ' AND m.group_id IS NOT NULL';
+    $matches = db_fetchall(
+        "SELECT m.*, g.name AS gname, g.name AS group_name, g.pause_start, g.pause_duration, $name_sel
+         FROM `match` m
+         LEFT JOIN grp g ON g.id=m.group_id
+         $name_join
+         WHERE m.competition_id=? AND m.court_no IS NOT NULL" . $phase_filter,
+        [$cid]
+    );
+
+    // Blockgröße S je Kreuzspiel-Block (für die Platzbereichs-Labels).
+    $blockS = [];
+    foreach ($matches as $m) {
+        if ($m['bracket'] !== null && str_starts_with((string)$m['bracket'], 'C') && (int)$m['ko_round'] === 1) {
+            $blockS[$m['bracket']] = ($blockS[$m['bracket']] ?? 0) + 2;
+        }
+    }
+    $round_names = [2=>'Finale', 4=>'Halbfinale', 8=>'Viertelfinale', 16=>'Achtelfinale',
+                    32=>'Runde der 32', 64=>'Runde der 64', 3=>'Spiel um Platz 3'];
+    $label = function($m) use ($round_names, $blockS) {
+        if ($m['group_id'] !== null) {
+            return ($m['gname'] ?: 'Gruppe');
+        }
+        $b = $m['bracket'];
+        if ($b === null) return $round_names[(int)$m['ko_round']] ?? ('Runde ' . (int)$m['ko_round']);
+        if ($b === 'GF') return 'Grand Final';
+        if ($b === 'W')  return 'WB R' . (int)$m['ko_round'];
+        if ($b === 'L')  return 'LB R' . (int)$m['ko_round'];
+        if (str_starts_with((string)$b, 'C')) {
+            $S  = $blockS[$b] ?? 0;
+            $ps = $S > 0 ? ($S >> ((int)$m['ko_round'] - 1)) : 0;
+            $lo = (int)$m['place_lo'];
+            if ($ps >= 2) { $hi = $lo + $ps - 1; return $ps <= 2 ? "Pl. {$lo}/{$hi}" : "Pl. {$lo}–{$hi}"; }
+            return 'Pl. ' . $lo;
+        }
+        return '';
+    };
+
+    // Chronologische Reihenfolge je Bahn: Gruppen zuerst (Runde/Match-Order), dann KO
+    // (erste Runde zuerst), dann Kreuzspiele.
+    $grpkey = fn($b) => $b === null ? 0 : (in_array($b, ['W','L','GF'], true) ? 1 : 2);
+    usort($matches, function($a, $b) use ($grpkey) {
+        $pa = $a['group_id'] !== null ? 0 : 1;
+        $pb = $b['group_id'] !== null ? 0 : 1;
+        if ($pa !== $pb) return $pa <=> $pb;
+        if ($pa === 0) {  // beide Gruppenspiele
+            if ((int)$a['round_no']    !== (int)$b['round_no'])    return (int)$a['round_no']    <=> (int)$b['round_no'];
+            if ((int)$a['match_order'] !== (int)$b['match_order']) return (int)$a['match_order'] <=> (int)$b['match_order'];
+            return (int)$a['id'] <=> (int)$b['id'];
+        }
+        $ga = $grpkey($a['bracket']); $gb = $grpkey($b['bracket']);
+        if ($ga !== $gb) return $ga <=> $gb;
+        if ($a['bracket'] === null) {  // Einzel-KO: höhere ko_round zuerst (chronologisch)
+            if ((int)$a['ko_round'] !== (int)$b['ko_round']) return (int)$b['ko_round'] <=> (int)$a['ko_round'];
+            return (int)$a['ko_position'] <=> (int)$b['ko_position'];
+        }
+        if ($a['bracket'] !== $b['bracket']) return strcmp((string)$a['bracket'], (string)$b['bracket']);
+        if ((int)$a['ko_round'] !== (int)$b['ko_round']) return (int)$a['ko_round'] <=> (int)$b['ko_round'];
+        return (int)$a['ko_position'] <=> (int)$b['ko_position'];
+    });
+
+    $byCourt = [];
+    foreach ($matches as $m) $byCourt[(int)$m['court_no']][] = $m;
+
+    $pname = fn($n) => ($n !== null && $n !== '') ? e($n) : '<span class="bp-none">&mdash;</span>';
+
+    $first = true;
+    for ($court = 1; $court <= $num_courts; $court++) {
+        $cms = $byCourt[$court] ?? [];
+        if (!$cms) continue;
+        if (!$first) $html .= '<pagebreak />';
+        $first = false;
+
+        $html .= '<p class="bp-lbl">' . e($c['name']) . '</p>';
+        $html .= '<p class="bp-hd">' . e($court_sg) . ' ' . $court . '</p>';
+        $html .= '<table class="bptbl"><thead><tr>'
+               . '<th style="width:16mm">Runde</th>'
+               . '<th style="width:40mm" class="l">Gruppe</th>'
+               . '<th>' . ($is_team ? 'Team 1' : 'Spieler 1') . '</th>'
+               . '<th style="width:10mm"></th>'
+               . '<th>' . ($is_team ? 'Team 2' : 'Spieler 2') . '</th>'
+               . '</tr></thead><tbody>';
+        $prev_round = null; $pause_shown = false;
+        foreach ($cms as $i => $m) {
+            // Pause-Zeile vor der ersten Runde nach der Gruppen-Pause.
+            $cr = (int)($m['round_no'] ?? 0);
+            if (!$pause_shown && $cr > 0) {
+                $gpw = group_pause_window($c, ['pause_start' => $m['pause_start'] ?? '', 'pause_duration' => $m['pause_duration'] ?? 0]);
+                if ($gpw && $cr === $gpw['after_round'] + 1 && ($prev_round === null || $prev_round <= $gpw['after_round'])) {
+                    $html .= "<tr><td colspan='5' style='text-align:center;font-weight:bold;color:#856404;background:#fff3cd;padding:1.2mm'>Pause &middot; "
+                           . e($gpw['start']) . ' &ndash; ' . e($gpw['end']) . " Uhr</td></tr>";
+                    $pause_shown = true;
+                }
+            }
+            $prev_round = $cr;
+            $alt = ($i % 2 === 1) ? ' class="alt"' : '';
+            // Runde: bei Gruppenspielen der Durchgang (round_no); bei KO/Kreuz trägt das Label die Runde.
+            $round_cell = ($m['group_id'] !== null && (int)$m['round_no'] > 0) ? (string)(int)$m['round_no'] : '&nbsp;';
+            $rt = match_schedule_time($c, $m);
+            if ($rt !== '') $round_cell .= "<div style='font-size:7.5pt;color:#1e40af;font-weight:normal'>" . $rt . "</div>";
+            $html .= '<tr' . $alt . '>'
+                   . '<td>' . $round_cell . '</td>'
+                   . '<td class="l">' . e($label($m)) . '</td>'
+                   . '<td class="p1">' . $pname($m['p1name']) . '</td>'
+                   . '<td class="vs">&ndash;</td>'
+                   . '<td class="p2">' . $pname($m['p2name']) . '</td>'
+                   . '</tr>';
+        }
+        $html .= '</tbody></table>';
+        $html .= '<table class="sfoot"><tr>'
+               . '<td style="text-align:left">Veranstaltung: ' . e($tname) . '</td>'
+               . '<td style="text-align:right">Datum: ' . $datum . '</td>'
+               . '</tr></table>';
+
+        // Zugehörige Match-Cards dieser Bahn (nur Begegnungen mit beiden Teilnehmern).
+        $court_cards = '';
+        foreach ($cms as $m) {
+            $p1set = $is_team ? !empty($m['team1_id']) : ($is_doubles ? !empty($m['double1_id']) : !empty($m['player1_id']));
+            $p2set = $is_team ? !empty($m['team2_id']) : ($is_doubles ? !empty($m['double2_id']) : !empty($m['player2_id']));
+            if (!$p1set || !$p2set) continue;
+            $court_cards .= _match_card_html($m, $c, $is_team, $is_doubles, $team_size, $score_mode, $court_sg, e($label($m)));
+        }
+        if ($court_cards !== '') {
+            $html .= '<p class="bp-lbl" style="margin-top:5mm">' . e($court_sg) . ' ' . $court . ' &ndash; Match-Cards</p>' . $court_cards;
+        }
+    }
+
+    if ($first) {
+        $html .= '<h2>' . e($court_pl) . '-Pläne</h2><p>Keine Begegnungen mit ' . e($court_sg) . '-Zuweisung vorhanden.</p>';
+    }
+
+    $pdf = mpdf(['margin_top' => 10, 'margin_bottom' => 10, 'margin_left' => 12, 'margin_right' => 12]);
+    $pdf->SetTitle($court_pl . '-Pläne: ' . $c['name']);
+    $pdf->WriteHTML($html);
+    $pdf->Output(_pdf_slug($court_pl) . '_plaene.pdf', \Mpdf\Output\Destination::INLINE);
     exit;
 }
 
@@ -1111,8 +1360,15 @@ function generate_cross_pdf(int $cid): void {
     $html .= '<h2 style="margin-top:0">' . e($c['name']) . ' — Kreuzspiele / Platzierungen</h2>';
     if ($t) $html .= '<div class="meta">' . e($t['name']) . '</div>';
 
-    // Endplatzierung
-    $finals = placement_final_places($cid);
+    // Endplatzierung erst, wenn kein offenes (spielbares, aber unbespieltes) Spiel mehr existiert.
+    $open_cross = (int)db_fetch(
+        "SELECT COUNT(*) n FROM `match` WHERE competition_id=? AND played=0
+           AND ( (player1_id IS NOT NULL AND player2_id IS NOT NULL)
+              OR (double1_id IS NOT NULL AND double2_id IS NOT NULL)
+              OR (team1_id   IS NOT NULL AND team2_id   IS NOT NULL) )",
+        [$cid]
+    )['n'];
+    $finals = $open_cross === 0 ? placement_final_places($cid) : [];
     if ($finals) {
         $html .= '<h3>Endplatzierung</h3><table><tr><th style="width:14mm">Platz</th><th>Teilnehmer</th></tr>';
         foreach ($finals as $place => $pid) {
@@ -1158,6 +1414,121 @@ function generate_cross_pdf(int $cid): void {
 }
 
 // ── Match-Cards (zum Ausdrucken) ──────────────────────────────────────────────
+
+// CSS-Block für Match-Cards (dynamische Mindesthöhe je Bewerbstyp/Satzmodus).
+function _match_card_styles(string $card_min_h): string {
+    return '<style>
+        .card { border: 0.8pt solid #d1d5db; border-radius: 2mm; padding: 3mm 5mm;
+                margin-bottom: 2mm; page-break-inside: avoid; min-height: ' . $card_min_h . '; }
+        .card-hdr { background: #eff6ff; padding: 1mm 4mm; margin: -3mm -5mm 2mm;
+                    border-radius: 2mm 2mm 0 0; font-weight: bold; font-size: 9pt; color: #1e40af; }
+        .players { width: 100%; border-collapse: collapse; margin-bottom: 2mm; }
+        .players td { padding: 1mm 3mm; border: 0.3pt solid #e5e7eb; font-size: 10pt; }
+        .players th { background: #f3f4f6; font-size: 8pt; padding: 0.8mm 3mm;
+                      border: 0.3pt solid #e5e7eb; text-align: left; }
+        .sig-table { width: 100%; border-collapse: collapse; }
+        .sig-write { height: 6mm; border-bottom: 0.6pt solid #374151; }
+        .sig-label { font-size: 8pt; color: #4b5563; padding-top: 0.8mm; }
+        .dtbl  { width:100%; border-collapse:collapse; margin-bottom:2mm; }
+        .dtbl td { border:0.3pt solid #e5e7eb; }
+        .dnum  { width:7mm; text-align:center; font-weight:bold; font-size:9pt; color:#6b7280; padding:1.2mm 1mm; }
+        .dhdr-num { width:7mm; background:#eff6ff; }
+        .dnm-l { width:40%; text-align:right; padding:1.2mm 3mm; }
+        .dnm-r { width:40%; padding:1.2mm 3mm; }
+        .dsc   { width:14%; text-align:center; font-size:9pt; padding:1.2mm 2mm; color:#374151; }
+        .dhdr-l { width:40%; text-align:right; font-weight:bold; font-size:10pt;
+                  padding:1.5mm 3mm; background:#eff6ff; }
+        .dhdr-r { width:40%; font-weight:bold; font-size:10pt;
+                  padding:1.5mm 3mm; background:#eff6ff; }
+        .dhdr-sc { width:14%; text-align:center; font-size:11pt; padding:1.5mm 2mm;
+                   background:#eff6ff; letter-spacing:1mm; }
+        .wl  { display:block; border-bottom:0.6pt solid #374151; min-height:5.5mm; }
+        .dlbl { font-size:7.5pt; color:#6b7280; }
+    </style>';
+}
+
+// Standard-Mindesthöhe einer Match-Card je Bewerbstyp/Satzmodus.
+function _match_card_min_h(bool $is_team, int $team_size, string $score_mode): string {
+    return ($is_team && $team_size > 0) ? (18 + $team_size * 8) . 'mm'
+        : (in_array($score_mode, ['sets', 'sets_grp']) ? '72mm' : '46mm');
+}
+
+// HTML einer einzelnen Match-Card. $label = Hauptbezeichnung (z.B. „Gruppe A", „Pl. 1/2"),
+// $game_nr = optionale „Spiel N"-Nummer (nur Gruppenspiele). Restliche Header-Zusätze
+// (Runde/Platz/Anwurf) werden aus $m/$c abgeleitet.
+function _match_card_html(array $m, array $c, bool $is_team, bool $is_doubles, int $team_size,
+                          string $score_mode, string $court_label, string $label, ?int $game_nr = null): string {
+    $show_rounds = !empty($c['show_byes']);
+    $round_card = ($show_rounds && !empty($m['round_no'])) ? ' &nbsp;·&nbsp; Runde ' . (int)$m['round_no'] : '';
+    $court_card = !empty($m['court_no']) ? ' &nbsp;·&nbsp; ' . $court_label . ' ' . (int)$m['court_no'] : '';
+    $kick_card  = '';
+    if ($is_team && !empty($c['kickoff_enabled']) && !empty($m['kickoff_team_id'])) {
+        $kt    = (int)$m['kickoff_team_id'];
+        $kname = ($kt === (int)($m['team1_id'] ?? 0)) ? ($m['p1name'] ?? '')
+               : (($kt === (int)($m['team2_id'] ?? 0)) ? ($m['p2name'] ?? '') : '');
+        if ($kname !== '') $kick_card = ' &nbsp;·&nbsp; Anwurf: ' . e($kname);
+    }
+    $spiel_card = (!$show_rounds && !empty($m['group_name']) && $game_nr !== null)
+        ? ' &nbsp;·&nbsp; Spiel ' . $game_nr : '';
+    $time      = match_schedule_time($c, $m);
+    $time_card = $time !== '' ? ' &nbsp;·&nbsp; ' . $time . ' Uhr' : '';
+
+    $h  = '<div class="card">';
+    $h .= '<div class="card-hdr">' . e($c['name']) . ' &nbsp;·&nbsp; ' . $label
+        . $round_card . $spiel_card . $court_card . $kick_card . $time_card . '</div>';
+
+    if ($is_team && $team_size > 0) {
+        $sc = $m['played'] ? $m['score1'] . ' : ' . $m['score2'] : '&nbsp;:&nbsp;';
+        $h .= '<table class="dtbl">'
+            . '<tr>'
+            . '<td class="dhdr-num">&nbsp;</td>'
+            . '<td class="dhdr-l">' . e($m['p1name'] ?? '') . '</td>'
+            . '<td class="dhdr-sc">' . $sc . '</td>'
+            . '<td class="dhdr-r">' . e($m['p2name'] ?? '') . '</td>'
+            . '</tr>';
+        for ($di = 1; $di <= $team_size; $di++) {
+            $h .= '<tr>'
+                . '<td class="dnum" style="height:8mm">' . $di . '</td>'
+                . '<td class="dnm-l" style="height:8mm">&nbsp;</td>'
+                . '<td class="dsc" style="height:8mm">&nbsp;:&nbsp;</td>'
+                . '<td class="dnm-r" style="height:8mm">&nbsp;</td>'
+                . '</tr>';
+        }
+        $h .= '</table>';
+    } else {
+        $is_grp_match  = !empty($m['group_name']);
+        $use_sets_card = ($score_mode === 'sets') || ($score_mode === 'sets_grp' && $is_grp_match);
+        $result_label  = $use_sets_card ? 'Sätze' : 'Ergebnis';
+        $h .= '<table class="players">'
+            . '<tr><th style="width:44%">Spieler 1</th><th style="width:12%;text-align:center">' . $result_label . '</th><th style="width:44%">Spieler 2</th></tr>'
+            . '<tr>'
+            . '<td>' . e($m['p1name'] ?? '') . (!empty($m['p1club']) ? '<br><span style="font-size:8pt;color:#6b7280">' . e($m['p1club']) . '</span>' : '') . '</td>'
+            . '<td style="text-align:center;font-size:14pt;letter-spacing:2mm">&nbsp;:&nbsp;</td>'
+            . '<td>' . e($m['p2name'] ?? '') . (!empty($m['p2club']) ? '<br><span style="font-size:8pt;color:#6b7280">' . e($m['p2club']) . '</span>' : '') . '</td>'
+            . '</tr></table>';
+        if ($use_sets_card) {
+            $h .= '<table style="width:55%;margin:1mm auto;border-collapse:collapse;font-size:8.5pt">';
+            for ($si = 1; $si <= 5; $si++) {
+                $h .= '<tr>'
+                    . '<td style="text-align:right;color:#6b7280;padding:0.6mm 2mm;border:none;white-space:nowrap">Satz ' . $si . '</td>'
+                    . '<td style="border:0.3pt solid #d1d5db;width:13mm;height:5.5mm"></td>'
+                    . '<td style="text-align:center;border:none;padding:0.3mm 1.5mm">:</td>'
+                    . '<td style="border:0.3pt solid #d1d5db;width:13mm;height:5.5mm"></td>'
+                    . '</tr>';
+            }
+            $h .= '</table>';
+        }
+    }
+
+    $sig1 = $is_team ? e($m['p1name'] ?? 'Team 1') : 'Spieler 1';
+    $sig2 = $is_team ? e($m['p2name'] ?? 'Team 2') : 'Spieler 2';
+    $h .= '<table class="sig-table"><tr>'
+        . '<td style="width:50%;padding-right:6mm"><div class="sig-write"></div><div class="sig-label">Unterschrift ' . $sig1 . '</div></td>'
+        . '<td style="width:50%;padding-left:6mm"><div class="sig-write"></div><div class="sig-label">Unterschrift ' . $sig2 . '</div></td>'
+        . '</tr></table>';
+    $h .= '</div>';
+    return $h;
+}
 
 function generate_match_cards_pdf(int $cid, ?int $gid = null): void {
     $c = db_fetch("SELECT * FROM competition WHERE id=?", [$cid]);
@@ -1216,7 +1587,7 @@ function generate_match_cards_pdf(int $cid, ?int $gid = null): void {
             "SELECT m.*,
              t1.name as p1name, '' as p1club,
              t2.name as p2name, '' as p2club,
-             g.name as group_name
+             g.name as group_name, g.pause_start, g.pause_duration
              FROM `match` m
              LEFT JOIN `team` t1 ON t1.id=m.team1_id
              LEFT JOIN `team` t2 ON t2.id=m.team2_id
@@ -1239,7 +1610,7 @@ function generate_match_cards_pdf(int $cid, ?int $gid = null): void {
                   WHEN COALESCE(dp2b.club,'')='' THEN COALESCE(dp2a.club,'')
                   WHEN dp2a.club=dp2b.club THEN dp2a.club
                   ELSE CONCAT(dp2a.club,' / ',dp2b.club) END as p2club,
-             g.name as group_name
+             g.name as group_name, g.pause_start, g.pause_duration
              FROM `match` m
              LEFT JOIN `double` d1 ON d1.id=m.double1_id
              LEFT JOIN `double` d2 ON d2.id=m.double2_id
@@ -1258,7 +1629,7 @@ function generate_match_cards_pdf(int $cid, ?int $gid = null): void {
             "SELECT m.*,
              TRIM(CONCAT(p1.name,IF(COALESCE(p1.firstname,'')!='',CONCAT(' ',p1.firstname),''))) as p1name, p1.club as p1club,
              TRIM(CONCAT(p2.name,IF(COALESCE(p2.firstname,'')!='',CONCAT(' ',p2.firstname),''))) as p2name, p2.club as p2club,
-             g.name as group_name
+             g.name as group_name, g.pause_start, g.pause_duration
              FROM `match` m
              LEFT JOIN player p1 ON p1.id=m.player1_id
              LEFT JOIN player p2 ON p2.id=m.player2_id
@@ -1279,36 +1650,9 @@ function generate_match_cards_pdf(int $cid, ?int $gid = null): void {
     $score_mode = $c['score_mode'] ?? 'match';
     // Karten füllen die Seite automatisch: dank page-break-inside:avoid passen so viele
     // Karten auf eine Seite wie Platz haben (kein fest erzwungener Umbruch).
-    $card_min_h     = ($is_team && $team_size > 0) ? (18 + $team_size * 8) . 'mm' : (in_array($score_mode, ['sets', 'sets_grp']) ? '72mm' : '46mm');
+    $card_min_h = _match_card_min_h($is_team, $team_size, $score_mode);
 
-    $html = pdf_css() . '<style>
-        .card { border: 0.8pt solid #d1d5db; border-radius: 2mm; padding: 3mm 5mm;
-                margin-bottom: 2mm; page-break-inside: avoid; min-height: ' . $card_min_h . '; }
-        .card-hdr { background: #eff6ff; padding: 1mm 4mm; margin: -3mm -5mm 2mm;
-                    border-radius: 2mm 2mm 0 0; font-weight: bold; font-size: 9pt; color: #1e40af; }
-        .players { width: 100%; border-collapse: collapse; margin-bottom: 2mm; }
-        .players td { padding: 1mm 3mm; border: 0.3pt solid #e5e7eb; font-size: 10pt; }
-        .players th { background: #f3f4f6; font-size: 8pt; padding: 0.8mm 3mm;
-                      border: 0.3pt solid #e5e7eb; text-align: left; }
-        .sig-table { width: 100%; border-collapse: collapse; }
-        .sig-write { height: 6mm; border-bottom: 0.6pt solid #374151; }
-        .sig-label { font-size: 8pt; color: #4b5563; padding-top: 0.8mm; }
-        .dtbl  { width:100%; border-collapse:collapse; margin-bottom:2mm; }
-        .dtbl td { border:0.3pt solid #e5e7eb; }
-        .dnum  { width:7mm; text-align:center; font-weight:bold; font-size:9pt; color:#6b7280; padding:1.2mm 1mm; }
-        .dhdr-num { width:7mm; background:#eff6ff; }
-        .dnm-l { width:40%; text-align:right; padding:1.2mm 3mm; }
-        .dnm-r { width:40%; padding:1.2mm 3mm; }
-        .dsc   { width:14%; text-align:center; font-size:9pt; padding:1.2mm 2mm; color:#374151; }
-        .dhdr-l { width:40%; text-align:right; font-weight:bold; font-size:10pt;
-                  padding:1.5mm 3mm; background:#eff6ff; }
-        .dhdr-r { width:40%; font-weight:bold; font-size:10pt;
-                  padding:1.5mm 3mm; background:#eff6ff; }
-        .dhdr-sc { width:14%; text-align:center; font-size:11pt; padding:1.5mm 2mm;
-                   background:#eff6ff; letter-spacing:1mm; }
-        .wl  { display:block; border-bottom:0.6pt solid #374151; min-height:5.5mm; }
-        .dlbl { font-size:7.5pt; color:#6b7280; }
-    </style>';
+    $html = pdf_css() . _match_card_styles($card_min_h);
 
     if (!$matches) {
         $html .= '<p style="color:#6b7280">Keine offenen Spiele gefunden.</p>';
@@ -1346,79 +1690,7 @@ function generate_match_cards_pdf(int $cid, ?int $gid = null): void {
             };
             $game_nr = (int)$m['ko_position'] + 1;
         }
-        // Spielrunden-Anzeige folgt der Bewerbsoption „Spielrunden anzeigen" (show_byes):
-        // aktiv → „Runde N" (Gruppenspiele), sonst → „Spiel N". KO/Kreuz tragen die Runde im Label.
-        $show_rounds = !empty($c['show_byes']);
-        $round_card = ($show_rounds && !empty($m['round_no'])) ? ' &nbsp;·&nbsp; Runde ' . (int)$m['round_no'] : '';
-        $court_card = !empty($m['court_no']) ? ' &nbsp;·&nbsp; ' . $court . ' ' . (int)$m['court_no'] : '';
-        // Anwurf-Mannschaft (nur Team-Bewerb mit aktivierter Anwurf-Auslosung).
-        $kick_card = '';
-        if ($is_team && !empty($c['kickoff_enabled']) && !empty($m['kickoff_team_id'])) {
-            $kt    = (int)$m['kickoff_team_id'];
-            $kname = ($kt === (int)($m['team1_id'] ?? 0)) ? ($m['p1name'] ?? '')
-                   : (($kt === (int)($m['team2_id'] ?? 0)) ? ($m['p2name'] ?? '') : '');
-            if ($kname !== '') $kick_card = ' &nbsp;·&nbsp; Anwurf: ' . e($kname);
-        }
-        // „Spiel N" nur bei Gruppenspielen UND nur wenn keine Spielrunde angezeigt wird.
-        $spiel_card = (!$show_rounds && !empty($m['group_name'])) ? ' &nbsp;·&nbsp; Spiel ' . $game_nr : '';
-        $html .= '<div class="card">';
-        $html .= '<div class="card-hdr">' . e($c['name']) . ' &nbsp;·&nbsp; ' . $label . $round_card . $spiel_card . $court_card . $kick_card . '</div>';
-
-        if ($is_team && $team_size > 0) {
-            // Team-Bewerb: Teamname-Zeile + Duel-Eintragszeilen
-            $sc = $m['played'] ? $m['score1'] . ' : ' . $m['score2'] : '&nbsp;:&nbsp;';
-            $html .= '<table class="dtbl">'
-                   . '<tr>'
-                   . '<td class="dhdr-num">&nbsp;</td>'
-                   . '<td class="dhdr-l">' . e($m['p1name'] ?? '') . '</td>'
-                   . '<td class="dhdr-sc">' . $sc . '</td>'
-                   . '<td class="dhdr-r">' . e($m['p2name'] ?? '') . '</td>'
-                   . '</tr>';
-            for ($di = 1; $di <= $team_size; $di++) {
-                $html .= '<tr>'
-                       . '<td class="dnum" style="height:8mm">' . $di . '</td>'
-                       . '<td class="dnm-l" style="height:8mm">&nbsp;</td>'
-                       . '<td class="dsc" style="height:8mm">&nbsp;:&nbsp;</td>'
-                       . '<td class="dnm-r" style="height:8mm">&nbsp;</td>'
-                       . '</tr>';
-            }
-            $html .= '</table>';
-        } else {
-            // Einzel / Doppel
-            $is_grp_match = !empty($m['group_name']);
-            $use_sets_card = ($score_mode === 'sets') || ($score_mode === 'sets_grp' && $is_grp_match);
-            $result_label  = $use_sets_card ? 'Sätze' : 'Ergebnis';
-            $html .= '<table class="players">'
-                . '<tr><th style="width:44%">Spieler 1</th><th style="width:12%;text-align:center">' . $result_label . '</th><th style="width:44%">Spieler 2</th></tr>'
-                . '<tr>'
-                . '<td>' . e($m['p1name'] ?? '') . ($m['p1club'] ? '<br><span style="font-size:8pt;color:#6b7280">' . e($m['p1club']) . '</span>' : '') . '</td>'
-                . '<td style="text-align:center;font-size:14pt;letter-spacing:2mm">&nbsp;:&nbsp;</td>'
-                . '<td>' . e($m['p2name'] ?? '') . ($m['p2club'] ? '<br><span style="font-size:8pt;color:#6b7280">' . e($m['p2club']) . '</span>' : '') . '</td>'
-                . '</tr></table>';
-            if ($use_sets_card) {
-                $html .= '<table style="width:55%;margin:1mm auto;border-collapse:collapse;font-size:8.5pt">';
-                for ($si = 1; $si <= 5; $si++) {
-                    $html .= '<tr>'
-                           . '<td style="text-align:right;color:#6b7280;padding:0.6mm 2mm;border:none;white-space:nowrap">Satz ' . $si . '</td>'
-                           . '<td style="border:0.3pt solid #d1d5db;width:13mm;height:5.5mm"></td>'
-                           . '<td style="text-align:center;border:none;padding:0.3mm 1.5mm">:</td>'
-                           . '<td style="border:0.3pt solid #d1d5db;width:13mm;height:5.5mm"></td>'
-                           . '</tr>';
-                }
-                $html .= '</table>';
-            }
-        }
-
-        // Unterschriften
-        $sig1 = $is_team ? e($m['p1name'] ?? 'Team 1') : 'Spieler 1';
-        $sig2 = $is_team ? e($m['p2name'] ?? 'Team 2') : 'Spieler 2';
-        $html .= '<table class="sig-table">'
-            . '<tr>'
-            . '<td style="width:50%;padding-right:6mm"><div class="sig-write"></div><div class="sig-label">Unterschrift ' . $sig1 . '</div></td>'
-            . '<td style="width:50%;padding-left:6mm"><div class="sig-write"></div><div class="sig-label">Unterschrift ' . $sig2 . '</div></td>'
-            . '</tr></table>';
-
-        $html .= '</div>';
+        $html .= _match_card_html($m, $c, $is_team, $is_doubles, $team_size, $score_mode, $court, $label, $game_nr);
     }
 
     $pdf = mpdf(['margin_top' => 5, 'margin_bottom' => 5, 'margin_left' => 12, 'margin_right' => 12]);

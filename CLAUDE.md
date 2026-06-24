@@ -150,7 +150,11 @@ oder **getrennt** (1. untereinander, 2. untereinander). Daraus entstehen Platzbl
 ### Gruppenplatzierungen (`lib/standings.php`)
 
 `group_standings(group_id)` (analog `team_standings`/`double_standings`) berechnet on the fly.
-Wertung: Sieg=2 Pkt., Unentschieden=1 Pkt., Niederlage=0 Pkt. Bei Punktegleichstand entscheidet
+Wertung über die Bewerbsoption **`competition.points_mode`** („Punktevergabe"): `'2-1-0'` (Default,
+Sieg/Unentsch./Niederl.), `'3-1-0'` oder `'3-2-1'`. `_parse_points_mode(mode)` → `[Sieg, Unent.,
+Niederl.]`, `_points_for(group_id)` lädt den Modus über den Bewerb; die Standings-Funktionen und die
+Mini-Tabellen in `_apply_h2h_tiebreaker()` / `_tied_ids_at_pos()` (Tie-Erkennung) nutzen ihn (inkl.
+Niederlage-Punkten bei `'3-2-1'`). Bei Punktegleichstand entscheidet
 `_apply_h2h_tiebreaker()` über zwei Kriterien-Blöcke: **Direktvergleich** (Mini-Tabelle der
 Gleichpunktigen: Punkte→Tordiff→Einzeldiff→Tore→Einzel) und **Gesamt-Differenz** (Tordiff→
 Einzeldiff→Tore→Einzel), danach `tiebreak_order` (manuell/Los).
@@ -223,6 +227,12 @@ Export-Funktionen:
   Block); zusätzlich KO-Phase und Kreuzspiele als kompakte Tabelle mit einer Zeile je Begegnung
   (Label/Platz/Mannschaft 1 + Ausfüllspalten + Mannschaft 2, möglichst viele je Seite).
   Datum = Turniertag (`tournament.event_date`), nicht das aktuelle Datum.
+- `generate_court_plans_pdf(cid)` — Bahnpläne (alle Bewerbstypen, nur bei `num_courts > 0`): pro
+  Spielplatz (`match.court_no`, 1..num_courts) ein Blatt mit der Spielreihenfolge — Spalten
+  Nr./Phase-Runde/Teilnehmer 1/–/Teilnehmer 2, **ohne** Ausfüllfelder. Reihenfolge je Bahn
+  chronologisch (Gruppen nach Runde/Match-Order, dann KO erste Runde zuerst, dann Kreuzspiele).
+  Sportabhängige Bezeichnung über `court_label()` (Button-Label „<Bahn>pläne"). Route
+  `…/competition/{id}/pdf/court-plans`.
 - `generate_registrations_pdf(tid)` / `generate_registrations_csv(tid)` — inkl. Änderungsanträge
 - `generate_tournament_players_pdf(tid)` / `generate_tournament_players_csv(tid)`
 - `generate_players_registry_pdf()` / `generate_players_registry_csv()` — globales Spielerregister
@@ -259,11 +269,11 @@ angelegt (`created=true`). Dedup: Doppel über Paar (beide Reihenfolgen), Team �
 | Tabelle | Zweck |
 |---------|-------|
 | `tournament` | Oberste Ebene |
-| `competition` | Disziplin innerhalb eines Turniers; `phase`: setup→group→ko→done; `mode`: groups_ko/groups_cross/ko_only/double_ko; `show_seeding`, `seeding_order` ('desc'=höhere Stärke stärker / 'asc'=niedrigere Stärke stärker (Tennis) / 'random'=komplett zufällige Gruppen-/KO-Auslosung ohne Setzung); `show_byes` (spielfreie Teilnehmer im Gruppen-Spielplan anzeigen); `force_byes` (jedem Teilnehmer ≥1 spielfreie Runde garantieren, auch bei gerader Anzahl — Phantom-Slot, wirkt bei Auslosung); `num_courts` (Anzahl Spielplätze, 0 = aus); `team_result_mode` (Team-Begegnungsergebnis: 'wins' = je Einzelsieg 1 Punkt, 'sum' = Einzelergebnisse aufsummieren, 'total' = nur Gesamtergebnis eingeben — bei 'sum'/'total' entfallen die Einzel-Spalten; bei 'total' werden im Spielplan/Web keine Einzelspiele erfasst, nur das Gesamtergebnis, Match-Cards/Teampläne behalten aber `team_size` Einzelspiel-Felder); `cross_config` (Modus groups_cross: pro Rang-Paar 'x'=Kreuz/'s'=getrennt, CSV); `kickoff_enabled` (Team: Anwurf je Gruppen-Begegnung zufällig & ausgeglichen auslosen); `standings_order` (Tabellenreihung: 'h2h'=Punkte→Direktvergleich→Differenz / 'diff'=Punkte→Differenz→Direktvergleich) |
+| `competition` | Disziplin innerhalb eines Turniers; `phase`: setup→group→ko→done; `mode`: groups_ko/groups_cross/ko_only/double_ko; `show_seeding`, `seeding_order` ('desc'=höhere Stärke stärker / 'asc'=niedrigere Stärke stärker (Tennis) / 'random'=komplett zufällige Gruppen-/KO-Auslosung ohne Setzung); `show_byes` (spielfreie Teilnehmer im Gruppen-Spielplan anzeigen); `force_byes` (jedem Teilnehmer ≥1 spielfreie Runde garantieren, auch bei gerader Anzahl — Phantom-Slot, wirkt bei Auslosung); `num_courts` (Anzahl Spielplätze, 0 = aus); `team_result_mode` (Team-Begegnungsergebnis: 'wins' = je Einzelsieg 1 Punkt, 'sum' = Einzelergebnisse aufsummieren, 'total' = nur Gesamtergebnis eingeben — bei 'sum'/'total' entfallen die Einzel-Spalten; bei 'total' werden im Spielplan/Web keine Einzelspiele erfasst, nur das Gesamtergebnis, Match-Cards/Teampläne behalten aber `team_size` Einzelspiel-Felder); `cross_config` (Modus groups_cross: pro Rang-Paar 'x'=Kreuz/'s'=getrennt, CSV); `kickoff_enabled` (Team: Anwurf je Gruppen-Begegnung zufällig & ausgeglichen auslosen); `standings_order` (Tabellenreihung: 'h2h'=Punkte→Direktvergleich→Differenz / 'diff'=Punkte→Differenz→Direktvergleich); `points_mode` (Punktevergabe: '2-1-0' Default / '3-1-0' / '3-2-1' = Sieg-Unentsch.-Niederl.); `schedule_enabled`/`schedule_duration`/`schedule_start` (Zeitplan: rundenbasierte Uhrzeiten — nur aktivierbar bei `num_courts>0` UND `show_byes`; Spieldauer/Runde in Min. + Startzeit HH:MM; Runde N startet `Startzeit+(N−1)·Spieldauer`, nur Gruppenphase) |
 | `player` | Globales Spielerregister |
 | `player_skill` | Spielstärke pro Sport (PK: player_id + sport) |
 | `competition_player` | Einem Bewerb zugeordnete Spieler (mit bewerbs-spezifischer Spielstärke) |
-| `grp` | Benannte Gruppen (A, B, C…) innerhalb eines Bewerbs; `courts` = komma-separierte Platzliste der Gruppe |
+| `grp` | Benannte Gruppen (A, B, C…) innerhalb eines Bewerbs; `courts` = komma-separierte Platzliste der Gruppe; `pause_start`/`pause_duration` = optionale Gruppen-Pause (nur bei aktivem Zeitplan+Spielrunden): eingeplant an der ersten Rundengrenze ≥ `pause_start`, Runden danach um die Dauer verschoben — angezeigt als „Pause · HH:MM–HH:MM Uhr" in Spielplan/Teamplänen/Bahnplänen (`group_round_time()`/`group_pause_window()` in `helpers.php`) |
 | `group_player` | Spieler in einer Gruppe |
 | `match` | Gruppenspiele (`group_id IS NOT NULL`, `round_no` = Runde der Kreismethode) und KO-Spiele (`group_id IS NULL`, `ko_round` gesetzt); `bracket`-Spalte: NULL=Einzel-KO, 'W'/'L'/'GF'=Doppel-KO, 'C0'/'C1'…=Platzierungs-Block (groups_cross); `court_no` = zugewiesener Spielplatz; `kickoff_team_id` = Team mit Anwurf (Team-Gruppenspiele, NULL = keins); `place_lo` = unterster Platz des Sub-Pools (Platzierungs-Bracket) |
 | `registration` | Öffentliche Anmeldung (status: pending/confirmed/rejected) |

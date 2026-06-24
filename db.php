@@ -342,6 +342,12 @@ function init_db(): void {
         "ALTER TABLE competition ADD COLUMN force_byes TINYINT(1) NOT NULL DEFAULT 0",
         "ALTER TABLE competition MODIFY COLUMN seeding_order VARCHAR(8) DEFAULT 'desc'",
         "ALTER TABLE competition ADD COLUMN standings_order VARCHAR(8) NOT NULL DEFAULT 'h2h'",
+        "ALTER TABLE competition ADD COLUMN points_mode VARCHAR(8) NOT NULL DEFAULT '2-1-0'",
+        "ALTER TABLE competition ADD COLUMN schedule_enabled TINYINT(1) NOT NULL DEFAULT 0",
+        "ALTER TABLE competition ADD COLUMN schedule_duration INT NOT NULL DEFAULT 0",
+        "ALTER TABLE competition ADD COLUMN schedule_start VARCHAR(5) NOT NULL DEFAULT ''",
+        "ALTER TABLE grp ADD COLUMN pause_start VARCHAR(5) NOT NULL DEFAULT ''",
+        "ALTER TABLE grp ADD COLUMN pause_duration INT NOT NULL DEFAULT 0",
     ];
     foreach ($migrations as $sql) {
         try { $pdo->exec($sql); } catch (\PDOException $e) { /* Spalte/Typ bereits korrekt */ }

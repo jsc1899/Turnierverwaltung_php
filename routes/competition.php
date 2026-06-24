@@ -302,7 +302,7 @@ function show(array $p): void {
             $all_played = !empty($matches)
                 && count(array_filter($matches, fn($m) => !(int)$m['played'])) === 0;
             $tie_ids = $all_played
-                ? tied_ids_at_boundary($standings, (int)($c['advance_count'] ?? 0), $matches, 'player1_id', 'player2_id')
+                ? tied_ids_at_boundary($standings, (int)($c['advance_count'] ?? 0), $matches, 'player1_id', 'player2_id', _parse_points_mode($c['points_mode'] ?? null))
                 : [];
             $groups[] = [
                 'group'     => $g,
@@ -319,6 +319,18 @@ function show(array $p): void {
         "SELECT COUNT(*) as n FROM `match` WHERE competition_id=? AND group_id IS NOT NULL AND played=0",
         [$cid]
     )['n'];
+
+    // Bewerb komplett: kein spielbares (beide Teilnehmer gesetzt), aber unbespieltes Spiel mehr
+    // im gesamten Bewerb (Gruppen + KO/Kreuz/Doppel-KO). Steuert die Anzeige der Endplatzierung.
+    $open_matches = (int)db_fetch(
+        "SELECT COUNT(*) as n FROM `match`
+         WHERE competition_id=? AND played=0
+           AND ( (player1_id IS NOT NULL AND player2_id IS NOT NULL)
+              OR (double1_id IS NOT NULL AND double2_id IS NOT NULL)
+              OR (team1_id   IS NOT NULL AND team2_id   IS NOT NULL) )",
+        [$cid]
+    )['n'];
+    $comp_complete = ($open_matches === 0);
 
     $ko_rounds         = [];
     $third_place_match = null;
@@ -685,6 +697,7 @@ function show(array $p): void {
         'groups' => $groups, 'ko_rounds' => $ko_rounds,
         'third_place_match' => $third_place_match,
         'unplayed_group' => $unplayed_group, 'has_open_tie' => $has_open_tie, 'places' => $places,
+        'comp_complete' => $comp_complete,
         'ko_no_results' => $ko_no_results, 'group_no_results' => $group_no_results,
         'dko_wb' => $dko_wb, 'dko_lb' => $dko_lb, 'dko_gf' => $dko_gf,
         'dko_cap' => $cap ?? 0, 'dko_lb_total' => $lb_total ?? 0,
@@ -739,7 +752,18 @@ function settings(array $p): void {
     $team_result_mode  = in_array(post('team_result_mode'), ['sum', 'total'], true) ? post('team_result_mode') : 'wins';
     $kickoff_enabled   = post('kickoff_enabled') ? 1 : 0;
     $standings_order   = post('standings_order') === 'diff' ? 'diff' : 'h2h';
+    $points_mode       = in_array(post('points_mode'), ['3-1-0', '3-2-1'], true) ? post('points_mode') : '2-1-0';
     $cross_config      = _cross_config_from_post($group_size);
+
+    // Zeitplan: nur möglich bei Spielplätzen UND Spielrunden; Spieldauer/Startzeit dann Pflicht.
+    $schedule_duration = max(0, min(600, (int)post('schedule_duration', 0)));
+    $schedule_start    = preg_match('/^\d{2}:\d{2}$/', (string)post('schedule_start', '')) ? post('schedule_start') : '';
+    $schedule_enabled  = (post('schedule_enabled') && $num_courts > 0 && $show_byes
+                          && $schedule_duration > 0 && $schedule_start !== '') ? 1 : 0;
+    if (!$schedule_enabled) { $schedule_duration = 0; $schedule_start = ''; }
+    if (post('schedule_enabled') && !$schedule_enabled) {
+        flash('warning', 'Zeitplan nicht aktiviert: Bitte Spielplätze und Spielrunden aktivieren sowie Spieldauer und Startzeit angeben.');
+    }
 
     $c = db_fetch("SELECT phase, mode, is_doubles, is_team, team_size, kickoff_enabled FROM competition WHERE id=?", [$cid]);
     if (!$c) { redirect('competition/' . $cid); return; }
@@ -795,11 +819,11 @@ function settings(array $p): void {
         db_execute("UPDATE competition SET third_place=?, registrations_open=?, max_players=?, show_seeding=?, show_skill=?, seeding_order=?, team_size=?, score_mode=?, num_courts=?, team_result_mode=?, kickoff_enabled=? WHERE id=?",
             [$third_place, $registrations_open, $max_players, $show_seeding, $show_skill, $seeding_order, $team_size, $score_mode, $num_courts, $team_result_mode, $kickoff_enabled, $cid]);
     } elseif ($c && $c['phase'] === 'setup') {
-        db_execute("UPDATE competition SET group_size=?, advance_count=?, third_place=?, registrations_open=?, max_players=?, show_skill=?, seeding_order=?, team_size=?, score_mode=?, show_byes=?, force_byes=?, num_courts=?, team_result_mode=?, kickoff_enabled=?, standings_order=?, cross_config=? WHERE id=?",
-            [$group_size, $advance_count, $third_place, $registrations_open, $max_players, $show_skill, $seeding_order, $team_size, $score_mode, $show_byes, $force_byes, $num_courts, $team_result_mode, $kickoff_enabled, $standings_order, $cross_config, $cid]);
+        db_execute("UPDATE competition SET group_size=?, advance_count=?, third_place=?, registrations_open=?, max_players=?, show_skill=?, seeding_order=?, team_size=?, score_mode=?, show_byes=?, force_byes=?, num_courts=?, team_result_mode=?, kickoff_enabled=?, standings_order=?, points_mode=?, cross_config=?, schedule_enabled=?, schedule_duration=?, schedule_start=? WHERE id=?",
+            [$group_size, $advance_count, $third_place, $registrations_open, $max_players, $show_skill, $seeding_order, $team_size, $score_mode, $show_byes, $force_byes, $num_courts, $team_result_mode, $kickoff_enabled, $standings_order, $points_mode, $cross_config, $schedule_enabled, $schedule_duration, $schedule_start, $cid]);
     } else {
-        db_execute("UPDATE competition SET advance_count=?, third_place=?, registrations_open=?, max_players=?, show_skill=?, seeding_order=?, team_size=?, score_mode=?, show_byes=?, force_byes=?, num_courts=?, team_result_mode=?, kickoff_enabled=?, standings_order=?, cross_config=? WHERE id=?",
-            [$advance_count, $third_place, $registrations_open, $max_players, $show_skill, $seeding_order, $team_size, $score_mode, $show_byes, $force_byes, $num_courts, $team_result_mode, $kickoff_enabled, $standings_order, $cross_config, $cid]);
+        db_execute("UPDATE competition SET advance_count=?, third_place=?, registrations_open=?, max_players=?, show_skill=?, seeding_order=?, team_size=?, score_mode=?, show_byes=?, force_byes=?, num_courts=?, team_result_mode=?, kickoff_enabled=?, standings_order=?, points_mode=?, cross_config=?, schedule_enabled=?, schedule_duration=?, schedule_start=? WHERE id=?",
+            [$advance_count, $third_place, $registrations_open, $max_players, $show_skill, $seeding_order, $team_size, $score_mode, $show_byes, $force_byes, $num_courts, $team_result_mode, $kickoff_enabled, $standings_order, $points_mode, $cross_config, $schedule_enabled, $schedule_duration, $schedule_start, $cid]);
     }
     // Bei verkleinertem team_size in der Gruppenphase verwaiste Aufstellungs-Zeilen entfernen.
     if ($ts_editable && $c['phase'] === 'group' && !empty($c['is_team'])) {
@@ -838,6 +862,27 @@ function save_courts(array $p): void {
     }
     assign_courts($cid);
     flash('success', 'Platzzuordnung gespeichert.');
+    redirect('competition/' . $cid);
+}
+
+function save_pauses(array $p): void {
+    require_edit();
+    csrf_verify();
+    $cid = (int)$p['id'];
+    $c = db_fetch("SELECT schedule_enabled, show_byes FROM competition WHERE id=?", [$cid]);
+    if (!$c) { redirect('competition/' . $cid); return; }
+    // Pause nur sinnvoll bei aktivem Zeitplan + Spielrunden; sonst Eingaben verwerfen.
+    $allow = !empty($c['schedule_enabled']) && !empty($c['show_byes']);
+    $valid_gids = array_column(db_fetchall("SELECT id FROM grp WHERE competition_id=?", [$cid]), 'id');
+    $starts = (array)($_POST['pause_start'] ?? []);
+    $durs   = (array)($_POST['pause_dur'] ?? []);
+    foreach ($valid_gids as $gid) {
+        $start = preg_match('/^\d{2}:\d{2}$/', (string)($starts[$gid] ?? '')) ? $starts[$gid] : '';
+        $dur   = max(0, min(600, (int)($durs[$gid] ?? 0)));
+        if (!$allow || $start === '' || $dur <= 0) { $start = ''; $dur = 0; }
+        db_execute("UPDATE grp SET pause_start=?, pause_duration=? WHERE id=?", [$start, $dur, $gid]);
+    }
+    flash('success', 'Pausen gespeichert.');
     redirect('competition/' . $cid);
 }
 
@@ -1269,7 +1314,7 @@ function draw_ko(array $p): void {
             $p1c = 'player1_id'; $p2c = 'player2_id';
         }
         $grp_matches = db_fetchall("SELECT * FROM `match` WHERE group_id=? AND played=1", [$g['id']]);
-        if (!empty(tied_ids_at_boundary($st, (int)$c['advance_count'], $grp_matches, $p1c, $p2c))) {
+        if (!empty(tied_ids_at_boundary($st, (int)$c['advance_count'], $grp_matches, $p1c, $p2c, _parse_points_mode($c['points_mode'] ?? null)))) {
             flash('warning', 'Bitte zuerst alle Tabellengleichstände auflösen, bevor die KO-Phase ausgelost wird.');
             redirect('competition/' . $cid);
             return;

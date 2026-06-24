@@ -167,6 +167,71 @@ function court_abbr(string $sport = ''): string {
     return ['tischtennis' => 'Ti', 'tennis' => 'Te', 'fussball' => 'Fe', 'cornhole' => 'B'][$sport] ?? 'Pl';
 }
 
+// ── Zeitplan (Bewerbsoption schedule_*) ────────────────────────────────────────
+// 'HH:MM' → Minuten ab Mitternacht, oder null bei ungültigem Format.
+function _hhmm_to_min(string $hhmm): ?int {
+    return preg_match('/^(\d{1,2}):(\d{2})$/', trim($hhmm), $mm) ? ((int)$mm[1] * 60 + (int)$mm[2]) : null;
+}
+// Minuten ab Mitternacht → 'HH:MM' (auf den Tag normalisiert).
+function _min_to_hhmm(int $t): string {
+    $t = (($t % 1440) + 1440) % 1440;
+    return sprintf('%02d:%02d', intdiv($t, 60), $t % 60);
+}
+
+// Startminute einer Runde (ohne Pause): Startzeit + (Runde-1)·Spieldauer; null wenn unkonfiguriert.
+function schedule_round_minutes(string $start, int $duration, int $round): ?int {
+    $st = _hhmm_to_min($start);
+    if ($round < 1 || $duration <= 0 || $st === null) return null;
+    return $st + ($round - 1) * $duration;
+}
+
+// Startzeit einer Runde (ohne Gruppen-Pause). '' wenn unkonfiguriert.
+function schedule_round_time(string $start, int $duration, int $round): string {
+    $m = schedule_round_minutes($start, $duration, $round);
+    return $m === null ? '' : _min_to_hhmm($m);
+}
+
+// ── Gruppen-Pause (grp.pause_start / grp.pause_duration) ───────────────────────
+// Runde, NACH der die Pause eingeplant wird (an der ersten Rundengrenze ≥ Pausenzeit).
+// 0 = keine (gültige) Pause. $c = competition, $g = grp-Zeile.
+function group_pause_after_round(array $c, array $g): int {
+    if (empty($c['schedule_enabled']) || (int)($g['pause_duration'] ?? 0) <= 0) return 0;
+    $st  = _hhmm_to_min((string)($c['schedule_start'] ?? ''));
+    $ps  = _hhmm_to_min((string)($g['pause_start'] ?? ''));
+    $dur = (int)($c['schedule_duration'] ?? 0);
+    if ($st === null || $ps === null || $dur <= 0) return 0;
+    $p = (int)ceil(($ps - $st) / $dur);   // erste Rundengrenze ≥ Pausenzeit → nach Runde p
+    return $p >= 1 ? $p : 0;
+}
+
+// Pausenfenster einer Gruppe: ['after_round'=>p, 'start'=>'HH:MM', 'end'=>'HH:MM'] oder null.
+function group_pause_window(array $c, array $g): ?array {
+    $p = group_pause_after_round($c, $g);
+    if ($p < 1) return null;
+    $startMin = schedule_round_minutes((string)$c['schedule_start'], (int)$c['schedule_duration'], $p + 1); // = Ende Runde p
+    if ($startMin === null) return null;
+    return ['after_round' => $p, 'start' => _min_to_hhmm($startMin), 'end' => _min_to_hhmm($startMin + (int)$g['pause_duration'])];
+}
+
+// Startzeit einer Runde inkl. Gruppen-Pause (Runden nach der Pause sind verschoben). '' wenn aus.
+function group_round_time(array $c, array $g, int $round): string {
+    $min = schedule_round_minutes((string)($c['schedule_start'] ?? ''), (int)($c['schedule_duration'] ?? 0), $round);
+    if (empty($c['schedule_enabled']) || $min === null) return '';
+    $p = group_pause_after_round($c, $g);
+    if ($p >= 1 && $round > $p) $min += (int)($g['pause_duration'] ?? 0);
+    return _min_to_hhmm($min);
+}
+
+// Startzeit einer (Gruppen-)Begegnung, sofern der Zeitplan aktiv ist; sonst ''. Nutzt — falls auf
+// $m vorhanden — die Pausenspalten (pause_start/pause_duration) der zugehörigen Gruppe.
+function match_schedule_time(array $c, array $m): string {
+    if (empty($c['schedule_enabled'])) return '';
+    $round = (int)($m['round_no'] ?? 0);
+    if ($round < 1) return '';
+    $g = ['pause_start' => $m['pause_start'] ?? '', 'pause_duration' => $m['pause_duration'] ?? 0];
+    return group_round_time($c, $g, $round);
+}
+
 // ── Spielstärke-Helper ─────────────────────────────────────────────────────────
 
 function player_sport_skill(int $pid, string $sport): float {
