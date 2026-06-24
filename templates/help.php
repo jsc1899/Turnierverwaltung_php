@@ -29,6 +29,7 @@ ob_start(); ?>
           <a href="#ko-direkt"       class="list-group-item list-group-item-action ps-4">↳ Nur KO-Runde</a>
           <a href="#doppel-ko"       class="list-group-item list-group-item-action ps-4">↳ Doppel-KO</a>
           <a href="#spielplaetze"    class="list-group-item list-group-item-action">Spielplätze</a>
+          <a href="#zeitplan"        class="list-group-item list-group-item-action">Zeitplan &amp; Pausen</a>
           <a href="#ergebnisse"      class="list-group-item list-group-item-action">Ergebnisse erfassen</a>
           <a href="#nennungen"       class="list-group-item list-group-item-action">Nennungen (öffentlich)</a>
           <a href="#exporte"         class="list-group-item list-group-item-action">PDF- &amp; CSV-Export</a>
@@ -157,20 +158,25 @@ ob_start(); ?>
         <li><strong>Bewerbsname</strong> — Bezeichnung des Bewerbs (z.B. „Herren Einzel")</li>
         <li><strong>Bewerbstyp</strong> — Einzelbewerb, Doppelbewerb oder Teambewerb (kann nach Zuweisung von Teilnehmern bzw. dem Auslosen nicht mehr geändert werden)</li>
         <li><strong>Spiele pro Team</strong> — Nur bei Teambewerb; Anzahl der Einzel-Duelle pro Mannschaftsspiel (0 = direkte Gesamtergebnis-Eingabe, 1 = ein Einzel ohne Spielerauswahl; ab 2 wird pro Duel eine Spielerauswahl eingeblendet). Änderbar im Setup sowie in der Gruppenphase, solange noch kein Gruppenergebnis erfasst wurde; danach gesperrt</li>
-        <li><strong>Begegnungsergebnis</strong> — Nur bei Teambewerb: <em>Je Einzelsieg 1 Punkt</em> (Summe der gewonnenen Duelle) oder <em>Einzelergebnisse aufsummieren</em> (Punkte aller Duelle addiert; dann entfallen die Einzel-Spalten)</li>
+        <li><strong>Begegnungsergebnis</strong> — Nur bei Teambewerb: <em>Je Einzelsieg 1 Punkt</em> (Summe der gewonnenen Duelle), <em>Einzelergebnisse aufsummieren</em> (Punkte aller Duelle addiert) oder <em>Nur Gesamtergebnis eingeben</em>. Bei den letzten beiden entfallen die Einzel-Spalten; bei <em>Nur Gesamtergebnis</em> werden im Web/Spielplan keine Einzelspiele erfasst (Spielkarten/Teampläne behalten aber Felder für die Einzelspiele)</li>
+        <li><strong>Anwurf auslosen</strong> — Nur bei Teambewerb: legt je Gruppen-Begegnung zufällig, aber ausgeglichen fest, welches Team Anwurf hat (Anzeige auf Spielkarten und Teamplänen)</li>
         <li><strong>Ergebniserfassung</strong> — Nur bei Einzel-/Doppelbewerb: <em>Spielergebnis</em> (ein Endstand), <em>Satzergebnisse</em> (mehrere Sätze) oder <em>Gruppe Sätze, KO Spielergebnis</em></li>
         <li><strong>Spielmodus</strong> — <em>Gruppenphase</em>, <em>KO-Modus</em> (nur KO) oder <em>Doppel-KO Modus</em> (nach dem ersten Auslosen gesperrt)</li>
         <li><strong>Gruppengröße</strong> — Anzahl Teilnehmer pro Gruppe (Gruppenphase), 3–20</li>
         <li><strong>Finalrunde</strong> — Nur im Gruppenmodus: <em>nur Gruppenphase</em>, <em>KO-Runde</em> oder <em>Kreuzspiele</em> (vollständige Platzierungsrunde). Solange die Finalrunde noch nicht ausgelost ist, kann zwischen KO und Kreuzspielen gewechselt werden</li>
         <li><strong>Aufsteiger</strong> — Bei Finalrunde KO: 1 (Gruppenerste) oder 2 (Erste &amp; Zweite)</li>
         <li><strong>Kreuzspiele – Paarungen je Rang</strong> — Bei Finalrunde Kreuzspiele: pro Rang-Paar (1+2, 3+4, …) festlegen, ob <em>über Kreuz</em> (1.A–2.B …) oder <em>getrennt</em> ausgespielt wird (siehe <a href="#kreuzspiele">Kreuzspiele</a>)</li>
-        <li><strong>Spielrunden anzeigen</strong> — Zeigt im Gruppen-Spielplan die Runden und spielfreien Teilnehmer (bei ungeraden Gruppen) an</li>
+        <li><strong>Spielrunden anzeigen</strong> — Zeigt im Gruppen-Spielplan die Runden (Durchgänge) und spielfreien Teilnehmer (bei ungeraden Gruppen) an. Voraussetzung für Zeitplan und Pausen</li>
+        <li><strong>Spielfreie Runde garantieren</strong> — Garantiert jedem Teilnehmer mindestens eine spielfreie Runde (auch bei gerader Teilnehmerzahl; der Spielplan wird dann i.d.R. eine Runde länger). Wirkt erst bei der nächsten Auslosung</li>
         <li><strong>Platz-3-Spiel</strong> — Bei KO-Finalrunde: ob die Halbfinalverlierer um Platz 3 spielen</li>
-        <li><strong>Setzungsreihenfolge</strong> — <em>Höhere Stärke = stärker</em> oder <em>Niedrigere Stärke = stärker</em> (Tennis-Modus)</li>
+        <li><strong>Setzungsreihenfolge</strong> — <em>Höhere Stärke = stärker</em>, <em>Niedrigere Stärke = stärker</em> (Tennis-Modus) oder <em>Zufällig (keine Setzung)</em> (komplett zufällige Gruppen-/KO-Auslosung)</li>
+        <li><strong>Tabellenreihung</strong> — Reihenfolge der Tiebreaker bei Punktegleichstand: <em>Punkte – Direktes Duell – Differenz</em> (Standard) oder <em>Punkte – Differenz – Direktes Duell</em></li>
+        <li><strong>Punktevergabe</strong> — Wertung in der Gruppentabelle: <em>Sieg 2 / Unentschieden 1 / Niederlage 0</em> (Standard), <em>Sieg 3 / 1 / 0</em> oder <em>Sieg 3 / 2 / 1</em></li>
         <li><strong>Spielstärke anzeigen (Gruppe)</strong> — Zeigt die Spielstärke neben den Teilnehmern in der Gruppenansicht</li>
         <li><strong>Setzungen anzeigen (KO)</strong> — Nur in KO-/Doppel-KO-Modi: blendet die Setzungslabels (z.B. „5-8") ein</li>
         <li><strong>Max. Teilnehmer</strong> — Obergrenze (0 = unbegrenzt)</li>
-        <li><strong>Spielplätze</strong> — Anzahl paralleler Plätze (0 = aus); siehe <a href="#spielplaetze">Spielplätze</a></li>
+        <li><strong>Spielplätze</strong> — Anzahl paralleler Plätze (0 = aus); die Bezeichnung richtet sich nach der Sportart (Bahn, Tisch, Spielfeld, Tennisplatz …); siehe <a href="#spielplaetze">Spielplätze</a></li>
+        <li><strong>Zeitplan</strong> — Berechnet Uhrzeiten je Runde; nur aktivierbar, wenn Spielplätze und Spielrunden aktiv sind; siehe <a href="#zeitplan">Zeitplan &amp; Pausen</a></li>
         <li><strong>Nennung offen</strong> — Ob der Bewerb im öffentlichen Anmeldeformular wählbar ist</li>
       </ul>
 
@@ -341,7 +347,7 @@ ob_start(); ?>
         <li>Ergebnisse erfassen → Tabelle wird automatisch berechnet</li>
         <li>Wenn alle Gruppenspiele eingetragen sind, erscheint je nach Finalrunde <strong>KO-Runde auslosen</strong> bzw. <strong>Kreuzspiele auslosen</strong> (entfällt bei <em>nur Gruppenphase</em>)</li>
       </ol>
-      <p>Die Gruppenplatzierung (Sieg=2 Pkt., Unentschieden=1 Pkt., Niederlage=0 Pkt.) bestimmt den Aufstieg. Tiebreaker-Reihenfolge bei Punktegleichstand:</p>
+      <p>Die Gruppenplatzierung bestimmt den Aufstieg. Die Punktevergabe ist in den Einstellungen wählbar (Standard <em>Sieg 2 / Unentschieden 1 / Niederlage 0</em>, alternativ <em>3/1/0</em> oder <em>3/2/1</em>). Tiebreaker-Reihenfolge bei Punktegleichstand (Reihenfolge der ersten beiden Blöcke über die Option <em>Tabellenreihung</em> wählbar):</p>
       <ol class="small">
         <li>Direkter Vergleich der punktegleichen Spieler: Punkte → Differenz → Plus</li>
         <li>Gesamte Differenz aller Gruppenspiele</li>
@@ -366,8 +372,9 @@ ob_start(); ?>
           </ul>
         </li>
         <li>Jeder Platzblock wird intern komplett ausgespielt: pro Runde spielen alle Aktiven, Sieger steigen auf, Verlierer ab — bis jeder Teilnehmer einen eindeutigen Platz hat. Freilose lösen sich automatisch auf.</li>
-        <li>Auslösen über <strong>Kreuzspiele auslosen</strong>; die Platzblöcke erscheinen oberhalb der Gruppen. Die Endplatzierung wird laufend aktualisiert.</li>
-        <li>Eigener Export: <strong>Kreuzspiele-PDF</strong>.</li>
+        <li>Auslösen über <strong>Kreuzspiele auslosen</strong>; die Platzblöcke erscheinen oberhalb der Gruppen.</li>
+        <li>Die <strong>Endplatzierung</strong> wird erst angezeigt, wenn im gesamten Bewerb kein offenes Spiel mehr existiert. Die ersten vier Plätze erscheinen als Kacheln, weitere Plätze sind aufklappbar.</li>
+        <li>Eigener Export: <strong>Kreuzspiele-PDF</strong> (Platzierungs-PDF).</li>
       </ul>
 
       <h5 id="ko-direkt" class="mt-3">Nur KO-Runde</h5>
@@ -395,7 +402,35 @@ ob_start(); ?>
         <li>In der Gruppenphase sind die Plätze an Gruppen gebunden: beim Auslosen erhält jede Gruppe automatisch einen gleichmäßigen Block (z.B. bei 6 Plätzen und 3 Gruppen → 1+2, 3+4, 5+6). Die Begegnungen rotieren über die Plätze ihrer Gruppe.</li>
         <li>Die Platzzuordnung je Gruppe ist manuell editierbar — über das Feld <strong>Plätze</strong> bei jeder Gruppe (komma-separiert, z.B. „1,2"). Nach dem Speichern werden die Plätze neu verteilt.</li>
         <li>KO- und Kreuzspiele nutzen den gesamten Platz-Pool; das Finale erhält Platz 1.</li>
-        <li>Der zugewiesene Platz („Platz X") erscheint in der Web-Ansicht (Gruppe und KO) sowie in allen Spielplan- und Spielkarten-PDFs.</li>
+        <li>Der zugewiesene Platz erscheint in der Web-Ansicht (Gruppe und KO) sowie in allen Spielplan- und Spielkarten-PDFs.</li>
+        <li><strong>Sportabhängige Bezeichnung:</strong> Je nach Sportart des Turniers heißt der Platz <em>Tisch</em> (Tischtennis), <em>Tennisplatz</em> (Tennis), <em>Spielfeld</em> (Fußball), <em>Bahn</em> (Cornhole) oder allgemein <em>Platz</em>.</li>
+        <li><strong>Bahnpläne-PDF:</strong> Pro Spielplatz die Spielreihenfolge der aktuellen Phase samt der zugehörigen Spielkarten (siehe <a href="#exporte">PDF-Export</a>).</li>
+      </ul>
+    </section>
+
+    <!-- Zeitplan & Pausen -->
+    <section id="zeitplan" class="mb-5">
+      <h2 class="h4 border-bottom pb-2">Zeitplan &amp; Pausen</h2>
+      <p>Optional kann für die Gruppenphase ein <strong>Zeitplan</strong> mit konkreten Uhrzeiten berechnet werden. Die Funktion ist nur aktivierbar, wenn <strong>Spielplätze</strong> und <strong>Spielrunden anzeigen</strong> aktiv sind (die Begegnungen einer Runde laufen parallel auf den Plätzen).</p>
+
+      <h5 class="mt-3">Zeitplan aktivieren</h5>
+      <ul>
+        <li>In den <strong>Bewerbseinstellungen</strong> die Option <strong>Zeitplan</strong> aktivieren. Es erscheinen zwei Pflichtfelder:
+          <ul>
+            <li><strong>Spieldauer/Runde</strong> — Dauer einer Runde in Minuten</li>
+            <li><strong>Startzeit</strong> — Uhrzeit des Bewerbsstarts (HH:MM)</li>
+          </ul>
+        </li>
+        <li>Runde <em>N</em> startet um <em>Startzeit + (N−1) × Spieldauer</em>. Die Uhrzeit wird im Web-Spielplan (Runden-Überschrift), in den Gruppen-, Teamplan- und Bahnplan-PDFs sowie auf den Spielkarten angezeigt.</li>
+      </ul>
+
+      <h5 class="mt-3">Pause je Gruppe</h5>
+      <p>Bei aktivem Zeitplan kann pro Gruppe optional eine <strong>Pause</strong> festgelegt werden (Abschnitt <em>Pause pro Gruppe</em> in den Einstellungen): Zeitpunkt + Dauer.</p>
+      <ul>
+        <li>Die Pause wird zum angegebenen Zeitpunkt bzw. — falls dieser mitten in einer Runde liegt — <strong>nach Ende der laufenden Runde</strong> eingeplant.</li>
+        <li>Alle Runden nach der Pause verschieben sich um die Pausendauer nach hinten.</li>
+        <li>Die Pause erscheint als eigene Zeile im Spielplan, in den Teamplänen und Bahnplänen (z.B. <em>Pause · 11:30 – 12:00 Uhr</em>).</li>
+        <li>Jede Gruppe kann eine eigene Pause haben; ohne Eintrag gibt es keine Pause.</li>
       </ul>
     </section>
 
@@ -518,6 +553,21 @@ ob_start(); ?>
               <td>Spielkarten PDF</td>
               <td>Bewerbsseite</td>
               <td>Papier-Ergebniszettel für alle offenen Spiele. Bei Teambewerben mit konfigurierten Duellen enthält jede Karte leere Zeilen für die Einzelergebnisse (3 Karten/Seite statt 6).</td>
+            </tr>
+            <tr>
+              <td>Teampläne PDF</td>
+              <td>Bewerbsseite (Teambewerb)</td>
+              <td>Pro Team ein Spielplan-Streifen zum Ausfüllen (Gruppenphase) bzw. kompakte Tabellen für KO/Kreuzspiele. Zeigt nur die aktuelle Phase.</td>
+            </tr>
+            <tr>
+              <td>Bahnpläne PDF <span class="text-muted">(bzw. Tisch-/Spielfeld-Pläne)</span></td>
+              <td>Bewerbsseite (bei Spielplätzen)</td>
+              <td>Pro Spielplatz die Spielreihenfolge der aktuellen Phase plus die zugehörigen Spielkarten.</td>
+            </tr>
+            <tr>
+              <td>Bewerbs-Aushang PDF</td>
+              <td>Bewerbsseite</td>
+              <td>Alle Teilnehmer je Gruppe auf einer Seite, mit Turnier-Logo und QR-Code zur Bewerbsseite.</td>
             </tr>
             <tr>
               <td>Bewerbsspieler PDF/CSV</td>
