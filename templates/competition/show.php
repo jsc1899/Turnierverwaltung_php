@@ -16,8 +16,8 @@ ob_start(); ?>
   </ol>
 </nav>
 
-<?php if (can_edit() && !$locked): ?>
-<!-- Test-Hilfe: füllt offene Ergebnisfelder zufällig aus -->
+<?php if (is_admin() && !$locked): ?>
+<!-- Test-Hilfe: füllt offene Ergebnisfelder zufällig aus (nur Admin) -->
 <div class="mb-3 d-flex flex-wrap align-items-center gap-2" id="test-tools"
      data-duels-bulk-url="<?= e(url('competition/'.$c['id'].'/duels/bulk')) ?>">
   <button type="button" class="btn btn-outline-warning btn-sm" onclick="fillTestResults(false)">
