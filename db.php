@@ -348,6 +348,7 @@ function init_db(): void {
         "ALTER TABLE competition ADD COLUMN schedule_start VARCHAR(5) NOT NULL DEFAULT ''",
         "ALTER TABLE grp ADD COLUMN pause_start VARCHAR(5) NOT NULL DEFAULT ''",
         "ALTER TABLE grp ADD COLUMN pause_duration INT NOT NULL DEFAULT 0",
+        "ALTER TABLE competition ADD COLUMN match_card_mode VARCHAR(10) NOT NULL DEFAULT 'fields'",
     ];
     foreach ($migrations as $sql) {
         try { $pdo->exec($sql); } catch (\PDOException $e) { /* Spalte/Typ bereits korrekt */ }

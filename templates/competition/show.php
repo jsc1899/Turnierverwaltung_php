@@ -210,6 +210,13 @@ ob_start(); ?>
           <label class="form-check-label" for="kickoff_enabled">Anwurf auslosen</label>
         </div>
       </div>
+      <div class="col-auto" id="field-match-card"<?= $comp_type !== 'team' ? ' style="display:none"' : '' ?>>
+        <label class="form-label">Match-Cards</label>
+        <select name="match_card_mode" class="form-select form-select-sm">
+          <option value="fields" <?= ($c['match_card_mode'] ?? 'fields') === 'fields'  ? ' selected' : '' ?>>mit Spielerfelder</option>
+          <option value="compact"<?= ($c['match_card_mode'] ?? 'fields') === 'compact' ? ' selected' : '' ?>>ohne Spielerfelder</option>
+        </select>
+      </div>
       <?php if (!$is_team): ?>
       <div class="col-auto">
         <label class="form-label">Ergebniserfassung</label>
@@ -2569,7 +2576,7 @@ window.addEventListener('resize', drawAllBrackets);
 // ── Bewerbstyp → team_size- und Begegnungsergebnis-Feld ein-/ausblenden ──────────────────
 (function() {
   var sel = document.querySelector('select[name="comp_type"]');
-  var flds = ['field-team-size', 'field-team-result', 'field-kickoff'].map(function(id){ return document.getElementById(id); });
+  var flds = ['field-team-size', 'field-team-result', 'field-kickoff', 'field-match-card'].map(function(id){ return document.getElementById(id); });
   if (!sel) return;
   sel.addEventListener('change', function() {
     var show = this.value === 'team';

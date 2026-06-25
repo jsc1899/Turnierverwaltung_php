@@ -914,6 +914,8 @@ function generate_court_plans_pdf(int $cid, ?int $gid = null): void {
 
     $team_size  = (int)($c['team_size'] ?? 0);
     $score_mode = $c['score_mode'] ?? 'match';
+    // „ohne Spielerfelder": kompaktes Team-Layout auch für die angehängten Match-Cards.
+    $compact = $is_team && $team_size > 0 && (($c['match_card_mode'] ?? 'fields') === 'compact');
     // Card-Styles zusätzlich einbinden (Bahn-Übersicht + angehängte Match-Cards je Bahn).
     $html .= _match_card_styles(_match_card_min_h($is_team, $team_size, $score_mode));
 
@@ -956,6 +958,15 @@ function generate_court_plans_pdf(int $cid, ?int $gid = null): void {
          WHERE m.competition_id=? AND m.court_no IS NOT NULL" . $phase_filter,
         $params
     );
+
+    // Compact-Layout: Start-Nummern je Gruppe (für Kopf-Nr. + Anspiel der Match-Cards).
+    $start_by_group = [];
+    if ($compact) {
+        foreach ($matches as $m) {
+            $g = (int)($m['group_id'] ?? 0);
+            if ($g && !isset($start_by_group[$g])) $start_by_group[$g] = team_start_numbers($g);
+        }
+    }
 
     // Blockgröße S je Kreuzspiel-Block (für die Platzbereichs-Labels).
     $blockS = [];
@@ -1067,7 +1078,9 @@ function generate_court_plans_pdf(int $cid, ?int $gid = null): void {
             $p1set = $is_team ? !empty($m['team1_id']) : ($is_doubles ? !empty($m['double1_id']) : !empty($m['player1_id']));
             $p2set = $is_team ? !empty($m['team2_id']) : ($is_doubles ? !empty($m['double2_id']) : !empty($m['player2_id']));
             if (!$p1set || !$p2set) continue;
-            $court_cards .= _match_card_html($m, $c, $is_team, $is_doubles, $team_size, $score_mode, $court_sg, e($label($m)));
+            $court_cards .= $compact
+                ? _match_card_team_compact_html($m, $c, $team_size, $court_sg, e($label($m)), $start_by_group)
+                : _match_card_html($m, $c, $is_team, $is_doubles, $team_size, $score_mode, $court_sg, e($label($m)));
         }
         if ($court_cards !== '') {
             $html .= '<p class="bp-lbl" style="margin-top:5mm">' . e($court_sg) . ' ' . $court . ' &ndash; Match-Cards</p>' . $court_cards;
@@ -1453,6 +1466,22 @@ function _match_card_styles(string $card_min_h): string {
                    background:#eff6ff; letter-spacing:1mm; }
         .wl  { display:block; border-bottom:0.6pt solid #374151; min-height:5.5mm; }
         .dlbl { font-size:7.5pt; color:#6b7280; }
+        /* Compact-Team-Card (Match-Cards ohne Spielerfelder) */
+        .mc2card { margin-bottom:6mm; min-height:42mm; }
+        .mc2outer { width:100%; border-collapse:collapse; margin-bottom:1.5mm; table-layout:fixed; }
+        .mc2half  { width:50%; vertical-align:top; padding-left:2mm; }
+        .mc2half-l { padding-left:0; padding-right:2mm; }
+        .mc2 { width:100%; border-collapse:collapse; table-layout:fixed; }
+        .mc2 td { border:0.3pt solid #9ca3af; }
+        .mc2-name { font-weight:bold; font-size:9.5pt; padding:1mm 2mm; background:#eff6ff; color:#1e40af; }
+        .mc2-nr   { text-align:center; font-weight:bold; font-size:9.5pt; padding:1mm 0.5mm; background:#eff6ff; color:#1e40af; }
+        .mc2-h    { text-align:center; font-size:7pt; color:#4b5563; background:#f3f4f6; padding:0.6mm 0.3mm; }
+        .mc2-cell { height:9mm; }
+        .mc2-info { border-collapse:collapse; margin-top:0.5mm; }
+        .mc2-info td  { font-size:8pt; padding:0.8mm 3mm; border:0.3pt solid #d1d5db; }
+        .mc2-info .lbl { color:#4b5563; background:#f9fafb; }
+        .mc2-info .val { text-align:center; font-weight:bold; min-width:8mm; }
+        .mc2-foot { font-size:8pt; color:#6b7280; padding-top:1mm; }
     </style>';
 }
 
@@ -1537,6 +1566,66 @@ function _match_card_html(array $m, array $c, bool $is_team, bool $is_doubles, i
         . '</tr></table>';
     $h .= '</div>';
     return $h;
+}
+
+// Kompakte Team-Match-Card („ohne Spielerfelder", Muster): pro Mannschaft Score-Spalten
+// 1..team_size + Summe, gekreuzte Unterschriften, Bahn/Anspiel/Runde, Fußzeile Bewerb · Gruppe.
+// $start_by_group: [group_id => [team_id => Start-Nr.]] (für Kopf-Nr. und Anspiel).
+function _match_card_team_compact_html(array $m, array $c, int $team_size,
+                                       string $court_label, string $label, array $start_by_group): string {
+    $gid    = (int)($m['group_id'] ?? 0);
+    $starts = $start_by_group[$gid] ?? [];
+    $name1  = $m['p1name'] ?? '';
+    $name2  = $m['p2name'] ?? '';
+    $nr1    = $starts[(int)($m['team1_id'] ?? 0)] ?? '';
+    $nr2    = $starts[(int)($m['team2_id'] ?? 0)] ?? '';
+
+    $inner = function (string $name, $nr) use ($team_size): string {
+        $h  = '<table class="mc2">';
+        $h .= '<tr><td class="mc2-name" colspan="' . $team_size . '">' . e($name) . '</td>'
+            . '<td class="mc2-nr">' . ($nr !== '' ? (int)$nr : '&nbsp;') . '</td></tr>';
+        $h .= '<tr>';
+        for ($i = 1; $i <= $team_size; $i++) $h .= '<td class="mc2-h">' . $i . '</td>';
+        $h .= '<td class="mc2-h">Summe</td></tr>';
+        $h .= '<tr>';
+        for ($i = 1; $i <= $team_size; $i++) $h .= '<td class="mc2-cell">&nbsp;</td>';
+        $h .= '<td class="mc2-cell">&nbsp;</td></tr>';
+        return $h . '</table>';
+    };
+
+    $h  = '<div class="card mc2card" style="padding:2.5mm 4mm">';
+    $h .= '<table class="mc2outer"><tr>'
+        . '<td class="mc2half mc2half-l">' . $inner($name1, $nr1) . '</td>'
+        . '<td class="mc2half">' . $inner($name2, $nr2) . '</td>'
+        . '</tr></table>';
+
+    // Unterschriften gekreuzt (links Mannschaft 2, rechts Mannschaft 1) wie im Muster.
+    $h .= '<table class="sig-table"><tr>'
+        . '<td style="width:50%;padding-right:6mm"><div class="sig-write"></div><div class="sig-label">Unterschrift ' . e($name2 ?: 'Mannschaft 2') . '</div></td>'
+        . '<td style="width:50%;padding-left:6mm"><div class="sig-write"></div><div class="sig-label">Unterschrift ' . e($name1 ?: 'Mannschaft 1') . '</div></td>'
+        . '</tr></table>';
+
+    // Info-Zeile: Bahn / Anspiel / Runde (nur vorhandene Werte).
+    $cells = [];
+    if (!empty($m['court_no'])) $cells[] = [$court_label, (int)$m['court_no']];
+    if (!empty($c['kickoff_enabled']) && !empty($m['kickoff_team_id'])) {
+        $ks = $starts[(int)$m['kickoff_team_id']] ?? '';
+        if ($ks !== '') $cells[] = ['Anspiel', (int)$ks];
+    }
+    if (!empty($m['round_no'])) $cells[] = ['Runde', (int)$m['round_no']];
+    $time = match_schedule_time($c, $m);
+    if ($time !== '') $cells[] = ['Zeit', $time . ' Uhr'];
+    if ($cells) {
+        $h .= '<table class="mc2-info"><tr>';
+        foreach ($cells as $pair) {
+            $h .= '<td class="lbl">' . e($pair[0]) . '</td><td class="val">' . $pair[1] . '</td>';
+        }
+        $h .= '</tr></table>';
+    }
+
+    $foot = ($gid && !empty($m['group_name'])) ? ('Gruppe ' . e($m['group_name'])) : $label;
+    $h .= '<div class="mc2-foot">' . e($c['name']) . ' &middot; ' . $foot . '</div>';
+    return $h . '</div>';
 }
 
 function generate_match_cards_pdf(int $cid, ?int $gid = null): void {
@@ -1657,9 +1746,20 @@ function generate_match_cards_pdf(int $cid, ?int $gid = null): void {
 
     $team_size  = (int)($c['team_size'] ?? 0);
     $score_mode = $c['score_mode'] ?? 'match';
+    // „ohne Spielerfelder": kompaktes Team-Layout (Muster). Nur bei Teambewerben mit team_size.
+    $compact = $is_team && $team_size > 0 && (($c['match_card_mode'] ?? 'fields') === 'compact');
     // Karten füllen die Seite automatisch: dank page-break-inside:avoid passen so viele
     // Karten auf eine Seite wie Platz haben (kein fest erzwungener Umbruch).
-    $card_min_h = _match_card_min_h($is_team, $team_size, $score_mode);
+    $card_min_h = $compact ? '42mm' : _match_card_min_h($is_team, $team_size, $score_mode);
+
+    // Compact-Layout: Start-Nummern je Gruppe vorberechnen (für Kopf + Anspiel).
+    $start_by_group = [];
+    if ($compact) {
+        foreach ($matches as $m) {
+            $g = (int)($m['group_id'] ?? 0);
+            if ($g && !isset($start_by_group[$g])) $start_by_group[$g] = team_start_numbers($g);
+        }
+    }
 
     $html = pdf_css() . _match_card_styles($card_min_h);
 
@@ -1699,7 +1799,9 @@ function generate_match_cards_pdf(int $cid, ?int $gid = null): void {
             };
             $game_nr = (int)$m['ko_position'] + 1;
         }
-        $html .= _match_card_html($m, $c, $is_team, $is_doubles, $team_size, $score_mode, $court, $label, $game_nr);
+        $html .= $compact
+            ? _match_card_team_compact_html($m, $c, $team_size, $court, $label, $start_by_group)
+            : _match_card_html($m, $c, $is_team, $is_doubles, $team_size, $score_mode, $court, $label, $game_nr);
     }
 
     $pdf = mpdf(['margin_top' => 5, 'margin_bottom' => 5, 'margin_left' => 12, 'margin_right' => 12]);

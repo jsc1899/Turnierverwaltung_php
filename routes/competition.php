@@ -750,6 +750,7 @@ function settings(array $p): void {
     $force_byes        = post('force_byes') ? 1 : 0;
     $num_courts        = max(0, min(20, (int)post('num_courts', 0)));
     $team_result_mode  = in_array(post('team_result_mode'), ['sum', 'total'], true) ? post('team_result_mode') : 'wins';
+    $match_card_mode   = post('match_card_mode') === 'compact' ? 'compact' : 'fields';
     $kickoff_enabled   = post('kickoff_enabled') ? 1 : 0;
     $standings_order   = post('standings_order') === 'diff' ? 'diff' : 'h2h';
     $points_mode       = in_array(post('points_mode'), ['3-1-0', '3-2-1'], true) ? post('points_mode') : '2-1-0';
@@ -816,14 +817,14 @@ function settings(array $p): void {
     }
 
     if (in_array($c['mode'], ['ko_only', 'double_ko'], true)) {
-        db_execute("UPDATE competition SET third_place=?, registrations_open=?, max_players=?, show_seeding=?, show_skill=?, seeding_order=?, team_size=?, score_mode=?, num_courts=?, team_result_mode=?, kickoff_enabled=? WHERE id=?",
-            [$third_place, $registrations_open, $max_players, $show_seeding, $show_skill, $seeding_order, $team_size, $score_mode, $num_courts, $team_result_mode, $kickoff_enabled, $cid]);
+        db_execute("UPDATE competition SET third_place=?, registrations_open=?, max_players=?, show_seeding=?, show_skill=?, seeding_order=?, team_size=?, score_mode=?, num_courts=?, team_result_mode=?, match_card_mode=?, kickoff_enabled=? WHERE id=?",
+            [$third_place, $registrations_open, $max_players, $show_seeding, $show_skill, $seeding_order, $team_size, $score_mode, $num_courts, $team_result_mode, $match_card_mode, $kickoff_enabled, $cid]);
     } elseif ($c && $c['phase'] === 'setup') {
-        db_execute("UPDATE competition SET group_size=?, advance_count=?, third_place=?, registrations_open=?, max_players=?, show_skill=?, seeding_order=?, team_size=?, score_mode=?, show_byes=?, force_byes=?, num_courts=?, team_result_mode=?, kickoff_enabled=?, standings_order=?, points_mode=?, cross_config=?, schedule_enabled=?, schedule_duration=?, schedule_start=? WHERE id=?",
-            [$group_size, $advance_count, $third_place, $registrations_open, $max_players, $show_skill, $seeding_order, $team_size, $score_mode, $show_byes, $force_byes, $num_courts, $team_result_mode, $kickoff_enabled, $standings_order, $points_mode, $cross_config, $schedule_enabled, $schedule_duration, $schedule_start, $cid]);
+        db_execute("UPDATE competition SET group_size=?, advance_count=?, third_place=?, registrations_open=?, max_players=?, show_skill=?, seeding_order=?, team_size=?, score_mode=?, show_byes=?, force_byes=?, num_courts=?, team_result_mode=?, match_card_mode=?, kickoff_enabled=?, standings_order=?, points_mode=?, cross_config=?, schedule_enabled=?, schedule_duration=?, schedule_start=? WHERE id=?",
+            [$group_size, $advance_count, $third_place, $registrations_open, $max_players, $show_skill, $seeding_order, $team_size, $score_mode, $show_byes, $force_byes, $num_courts, $team_result_mode, $match_card_mode, $kickoff_enabled, $standings_order, $points_mode, $cross_config, $schedule_enabled, $schedule_duration, $schedule_start, $cid]);
     } else {
-        db_execute("UPDATE competition SET advance_count=?, third_place=?, registrations_open=?, max_players=?, show_skill=?, seeding_order=?, team_size=?, score_mode=?, show_byes=?, force_byes=?, num_courts=?, team_result_mode=?, kickoff_enabled=?, standings_order=?, points_mode=?, cross_config=?, schedule_enabled=?, schedule_duration=?, schedule_start=? WHERE id=?",
-            [$advance_count, $third_place, $registrations_open, $max_players, $show_skill, $seeding_order, $team_size, $score_mode, $show_byes, $force_byes, $num_courts, $team_result_mode, $kickoff_enabled, $standings_order, $points_mode, $cross_config, $schedule_enabled, $schedule_duration, $schedule_start, $cid]);
+        db_execute("UPDATE competition SET advance_count=?, third_place=?, registrations_open=?, max_players=?, show_skill=?, seeding_order=?, team_size=?, score_mode=?, show_byes=?, force_byes=?, num_courts=?, team_result_mode=?, match_card_mode=?, kickoff_enabled=?, standings_order=?, points_mode=?, cross_config=?, schedule_enabled=?, schedule_duration=?, schedule_start=? WHERE id=?",
+            [$advance_count, $third_place, $registrations_open, $max_players, $show_skill, $seeding_order, $team_size, $score_mode, $show_byes, $force_byes, $num_courts, $team_result_mode, $match_card_mode, $kickoff_enabled, $standings_order, $points_mode, $cross_config, $schedule_enabled, $schedule_duration, $schedule_start, $cid]);
     }
     // Bei verkleinertem team_size in der Gruppenphase verwaiste Aufstellungs-Zeilen entfernen.
     if ($ts_editable && $c['phase'] === 'group' && !empty($c['is_team'])) {
