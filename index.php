@@ -227,6 +227,8 @@ $routes = [
     // Admin
     ['GET',  '/admin/users',              'admin', 'users'],
     ['POST', '/admin/user/{id}/role',     'admin', 'set_role'],
+    ['POST', '/admin/user/{id}/active',   'admin', 'toggle_active'],
+    ['POST', '/admin/user/{id}/resend',   'admin', 'resend_confirm'],
     ['POST', '/admin/user/{id}/delete',   'admin', 'delete_user'],
     ['GET',  '/admin/design',             'admin', 'design'],
     ['POST', '/admin/design',             'admin', 'save_design'],

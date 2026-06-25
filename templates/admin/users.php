@@ -5,7 +5,7 @@ ob_start(); ?>
 <div class="table-responsive">
   <table class="table table-hover align-middle" data-sortable>
     <thead class="table-light">
-      <tr><th>Benutzer</th><th>E-Mail</th><th class="no-sort">Rolle</th><th>Registriert</th><th>Zuletzt online</th><th class="no-sort"></th></tr>
+      <tr><th>Benutzer</th><th>E-Mail</th><th class="no-sort">Rolle</th><th>Aktiviert</th><th>Registriert</th><th>Zuletzt online</th><th class="no-sort"></th></tr>
     </thead>
     <tbody>
       <?php foreach ($users as $u): ?>
@@ -26,15 +26,39 @@ ob_start(); ?>
             <?php endif; ?>
           </form>
         </td>
+        <td data-sort="<?= $u['confirmed'] ? '1' : '0' ?>">
+          <?php if ($u['confirmed']): ?>
+          <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Ja</span>
+          <?php else: ?>
+          <span class="badge bg-secondary"><i class="bi bi-x-circle me-1"></i>Nein</span>
+          <?php endif; ?>
+        </td>
         <td class="text-muted small"><?= e($u['created_at'] ?? '') ?></td>
         <td class="text-muted small"><?= $u['last_login'] ? e($u['last_login']) : '<span class="text-secondary">–</span>' ?></td>
         <td>
           <?php if ($u['email'] !== ADMIN_EMAIL): ?>
-          <form method="post" action="<?= url('admin/user/' . $u['id'] . '/delete') ?>"
-                data-confirm="Benutzer wirklich löschen?">
-            <?= csrf_field() ?>
-            <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button>
-          </form>
+          <div class="d-flex gap-1">
+            <form method="post" action="<?= url('admin/user/' . $u['id'] . '/active') ?>">
+              <?= csrf_field() ?>
+              <?php if ($u['confirmed']): ?>
+              <button class="btn btn-outline-warning btn-sm" title="Benutzer deaktivieren"
+                      data-confirm="Benutzer wirklich deaktivieren?"><i class="bi bi-person-x"></i></button>
+              <?php else: ?>
+              <button class="btn btn-outline-success btn-sm" title="Benutzer aktivieren"><i class="bi bi-person-check"></i></button>
+              <?php endif; ?>
+            </form>
+            <?php if (!$u['confirmed']): ?>
+            <form method="post" action="<?= url('admin/user/' . $u['id'] . '/resend') ?>">
+              <?= csrf_field() ?>
+              <button class="btn btn-outline-primary btn-sm" title="Aktivierungsmail erneut senden"><i class="bi bi-envelope-arrow-up"></i></button>
+            </form>
+            <?php endif; ?>
+            <form method="post" action="<?= url('admin/user/' . $u['id'] . '/delete') ?>"
+                  data-confirm="Benutzer wirklich löschen?">
+              <?= csrf_field() ?>
+              <button class="btn btn-outline-danger btn-sm" title="Benutzer löschen"><i class="bi bi-trash"></i></button>
+            </form>
+          </div>
           <?php endif; ?>
         </td>
       </tr>
