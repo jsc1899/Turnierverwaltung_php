@@ -76,173 +76,9 @@ function new_competition(array $p): void {
     redirect('tournament/' . $p['tid']);
 }
 
-function show(array $p): void {
-    $cid = (int)$p['id'];
-    $c   = db_fetch("SELECT * FROM competition WHERE id = ?", [$cid]);
-    if (!$c) { redirect(''); return; }
-    $t = db_fetch("SELECT * FROM tournament WHERE id = ?", [$c['tournament_id']]);
-    $is_doubles = !empty($c['is_doubles']);
-    $is_team    = !empty($c['is_team']);
-
-    // Teilnehmer laden (Spieler oder Doppel oder Teams je nach Bewerb-Typ)
-    $assigned = $assigned_doubles = $unassigned = $unassigned_doubles = [];
-    $assigned_teams = $unassigned_teams = [];
-    $unassigned_skills = [];
-
-    if ($is_team) {
-        $assigned_teams = db_fetchall(
-            "SELECT t.id, t.name, ct.skill, ct.created_at as reg_date
-             FROM `team` t JOIN competition_team ct ON ct.team_id = t.id
-             WHERE ct.competition_id = ? ORDER BY t.name",
-            [$cid]
-        );
-        foreach ($assigned_teams as &$team) {
-            $team['members'] = db_fetchall(
-                "SELECT TRIM(CONCAT(COALESCE(p.firstname,''), IF(COALESCE(p.firstname,'')!='', ' ',''), p.name)) as fullname, p.club
-                 FROM player p JOIN `team_player` tp ON tp.player_id = p.id WHERE tp.team_id = ? ORDER BY p.name",
-                [$team['id']]
-            );
-        }
-        unset($team);
-        $unassigned_teams = db_fetchall(
-            "SELECT t.id, t.name, t.skill FROM `team` t
-             WHERE t.is_active=1 AND t.id NOT IN (SELECT team_id FROM competition_team WHERE competition_id=?)
-             ORDER BY t.name",
-            [$cid]
-        );
-        // Team-Mitglieder und bestehende Duelle für Duel-Modals (nur wenn team_size > 0)
-        $team_members   = [];
-        $existing_duels = [];
-        if ((int)($c['team_size'] ?? 0) > 0) {
-            foreach ($assigned_teams as $tm) {
-                $team_members[$tm['id']] = db_fetchall(
-                    "SELECT p.id,
-                     TRIM(CONCAT(p.name, IF(COALESCE(p.firstname,'')!='',CONCAT(' ',p.firstname),''))) as fullname
-                     FROM player p JOIN `team_player` tp ON tp.player_id=p.id
-                     WHERE tp.team_id=? ORDER BY p.name",
-                    [$tm['id']]
-                );
-            }
-            foreach (db_fetchall(
-                "SELECT d.*,
-                 TRIM(CONCAT(COALESCE(p1.firstname,''), IF(COALESCE(p1.firstname,'')!='',' ',''), p1.name)) as player1_name,
-                 TRIM(CONCAT(COALESCE(p2.firstname,''), IF(COALESCE(p2.firstname,'')!='',' ',''), p2.name)) as player2_name
-                 FROM team_match_duel d
-                 JOIN `match` m ON m.id=d.match_id
-                 LEFT JOIN player p1 ON p1.id=d.player1_id
-                 LEFT JOIN player p2 ON p2.id=d.player2_id
-                 WHERE m.competition_id=? ORDER BY d.match_id, d.duel_order",
-                [$cid]
-            ) as $duel) {
-                $existing_duels[$duel['match_id']][] = $duel;
-            }
-        }
-    }
-
-    // Bestehende Satzergebnisse laden (wenn score_mode='sets' oder 'sets_grp')
-    $existing_sets = [];
-    if (in_array($c['score_mode'] ?? 'match', ['sets', 'sets_grp'])) {
-        foreach (db_fetchall(
-            "SELECT s.* FROM match_set s
-             JOIN `match` m ON m.id = s.match_id
-             WHERE m.competition_id = ? ORDER BY s.match_id, s.set_order",
-            [$cid]
-        ) as $s) {
-            $existing_sets[$s['match_id']][] = $s;
-        }
-    }
-
-    if ($is_doubles) {
-        $assigned_doubles = db_fetchall(
-            "SELECT d.id, d.name, d.player1_id, d.player2_id,
-             TRIM(CONCAT(COALESCE(p1.firstname,''), IF(COALESCE(p1.firstname,'')!='', ' ',''), p1.name)) as p1name,
-             TRIM(CONCAT(COALESCE(p2.firstname,''), IF(COALESCE(p2.firstname,'')!='', ' ',''), p2.name)) as p2name,
-             p1.club as p1club, p2.club as p2club,
-             cd.created_at as reg_date, cd.skill
-             FROM `double` d
-             JOIN player p1 ON p1.id = d.player1_id
-             JOIN player p2 ON p2.id = d.player2_id
-             JOIN competition_double cd ON cd.double_id = d.id
-             WHERE cd.competition_id = ? ORDER BY d.name",
-            [$cid]
-        );
-        $assigned_dids = array_column($assigned_doubles, 'id');
-        $d_sport = $t['sport'] ?? '';
-        foreach ($assigned_doubles as &$d) {
-            $d['registry_skill'] = _get_player_skill((int)$d['player1_id'], $d_sport)
-                                 + _get_player_skill((int)$d['player2_id'], $d_sport);
-        }
-        unset($d);
-        $unassigned_doubles = db_fetchall(
-            "SELECT d.id, d.name, d.player1_id, d.player2_id FROM `double` d
-             WHERE d.is_active=1 AND d.id NOT IN
-             (SELECT double_id FROM competition_double WHERE competition_id = ?)
-             ORDER BY d.name",
-            [$cid]
-        );
-        foreach ($unassigned_doubles as &$ud) {
-            $ud['skill'] = _get_player_skill((int)$ud['player1_id'], $d_sport)
-                         + _get_player_skill((int)$ud['player2_id'], $d_sport);
-        }
-        unset($ud);
-        // Alle competition_player-Einträge ohne Doppelpartner (authoritative source, unabhängig von registration-Status)
-        $confirmed_regs = ($c['phase'] === 'setup' && !empty($c['is_doubles'])) ? db_fetchall(
-            "SELECT p.id as player_id, p.firstname, p.name as lastname, p.club, p.pass_nr,
-                    COALESCE((
-                      SELECT rc.partner_name
-                      FROM registration_competition rc
-                      JOIN registration r ON r.id = rc.registration_id
-                      WHERE rc.competition_id = ?
-                        AND ((r.pass_nr != '' AND r.pass_nr = p.pass_nr)
-                             OR (r.lastname = p.name AND r.firstname = p.firstname))
-                      ORDER BY r.created_at DESC LIMIT 1
-                    ), (
-                      SELECT rcc.partner_name
-                      FROM registration_change_competition rcc
-                      JOIN registration_change_request rcr ON rcr.id = rcc.change_request_id
-                      JOIN registration r ON r.id = rcr.registration_id
-                      WHERE rcc.competition_id = ? AND rcc.action = 'add' AND rcc.status = 'confirmed'
-                        AND ((r.pass_nr != '' AND r.pass_nr = p.pass_nr)
-                             OR (r.lastname = p.name AND r.firstname = p.firstname))
-                      ORDER BY rcr.created_at DESC LIMIT 1
-                    ), '') as partner_name
-             FROM competition_player cp
-             JOIN player p ON p.id = cp.player_id
-             WHERE cp.competition_id = ?
-               AND cp.player_id NOT IN (
-                   SELECT d2.player1_id FROM `double` d2
-                   JOIN competition_double cd2 ON cd2.double_id = d2.id
-                   WHERE cd2.competition_id = ?
-                   UNION
-                   SELECT d2.player2_id FROM `double` d2
-                   JOIN competition_double cd2 ON cd2.double_id = d2.id
-                   WHERE cd2.competition_id = ?
-               )
-             ORDER BY p.name, p.firstname",
-            [$cid, $cid, $cid, $cid, $cid]
-        ) : [];
-    } else {
-        $assigned = db_fetchall(
-            "SELECT p.id, p.name, p.firstname, p.club, p.gender, p.pass_nr, p.email,
-             cp.created_at as reg_date, cp.skill
-             FROM player p JOIN competition_player cp ON cp.player_id = p.id
-             WHERE cp.competition_id = ? ORDER BY p.name, p.firstname",
-            [$cid]
-        );
-        $assigned_ids = array_column($assigned, 'id');
-        $all_players  = db_fetchall("SELECT * FROM player WHERE is_active=1 ORDER BY name, firstname");
-        $unassigned   = array_filter($all_players, fn($pl) => !in_array($pl['id'], $assigned_ids));
-        $sport        = $t ? ($t['sport'] ?? '') : '';
-        foreach ($assigned as &$pl) {
-            $pl['registry_skill'] = _get_player_skill($pl['id'], $sport);
-        }
-        unset($pl);
-        foreach ($unassigned as $pl) {
-            $unassigned_skills[$pl['id']] = _get_player_skill($pl['id'], $sport);
-        }
-        $unassigned = array_values($unassigned);
-    }
-
+// View-Daten (Gruppen, KO/DKO/Kreuz, Endplatzierung, Setzungen) - geteilt von show() und monitor().
+function competition_view_data(array $c, bool $is_team, bool $is_doubles): array {
+    $cid = (int)$c['id'];
     $groups = [];
     if (in_array($c['phase'], ['group', 'ko', 'done'], true)) {
         $grps = db_fetchall("SELECT * FROM grp WHERE competition_id = ? ORDER BY name", [$cid]);
@@ -680,6 +516,184 @@ function show(array $p): void {
         $ko_no_results = ((int)$played_ko === 0);
     }
 
+    return [
+        'groups' => $groups, 'has_open_tie' => $has_open_tie, 'unplayed_group' => $unplayed_group,
+        'open_matches' => $open_matches, 'comp_complete' => $comp_complete,
+        'ko_rounds' => $ko_rounds, 'third_place_match' => $third_place_match, 'places' => $places,
+        'cross_blocks' => $cross_blocks, 'dko_wb' => $dko_wb, 'dko_lb' => $dko_lb, 'dko_gf' => $dko_gf,
+        'cap' => $cap ?? 0, 'lb_total' => $lb_total ?? 0,
+        'ko_seedings' => $ko_seedings, 'group_no_results' => $group_no_results, 'ko_no_results' => $ko_no_results,
+    ];
+}
+
+function show(array $p): void {
+    $cid = (int)$p['id'];
+    $c   = db_fetch("SELECT * FROM competition WHERE id = ?", [$cid]);
+    if (!$c) { redirect(''); return; }
+    $t = db_fetch("SELECT * FROM tournament WHERE id = ?", [$c['tournament_id']]);
+    $is_doubles = !empty($c['is_doubles']);
+    $is_team    = !empty($c['is_team']);
+
+    // Teilnehmer laden (Spieler oder Doppel oder Teams je nach Bewerb-Typ)
+    $assigned = $assigned_doubles = $unassigned = $unassigned_doubles = [];
+    $assigned_teams = $unassigned_teams = [];
+    $unassigned_skills = [];
+
+    if ($is_team) {
+        $assigned_teams = db_fetchall(
+            "SELECT t.id, t.name, ct.skill, ct.created_at as reg_date
+             FROM `team` t JOIN competition_team ct ON ct.team_id = t.id
+             WHERE ct.competition_id = ? ORDER BY t.name",
+            [$cid]
+        );
+        foreach ($assigned_teams as &$team) {
+            $team['members'] = db_fetchall(
+                "SELECT TRIM(CONCAT(COALESCE(p.firstname,''), IF(COALESCE(p.firstname,'')!='', ' ',''), p.name)) as fullname, p.club
+                 FROM player p JOIN `team_player` tp ON tp.player_id = p.id WHERE tp.team_id = ? ORDER BY p.name",
+                [$team['id']]
+            );
+        }
+        unset($team);
+        $unassigned_teams = db_fetchall(
+            "SELECT t.id, t.name, t.skill FROM `team` t
+             WHERE t.is_active=1 AND t.id NOT IN (SELECT team_id FROM competition_team WHERE competition_id=?)
+             ORDER BY t.name",
+            [$cid]
+        );
+        // Team-Mitglieder und bestehende Duelle für Duel-Modals (nur wenn team_size > 0)
+        $team_members   = [];
+        $existing_duels = [];
+        if ((int)($c['team_size'] ?? 0) > 0) {
+            foreach ($assigned_teams as $tm) {
+                $team_members[$tm['id']] = db_fetchall(
+                    "SELECT p.id,
+                     TRIM(CONCAT(p.name, IF(COALESCE(p.firstname,'')!='',CONCAT(' ',p.firstname),''))) as fullname
+                     FROM player p JOIN `team_player` tp ON tp.player_id=p.id
+                     WHERE tp.team_id=? ORDER BY p.name",
+                    [$tm['id']]
+                );
+            }
+            foreach (db_fetchall(
+                "SELECT d.*,
+                 TRIM(CONCAT(COALESCE(p1.firstname,''), IF(COALESCE(p1.firstname,'')!='',' ',''), p1.name)) as player1_name,
+                 TRIM(CONCAT(COALESCE(p2.firstname,''), IF(COALESCE(p2.firstname,'')!='',' ',''), p2.name)) as player2_name
+                 FROM team_match_duel d
+                 JOIN `match` m ON m.id=d.match_id
+                 LEFT JOIN player p1 ON p1.id=d.player1_id
+                 LEFT JOIN player p2 ON p2.id=d.player2_id
+                 WHERE m.competition_id=? ORDER BY d.match_id, d.duel_order",
+                [$cid]
+            ) as $duel) {
+                $existing_duels[$duel['match_id']][] = $duel;
+            }
+        }
+    }
+
+    // Bestehende Satzergebnisse laden (wenn score_mode='sets' oder 'sets_grp')
+    $existing_sets = [];
+    if (in_array($c['score_mode'] ?? 'match', ['sets', 'sets_grp'])) {
+        foreach (db_fetchall(
+            "SELECT s.* FROM match_set s
+             JOIN `match` m ON m.id = s.match_id
+             WHERE m.competition_id = ? ORDER BY s.match_id, s.set_order",
+            [$cid]
+        ) as $s) {
+            $existing_sets[$s['match_id']][] = $s;
+        }
+    }
+
+    if ($is_doubles) {
+        $assigned_doubles = db_fetchall(
+            "SELECT d.id, d.name, d.player1_id, d.player2_id,
+             TRIM(CONCAT(COALESCE(p1.firstname,''), IF(COALESCE(p1.firstname,'')!='', ' ',''), p1.name)) as p1name,
+             TRIM(CONCAT(COALESCE(p2.firstname,''), IF(COALESCE(p2.firstname,'')!='', ' ',''), p2.name)) as p2name,
+             p1.club as p1club, p2.club as p2club,
+             cd.created_at as reg_date, cd.skill
+             FROM `double` d
+             JOIN player p1 ON p1.id = d.player1_id
+             JOIN player p2 ON p2.id = d.player2_id
+             JOIN competition_double cd ON cd.double_id = d.id
+             WHERE cd.competition_id = ? ORDER BY d.name",
+            [$cid]
+        );
+        $assigned_dids = array_column($assigned_doubles, 'id');
+        $d_sport = $t['sport'] ?? '';
+        foreach ($assigned_doubles as &$d) {
+            $d['registry_skill'] = _get_player_skill((int)$d['player1_id'], $d_sport)
+                                 + _get_player_skill((int)$d['player2_id'], $d_sport);
+        }
+        unset($d);
+        $unassigned_doubles = db_fetchall(
+            "SELECT d.id, d.name, d.player1_id, d.player2_id FROM `double` d
+             WHERE d.is_active=1 AND d.id NOT IN
+             (SELECT double_id FROM competition_double WHERE competition_id = ?)
+             ORDER BY d.name",
+            [$cid]
+        );
+        foreach ($unassigned_doubles as &$ud) {
+            $ud['skill'] = _get_player_skill((int)$ud['player1_id'], $d_sport)
+                         + _get_player_skill((int)$ud['player2_id'], $d_sport);
+        }
+        unset($ud);
+        // Alle competition_player-Einträge ohne Doppelpartner (authoritative source, unabhängig von registration-Status)
+        $confirmed_regs = ($c['phase'] === 'setup' && !empty($c['is_doubles'])) ? db_fetchall(
+            "SELECT p.id as player_id, p.firstname, p.name as lastname, p.club, p.pass_nr,
+                    COALESCE((
+                      SELECT rc.partner_name
+                      FROM registration_competition rc
+                      JOIN registration r ON r.id = rc.registration_id
+                      WHERE rc.competition_id = ?
+                        AND ((r.pass_nr != '' AND r.pass_nr = p.pass_nr)
+                             OR (r.lastname = p.name AND r.firstname = p.firstname))
+                      ORDER BY r.created_at DESC LIMIT 1
+                    ), (
+                      SELECT rcc.partner_name
+                      FROM registration_change_competition rcc
+                      JOIN registration_change_request rcr ON rcr.id = rcc.change_request_id
+                      JOIN registration r ON r.id = rcr.registration_id
+                      WHERE rcc.competition_id = ? AND rcc.action = 'add' AND rcc.status = 'confirmed'
+                        AND ((r.pass_nr != '' AND r.pass_nr = p.pass_nr)
+                             OR (r.lastname = p.name AND r.firstname = p.firstname))
+                      ORDER BY rcr.created_at DESC LIMIT 1
+                    ), '') as partner_name
+             FROM competition_player cp
+             JOIN player p ON p.id = cp.player_id
+             WHERE cp.competition_id = ?
+               AND cp.player_id NOT IN (
+                   SELECT d2.player1_id FROM `double` d2
+                   JOIN competition_double cd2 ON cd2.double_id = d2.id
+                   WHERE cd2.competition_id = ?
+                   UNION
+                   SELECT d2.player2_id FROM `double` d2
+                   JOIN competition_double cd2 ON cd2.double_id = d2.id
+                   WHERE cd2.competition_id = ?
+               )
+             ORDER BY p.name, p.firstname",
+            [$cid, $cid, $cid, $cid, $cid]
+        ) : [];
+    } else {
+        $assigned = db_fetchall(
+            "SELECT p.id, p.name, p.firstname, p.club, p.gender, p.pass_nr, p.email,
+             cp.created_at as reg_date, cp.skill
+             FROM player p JOIN competition_player cp ON cp.player_id = p.id
+             WHERE cp.competition_id = ? ORDER BY p.name, p.firstname",
+            [$cid]
+        );
+        $assigned_ids = array_column($assigned, 'id');
+        $all_players  = db_fetchall("SELECT * FROM player WHERE is_active=1 ORDER BY name, firstname");
+        $unassigned   = array_filter($all_players, fn($pl) => !in_array($pl['id'], $assigned_ids));
+        $sport        = $t ? ($t['sport'] ?? '') : '';
+        foreach ($assigned as &$pl) {
+            $pl['registry_skill'] = _get_player_skill($pl['id'], $sport);
+        }
+        unset($pl);
+        foreach ($unassigned as $pl) {
+            $unassigned_skills[$pl['id']] = _get_player_skill($pl['id'], $sport);
+        }
+        $unassigned = array_values($unassigned);
+    }
+
+    extract(competition_view_data($c, $is_team, $is_doubles));
     render('competition/show', [
         'page_title' => $c['name'],
         'c' => $c, 't' => $t,
@@ -704,6 +718,23 @@ function show(array $p): void {
         'ko_seedings' => $ko_seedings,
         'cross_blocks' => $cross_blocks,
     ]);
+}
+
+// Öffentliche Monitoransicht eines Bewerbs (Vollbild, große Schrift, Auto-Scroll/Reload).
+// Nutzt dieselben View-Daten wie show(); kein require_edit (wie show öffentlich).
+function monitor(array $p): void {
+    $cid = (int)$p['id'];
+    $c   = db_fetch("SELECT * FROM competition WHERE id = ?", [$cid]);
+    if (!$c) { redirect(''); return; }
+    $t = db_fetch("SELECT * FROM tournament WHERE id = ?", [$c['tournament_id']]);
+    $is_doubles = !empty($c['is_doubles']);
+    $is_team    = !empty($c['is_team']);
+    $data = competition_view_data($c, $is_team, $is_doubles);
+    render('competition/monitor', [
+        'page_title' => $c['name'] . ' — Monitor',
+        'c' => $c, 't' => $t,
+        'is_team' => $is_team, 'is_doubles' => $is_doubles,
+    ] + $data);
 }
 
 function settings(array $p): void {

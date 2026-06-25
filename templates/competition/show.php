@@ -47,6 +47,10 @@ ob_start(); ?>
 
   <?php if (can_edit()): ?>
   <div class="ms-auto d-flex gap-2 flex-wrap">
+    <a href="<?= url('competition/'.$c['id'].'/monitor') ?>" target="_blank"
+       class="btn btn-outline-secondary btn-sm" title="Monitoransicht (Vollbild für Anzeige/Beamer)">
+      <i class="bi bi-display"></i>
+    </a>
     <?php if (!$locked && in_array($c['phase'], ['group','ko'], true)): ?>
     <form method="post" action="<?= url('competition/'.$c['id'].'/settings') ?>?action=done">
       <?= csrf_field() ?><input type="hidden" name="mark_done" value="1">
@@ -1027,7 +1031,7 @@ ob_start(); ?>
       <div class="card-body p-0">
         <div class="grp-normal-view">
         <!-- Standings table -->
-        <div class="table-responsive">
+        <div class="table-responsive" id="standings-<?= (int)$g['id'] ?>">
           <table class="table table-sm table-hover align-middle mb-0">
             <thead class="table-light">
               <tr><th>#</th><th><?= $is_team ? 'Team' : 'Spieler' ?></th><th class="text-center">Sp</th><th class="text-center">S</th><th class="text-center">U</th><th class="text-center">N</th><th class="text-center" style="width:72px"><?= $sets_mode_active ? 'V (Sätze)' : 'V' ?></th><th class="text-center" style="width:72px"><?= $sets_mode_active ? '+/- (Sätze)' : '+/-' ?></th><?php if ($show_einzel): ?><th class="text-center" style="width:72px"><?= $sets_mode_active ? 'V (Punkte)' : 'V (Einzel)' ?></th><th class="text-center" style="width:72px"><?= $sets_mode_active ? '+/- (Punkte)' : '+/- (Einzel)' ?></th><?php endif; ?><th class="text-center">Pkt</th></tr>
@@ -1181,7 +1185,7 @@ ob_start(); ?>
               ? '<span class="badge bg-light text-secondary border flex-shrink-0" style="white-space:nowrap;margin-top:3px"><i class="bi bi-geo-alt"></i> ' . e($court_sg) . ' ' . (int)$m['court_no'] . '</span>'
               : '';
           ?>
-          <div class="d-flex align-items-start gap-2"><?= $court_pre ?><div class="flex-grow-1" style="min-width:0">
+          <div class="d-flex align-items-start gap-2" id="match-row-<?= $m['id'] ?>"><?= $court_pre ?><div class="flex-grow-1" style="min-width:0">
           <?php
             if ($use_duels):
               $t1id = (int)($m['team1_id'] ?? 0);
@@ -1343,27 +1347,41 @@ ob_start(); ?>
           </div>
           <?php else: ?>
           <?php if ($grp_editable): ?>
+          <?php
+            // Ergebnisfärbung (nur bei gespeichertem Ergebnis): Sieger grün, Verlierer rot,
+            // Unentschieden beide blau – gedämpfte Farben, Inhalt bleibt lesbar.
+            $cls1 = $cls2 = '';
+            if ($m['played']) {
+                $s1c = (int)$m['score1']; $s2c = (int)$m['score2'];
+                if     ($s1c >  $s2c) { $cls1 = ' score-win';  $cls2 = ' score-loss'; }
+                elseif ($s1c <  $s2c) { $cls1 = ' score-loss'; $cls2 = ' score-win'; }
+                else                  { $cls1 = ' score-draw'; $cls2 = ' score-draw'; }
+            }
+          ?>
           <div class="mb-2" style="display:grid;grid-template-columns:64px 1fr 56px 1.2rem 56px 1fr 64px;align-items:center;column-gap:4px">
             <div></div>
             <span class="text-end small text-truncate"><?= e($m['p1name']) ?></span>
             <input type="number" name="matches[<?= $m['id'] ?>][score1]" min="0"
-                   form="grp-form-<?= $g['id'] ?>"
-                   class="form-control form-control-sm text-center"
+                   form="grp-form-<?= $g['id'] ?>"<?= $m['played'] ? ' readonly' : '' ?>
+                   class="form-control form-control-sm text-center<?= $cls1 ?>"
                    value="<?= $m['played'] ? $m['score1'] : '' ?>">
             <span class="text-center">:</span>
             <input type="number" name="matches[<?= $m['id'] ?>][score2]" min="0"
-                   form="grp-form-<?= $g['id'] ?>"
-                   class="form-control form-control-sm text-center"
+                   form="grp-form-<?= $g['id'] ?>"<?= $m['played'] ? ' readonly' : '' ?>
+                   class="form-control form-control-sm text-center<?= $cls2 ?>"
                    value="<?= $m['played'] ? $m['score2'] : '' ?>">
             <span class="small text-truncate"><?= e($m['p2name']) ?></span>
-            <div class="d-flex align-items-center gap-1 justify-content-end">
+            <div class="d-flex align-items-center gap-1 justify-content-end" id="match-actions-<?= $m['id'] ?>">
+              <?php if (!$m['played']): ?>
               <button type="button" class="btn btn-sm btn-outline-primary p-0 save-one-result" style="width:30px;height:30px"
                       title="Dieses Ergebnis speichern"
-                      data-mid="<?= $m['id'] ?>" data-url="<?= url('match/'.$m['id'].'/result') ?>" data-csrf="<?= csrf_token() ?>">
+                      data-mid="<?= $m['id'] ?>" data-gid="<?= (int)$g['id'] ?>" data-url="<?= url('match/'.$m['id'].'/result') ?>" data-csrf="<?= csrf_token() ?>">
                 <i class="bi bi-save"></i>
               </button>
+              <?php endif; ?>
               <?php if ($m['played']): ?>
               <form method="post" action="<?= url('match/'.$m['id'].'/result/clear') ?>"
+                    class="js-inline-clear" data-mid="<?= $m['id'] ?>" data-gid="<?= (int)$g['id'] ?>"
                     data-confirm="Ergebnis wirklich löschen?">
                 <?= csrf_field() ?>
                 <button class="btn btn-sm btn-outline-danger p-0" style="width:30px;height:30px" title="Ergebnis löschen">
@@ -1374,10 +1392,25 @@ ob_start(); ?>
             </div>
           </div>
           <?php else: ?>
-          <div class="mb-1 d-flex align-items-center gap-2 small">
-            <span class="text-end text-truncate" style="min-width:0;flex:1"><?= e($m['p1name']) ?></span>
-            <span class="badge <?= $m['played'] ? 'bg-secondary' : 'bg-light text-muted border' ?>"><?= $m['played'] ? $m['score1'].':'.$m['score2'] : '—:—' ?></span>
-            <span class="text-truncate" style="min-width:0;flex:1"><?= e($m['p2name']) ?></span>
+          <?php
+            // Gäste/Viewer (sowie gesperrte/abgeschlossene Phase): gleiche farbigen Kästchen
+            // wie in der Editieransicht – Sieger grün, Verlierer rot, Unentschieden beide blau.
+            $cls1 = $cls2 = '';
+            if ($m['played']) {
+                $s1c = (int)$m['score1']; $s2c = (int)$m['score2'];
+                if     ($s1c >  $s2c) { $cls1 = ' score-win';  $cls2 = ' score-loss'; }
+                elseif ($s1c <  $s2c) { $cls1 = ' score-loss'; $cls2 = ' score-win'; }
+                else                  { $cls1 = ' score-draw'; $cls2 = ' score-draw'; }
+            }
+          ?>
+          <div class="mb-2" style="display:grid;grid-template-columns:64px 1fr 56px 1.2rem 56px 1fr 64px;align-items:center;column-gap:4px">
+            <div></div>
+            <span class="text-end small text-truncate"><?= e($m['p1name']) ?></span>
+            <span class="score-box<?= $cls1 ?>"><?= $m['played'] ? (int)$m['score1'] : '' ?></span>
+            <span class="text-center">:</span>
+            <span class="score-box<?= $cls2 ?>"><?= $m['played'] ? (int)$m['score2'] : '' ?></span>
+            <span class="small text-truncate"><?= e($m['p2name']) ?></span>
+            <div></div>
           </div>
           <?php endif; ?>
           <?php endif; ?>
@@ -2208,31 +2241,89 @@ $extra_js = <<<'JS'
 <style>
 .add-entry-item:hover { background: var(--bs-tertiary-bg); }
 .add-entry-item:has(input:checked) { background: var(--bs-primary-bg-subtle); }
+@keyframes resultSavedFlash { 0% { background: #d1e7dd; } 100% { background: transparent; } }
+.result-saved-flash { animation: resultSavedFlash 1.2s ease-out; border-radius: 4px; }
+/* Read-only-Kästchen (Gäste/Viewer/gesperrte Phase) im Look der Eingabefelder */
+.score-box { display:inline-flex; align-items:center; justify-content:center; width:100%;
+  min-height:31px; padding:.2rem .3rem; font-size:.875rem; color:#212529;
+  background:#fff; border:1px solid #ced4da; border-radius:.25rem; }
+/* Ergebnisfärbung der Score-Kästchen (gedämpft, Inhalt lesbar) – Eingabefelder + Read-only */
+.score-win  { background-color: #d1e7dd !important; border-color: #a3cfbb !important; }
+.score-loss { background-color: #f8d7da !important; border-color: #e9a3ac !important; }
+.score-draw { background-color: #cfe2ff !important; border-color: #9ec5fe !important; }
+/* Gespeicherten Wert exakt zentrieren: Spinner ausblenden (reservieren sonst Platz) */
+input.form-control[name^="matches"][readonly] { text-align: center !important; -moz-appearance: textfield; }
+input.form-control[name^="matches"][readonly]::-webkit-inner-spin-button,
+input.form-control[name^="matches"][readonly]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 </style>
 <script>
-// ── Einzelnes Ergebnis inline speichern ──────────────────────────
-// Liest die Score-Felder einer Begegnung (name="matches[mid][scoreN]") und
-// sendet nur dieses Ergebnis an /match/{id}/result.
-document.addEventListener('click', function(ev) {
-  var btn = ev.target.closest('.save-one-result');
-  if (!btn) return;
-  ev.preventDefault();
-  var mid = btn.dataset.mid;
-  var s1 = document.getElementsByName('matches[' + mid + '][score1]')[0];
-  var s2 = document.getElementsByName('matches[' + mid + '][score2]')[0];
-  if (!s1 || !s2) return;
-  if (s1.value === '' || s2.value === '') { alert('Bitte beide Werte eingeben.'); return; }
-  var f = document.createElement('form');
-  f.method = 'post';
-  f.action = btn.dataset.url;
-  [['csrf_token', btn.dataset.csrf], ['score1', s1.value], ['score2', s2.value]].forEach(function(kv) {
-    var i = document.createElement('input');
-    i.type = 'hidden'; i.name = kv[0]; i.value = kv[1];
-    f.appendChild(i);
+// ── Einzelnes Ergebnis inline speichern/löschen (ohne Seitenreload) ──────────
+// Speichert/löscht nur dieses Ergebnis und tauscht aus der Server-Antwort gezielt
+// die Gruppentabelle (#standings-<gid>) und die Aktions-Icons (#match-actions-<mid>)
+// aus. Andere, noch nicht gespeicherte Eingaben in der Gruppe bleiben erhalten.
+(function() {
+  function parseDoc(text) { return new DOMParser().parseFromString(text, 'text/html'); }
+
+  function applyResponse(doc, gid, mid) {
+    // Ganze Begegnungszeile (inkl. Felder → readonly/editierbar) und Tabelle austauschen.
+    ['match-row-' + mid, 'standings-' + gid].forEach(function(id) {
+      var nw = doc.getElementById(id), cur = document.getElementById(id);
+      if (nw && cur) cur.replaceWith(nw);
+    });
+    var alerts = doc.querySelectorAll('.alert-danger, .alert-warning');
+    if (alerts.length) {
+      alert(Array.prototype.map.call(alerts, function(a) { return a.textContent.trim(); }).join('\n'));
+    }
+  }
+
+  function flashRow(mid) {
+    var row = document.getElementById('match-row-' + mid);
+    if (!row) return;
+    row.classList.remove('result-saved-flash');
+    void row.offsetWidth;            // Reflow erzwingen, damit die Animation neu startet
+    row.classList.add('result-saved-flash');
+  }
+
+  function postForm(url, body) {
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body
+    }).then(function(r) { return r.text(); });
+  }
+
+  // Speichern
+  document.addEventListener('click', function(ev) {
+    var btn = ev.target.closest('.save-one-result');
+    if (!btn) return;
+    ev.preventDefault();
+    var mid = btn.dataset.mid, gid = btn.dataset.gid;
+    var s1 = document.getElementsByName('matches[' + mid + '][score1]')[0];
+    var s2 = document.getElementsByName('matches[' + mid + '][score2]')[0];
+    if (!s1 || !s2) return;
+    if (s1.value === '' || s2.value === '') { alert('Bitte beide Werte eingeben.'); return; }
+    btn.disabled = true;
+    var body = new URLSearchParams();
+    body.append('csrf_token', btn.dataset.csrf);
+    body.append('score1', s1.value);
+    body.append('score2', s2.value);
+    postForm(btn.dataset.url, body.toString())
+      .then(function(t) { applyResponse(parseDoc(t), gid, mid); flashRow(mid); })
+      .catch(function() { alert('Speichern fehlgeschlagen.'); btn.disabled = false; });
   });
-  document.body.appendChild(f);
-  f.submit();
-});
+
+  // Löschen (Bestätigung übernimmt der globale data-confirm-Handler)
+  document.addEventListener('submit', function(ev) {
+    var form = ev.target.closest('form.js-inline-clear');
+    if (!form) return;
+    if (ev.defaultPrevented) return;   // Bestätigung wurde abgelehnt
+    ev.preventDefault();
+    var mid = form.dataset.mid, gid = form.dataset.gid;
+    postForm(form.action, new URLSearchParams(new FormData(form)).toString())
+      .then(function(t) { applyResponse(parseDoc(t), gid, mid); })
+      .catch(function() { alert('Löschen fehlgeschlagen.'); });
+  });
+})();
 
 // ── Group Drag-and-Drop ──────────────────────────────────────────
 var grpDragEl = null, grpEditActive = false;

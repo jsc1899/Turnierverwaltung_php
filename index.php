@@ -130,6 +130,7 @@ $routes = [
     // Competitions
     ['GET|POST', '/tournament/{tid}/competition/new',        'competition', 'new_competition'],
     ['GET',      '/competition/{id}',                        'competition', 'show'],
+    ['GET',      '/competition/{id}/monitor',                 'competition', 'monitor'],
     ['GET|POST', '/competition/{id}/settings',               'competition', 'settings'],
     ['POST',     '/competition/{id}/delete',                 'competition', 'delete'],
     ['POST',     '/competition/{id}/player/add',             'competition', 'add_player'],
