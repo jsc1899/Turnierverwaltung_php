@@ -349,6 +349,10 @@ function init_db(): void {
         "ALTER TABLE grp ADD COLUMN pause_start VARCHAR(5) NOT NULL DEFAULT ''",
         "ALTER TABLE grp ADD COLUMN pause_duration INT NOT NULL DEFAULT 0",
         "ALTER TABLE competition ADD COLUMN match_card_mode VARCHAR(10) NOT NULL DEFAULT 'fields'",
+        "ALTER TABLE competition ADD COLUMN monitor_show_schedule TINYINT(1) NOT NULL DEFAULT 0",
+        "ALTER TABLE competition ADD COLUMN monitor_scroll_speed VARCHAR(8) NOT NULL DEFAULT 'medium'",
+        "ALTER TABLE competition ADD COLUMN monitor_scroll_mode VARCHAR(8) NOT NULL DEFAULT 'smooth'",
+        "ALTER TABLE competition ADD COLUMN monitor_block_pause INT NOT NULL DEFAULT 5",
     ];
     foreach ($migrations as $sql) {
         try { $pdo->exec($sql); } catch (\PDOException $e) { /* Spalte/Typ bereits korrekt */ }

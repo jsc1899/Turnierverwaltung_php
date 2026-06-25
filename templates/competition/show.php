@@ -161,8 +161,72 @@ ob_start(); ?>
     </button>
   </li>
   <?php endif; ?>
+  <?php if (can_edit()): ?>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tab-monitor-btn"
+            data-bs-toggle="tab" data-bs-target="#tab-monitor" type="button" role="tab">
+      <i class="bi bi-display me-1"></i>Monitor
+    </button>
+  </li>
+  <?php endif; ?>
 </ul>
 <div class="tab-content border border-top-0 rounded-bottom mb-4">
+
+  <?php if (can_edit()): ?>
+  <!-- Tab: Monitor -->
+  <div class="tab-pane fade p-3" id="tab-monitor" role="tabpanel">
+    <form method="post" action="<?= url('competition/'.$c['id'].'/monitor-settings') ?>" class="row g-3 align-items-end">
+      <?= csrf_field() ?>
+      <div class="col-12">
+        <a href="<?= url('competition/'.$c['id'].'/monitor') ?>" target="_blank" class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-display me-1"></i>Monitoransicht öffnen
+        </a>
+      </div>
+      <div class="col-auto d-flex align-items-end pb-1">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="monitor_show_schedule" id="monitor_show_schedule"
+                 <?= !empty($c['monitor_show_schedule']) ? 'checked' : '' ?>>
+          <label class="form-check-label" for="monitor_show_schedule">Spielplan in der Gruppenphase anzeigen</label>
+        </div>
+      </div>
+      <div class="col-auto">
+        <label class="form-label">Scrollgeschwindigkeit</label>
+        <select name="monitor_scroll_speed" class="form-select form-select-sm">
+          <option value="slow"  <?= ($c['monitor_scroll_speed'] ?? 'medium') === 'slow'   ? ' selected' : '' ?>>Langsam</option>
+          <option value="medium"<?= ($c['monitor_scroll_speed'] ?? 'medium') === 'medium' ? ' selected' : '' ?>>Mittel</option>
+          <option value="fast"  <?= ($c['monitor_scroll_speed'] ?? 'medium') === 'fast'   ? ' selected' : '' ?>>Schnell</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <label class="form-label">Scrollmodus</label>
+        <select name="monitor_scroll_mode" class="form-select form-select-sm" id="monitor_scroll_mode">
+          <option value="smooth"<?= ($c['monitor_scroll_mode'] ?? 'smooth') === 'smooth' ? ' selected' : '' ?>>Gleichmäßig</option>
+          <option value="block" <?= ($c['monitor_scroll_mode'] ?? 'smooth') === 'block'  ? ' selected' : '' ?>>Blockweise</option>
+        </select>
+      </div>
+      <div class="col-auto" id="field-block-pause"<?= ($c['monitor_scroll_mode'] ?? 'smooth') !== 'block' ? ' style="display:none"' : '' ?>>
+        <label class="form-label">Verweildauer je Block (Sek.)</label>
+        <input type="number" name="monitor_block_pause" class="form-control form-control-sm" style="width:120px"
+               min="1" max="120" value="<?= (int)($c['monitor_block_pause'] ?? 5) ?>">
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>Speichern</button>
+      </div>
+    </form>
+    <div class="form-text mt-2">
+      Beim <strong>blockweisen</strong> Scrollen wird nacheinander zu jedem Abschnitt (Endplatzierung,
+      Gruppen, KO-/Finalrunden-Bereiche) gescrollt und dort die eingestellte Zeit verweilt.
+    </div>
+    <script>
+    (function() {
+      var sel = document.getElementById('monitor_scroll_mode');
+      var fld = document.getElementById('field-block-pause');
+      if (!sel || !fld) return;
+      sel.addEventListener('change', function() { fld.style.display = this.value === 'block' ? '' : 'none'; });
+    })();
+    </script>
+  </div>
+  <?php endif; ?>
 
   <?php if ((can_edit() && !$locked)): ?>
   <!-- Tab: Einstellungen -->

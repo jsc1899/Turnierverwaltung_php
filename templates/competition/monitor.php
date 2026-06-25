@@ -10,6 +10,12 @@
 $phase_labels = ['setup'=>'Einrichtung','group'=>'Gruppenphase','ko'=>'KO-Phase','done'=>'Beendet'];
 $phase_colors = ['setup'=>'secondary','group'=>'warning','ko'=>'info','done'=>'success'];
 
+// Monitor-Einstellungen (Register „Monitor")
+$mon_show_schedule = !empty($c['monitor_show_schedule']);
+$mon_scroll_speed  = in_array($c['monitor_scroll_speed'] ?? 'medium', ['slow','medium','fast'], true) ? $c['monitor_scroll_speed'] : 'medium';
+$mon_scroll_mode   = ($c['monitor_scroll_mode'] ?? 'smooth') === 'block' ? 'block' : 'smooth';
+$mon_block_pause   = max(1, (int)($c['monitor_block_pause'] ?? 5));
+
 // Markierung der Aufstiegsplätze (analog show.php)
 $highlight_count = (int)($c['advance_count'] ?? 0);
 if (($c['mode'] ?? '') === 'groups_cross') {
@@ -60,6 +66,26 @@ $bracketBox = function(array $m, string $label = '', string $border = '#dee2e6')
          . $hdr
          . $row($m['p1name'] ?? '', (int)($m['player1_id'] ?? 0), $s1, $w === 1, true)
          . $row($m['p2name'] ?? '', (int)($m['player2_id'] ?? 0), $s2, $w === 2, false)
+         . '</div>';
+};
+
+// Spielplan-Begegnung mit farbigen Ergebnis-Kästchen (wie Webansicht):
+// Sieger grün, Verlierer rot, Unentschieden beide blau.
+$schedRow = function(array $m) use ($winner): string {
+    $w  = $winner($m);
+    $pl = !empty($m['played']);
+    $n1 = trim((string)($m['p1name'] ?? '')) !== '' ? e($m['p1name']) : '<span class="text-muted">—</span>';
+    $n2 = trim((string)($m['p2name'] ?? '')) !== '' ? e($m['p2name']) : '<span class="text-muted">—</span>';
+    $c1 = $pl ? ($w === 1 ? ' score-win' : ($w === 2 ? ' score-loss' : ' score-draw')) : '';
+    $c2 = $pl ? ($w === 2 ? ' score-win' : ($w === 1 ? ' score-loss' : ' score-draw')) : '';
+    $s1 = $pl ? (int)$m['score1'] : '';
+    $s2 = $pl ? (int)$m['score2'] : '';
+    return '<div class="mon-sched-row">'
+         . '<span class="nm nm1">' . $n1 . '</span>'
+         . '<span class="sbox' . $c1 . '">' . $s1 . '</span>'
+         . '<span class="sep">:</span>'
+         . '<span class="sbox' . $c2 . '">' . $s2 . '</span>'
+         . '<span class="nm nm2">' . $n2 . '</span>'
          . '</div>';
 };
 
@@ -149,6 +175,22 @@ $teilnehmer_kopf = $is_team ? 'Mannschaft' : ($is_doubles ? 'Doppel' : 'Spieler'
     .mon-ko-score { font-size:1rem; letter-spacing:.05em; }
     .mon-ko-lbl { grid-column:1 / -1; font-size:.8rem; color:#9aa5b1; }
     .mon-ko-block-title { font-size:1.2rem; font-weight:700; margin:.4rem 0; }
+    .mon-block { scroll-margin-top: 14px; }
+    /* Spielplan je Gruppe (optional) */
+    .mon-sched { padding:.45rem .8rem; border-top:1px solid #eef2f7; }
+    .mon-sched-round { text-align:center; font-weight:700; font-size:.92rem; color:#5a6573; border-top:1px solid #e6eaef; margin-top:.4rem; padding-top:.3rem; }
+    .mon-sched-round:first-child { border-top:0; margin-top:0; padding-top:0; }
+    .mon-sched-pause { text-align:center; font-weight:700; font-size:.85rem; color:#856404; background:#fff3cd; border-radius:.3rem; padding:.2rem; margin:.35rem 0; }
+    /* Begegnung mit farbigen Ergebnis-Kästchen (wie Webansicht) */
+    .mon-sched-row { display:grid; grid-template-columns:1fr 2.4rem .6rem 2.4rem 1fr; align-items:center; gap:.4rem; padding:.25rem 0; }
+    .mon-sched-row .nm { font-size:1.02rem; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .mon-sched-row .nm1 { text-align:right; }
+    .mon-sched-row .sep { text-align:center; color:#9aa5b1; }
+    .mon-sched-row .sbox { display:inline-flex; align-items:center; justify-content:center; min-height:30px; font-weight:700;
+                           border:1px solid #ced4da; border-radius:.25rem; background:#fff; }
+    .mon-sched-row .score-win  { background:#d1e7dd; border-color:#a3cfbb; }
+    .mon-sched-row .score-loss { background:#f8d7da; border-color:#e9a3ac; }
+    .mon-sched-row .score-draw { background:#cfe2ff; border-color:#9ec5fe; }
   </style>
 </head>
 <body>
@@ -166,6 +208,7 @@ $teilnehmer_kopf = $is_team ? 'Mannschaft' : ($is_doubles ? 'Doppel' : 'Spieler'
   </div>
 
   <?php if (!empty($places) && !empty($comp_complete)): ?>
+  <div class="mon-block">
   <div class="mon-section-title"><i class="bi bi-trophy-fill text-warning"></i>Endplatzierung</div>
   <div class="mon-podium">
     <?php foreach ($places as $pl): if ((int)$pl['rank'] > 4) continue; ?>
@@ -184,13 +227,14 @@ $teilnehmer_kopf = $is_team ? 'Mannschaft' : ($is_doubles ? 'Doppel' : 'Spieler'
     <?php endforeach; ?>
   </div>
   <?php endif; ?>
+  </div>
   <?php endif; ?>
 
   <?php if (!empty($groups) && !$has_ko): // nur aktuelle Stage: Gruppen ausblenden, sobald Finalrunde läuft ?>
   <div class="mon-section-title"><i class="bi bi-table"></i>Gruppen</div>
   <div class="grp-grid">
     <?php foreach ($groups as $gi): $g = $gi['group']; $standings = $gi['standings']; ?>
-    <div class="grp-card">
+    <div class="grp-card mon-block">
       <div class="hd"><?= e($g['name']) ?></div>
       <table class="mon-tbl">
         <thead>
@@ -217,6 +261,30 @@ $teilnehmer_kopf = $is_team ? 'Mannschaft' : ($is_doubles ? 'Doppel' : 'Spieler'
           <?php endforeach; ?>
         </tbody>
       </table>
+      <?php if ($mon_show_schedule && !empty($gi['matches'])): ?>
+      <div class="mon-sched">
+        <?php
+          $sched_prev = null;
+          $grp_pause  = group_pause_window($c, $g);
+          foreach ($gi['matches'] as $m):
+            if (empty($m['player1_id']) || empty($m['player2_id'])) continue;
+            $cur_round = (int)($m['round_no'] ?? 0);
+            if ($cur_round !== $sched_prev) {
+                // Pause zwischen den Runden (wie Webansicht)
+                if ($grp_pause && $sched_prev !== null && $sched_prev <= $grp_pause['after_round'] && $cur_round > $grp_pause['after_round']) {
+                    echo '<div class="mon-sched-pause">Pause &middot; ' . e($grp_pause['start']) . ' &ndash; ' . e($grp_pause['end']) . ' Uhr</div>';
+                }
+                if ($cur_round > 0) {
+                    $rt = group_round_time($c, $g, $cur_round);
+                    echo '<div class="mon-sched-round">Runde ' . $cur_round . ($rt !== '' ? ' &middot; ' . $rt . ' Uhr' : '') . '</div>';
+                }
+                $sched_prev = $cur_round;
+            }
+            echo $schedRow($m);
+          endforeach;
+        ?>
+      </div>
+      <?php endif; ?>
     </div>
     <?php endforeach; ?>
   </div>
@@ -227,6 +295,7 @@ $teilnehmer_kopf = $is_team ? 'Mannschaft' : ($is_doubles ? 'Doppel' : 'Spieler'
 
   <?php if (!empty($cross_blocks)): // groups_cross ?>
   <?php foreach ($cross_blocks as $blk): ?>
+  <div class="mon-block">
   <div class="mon-ko-block-title"><?= e($blk['label']) ?></div>
   <div class="mon-ko-cols">
     <?php foreach ($blk['rounds'] as $ri => $rd): ?>
@@ -238,25 +307,33 @@ $teilnehmer_kopf = $is_team ? 'Mannschaft' : ($is_doubles ? 'Doppel' : 'Spieler'
     </div>
     <?php endforeach; ?>
   </div>
+  </div>
   <?php endforeach; ?>
 
   <?php elseif (!empty($dko_wb) || !empty($dko_gf)): // double_ko — Turnierbäume (Winners/Losers/Finale) ?>
   <?php $dko_num = 0; ?>
   <?php if (!empty($dko_wb)): ?>
-  <div class="mon-ko-block-title"><i class="bi bi-trophy-fill text-warning"></i> Winners Bracket</div>
-  <?= $renderTree($dko_wb, 'mon-dko-wb-bracket', 'mon-dko-wb-svg', 'ko-round', true, $dko_num) ?>
+  <div class="mon-block">
+    <div class="mon-ko-block-title"><i class="bi bi-trophy-fill text-warning"></i> Winners Bracket</div>
+    <?= $renderTree($dko_wb, 'mon-dko-wb-bracket', 'mon-dko-wb-svg', 'ko-round', true, $dko_num) ?>
+  </div>
   <?php endif; ?>
   <?php if (!empty($dko_lb)): ?>
-  <div class="mon-ko-block-title"><i class="bi bi-arrow-down-circle text-danger"></i> Losers Bracket</div>
-  <?= $renderTree($dko_lb, 'mon-dko-lb-bracket', 'mon-dko-lb-svg', 'lb-round', false, $dko_num) ?>
+  <div class="mon-block">
+    <div class="mon-ko-block-title"><i class="bi bi-arrow-down-circle text-danger"></i> Losers Bracket</div>
+    <?= $renderTree($dko_lb, 'mon-dko-lb-bracket', 'mon-dko-lb-svg', 'lb-round', false, $dko_num) ?>
+  </div>
   <?php endif; ?>
   <?php if (!empty($dko_gf)): ?>
-  <div class="mon-ko-block-title"><i class="bi bi-star-fill text-warning"></i> Großes Finale</div>
-  <div style="max-width:520px"><?= $bracketBox($dko_gf, '', '#0d6efd') ?></div>
+  <div class="mon-block">
+    <div class="mon-ko-block-title"><i class="bi bi-star-fill text-warning"></i> Großes Finale</div>
+    <div style="max-width:520px"><?= $bracketBox($dko_gf, '', '#0d6efd') ?></div>
+  </div>
   <?php endif; ?>
 
   <?php else: // groups_ko / ko_only — Turnierbaum mit Kästchen + Verbindungslinien ?>
   <?php $ko_num = 0; ?>
+  <div class="mon-block">
   <?= $renderTree($ko_rounds, 'mon-ko-bracket', 'mon-ko-svg', 'ko-round', true, $ko_num) ?>
   <?php if (!empty($third_place_match)): ?>
   <!-- Spiel um Platz 3 (unter dem Finale ausgerichtet) -->
@@ -268,6 +345,7 @@ $teilnehmer_kopf = $is_team ? 'Mannschaft' : ($is_doubles ? 'Doppel' : 'Spieler'
     </div>
   </div>
   <?php endif; ?>
+  </div>
   <?php endif; ?>
   <?php endif; ?>
 
@@ -355,11 +433,17 @@ $teilnehmer_kopf = $is_team ? 'Mannschaft' : ($is_doubles ? 'Doppel' : 'Spieler'
   document.addEventListener('DOMContentLoaded', function(){ setTimeout(drawAll, 50); });
 })();
 
-// Auto-Scroll (langsam auf/ab) + Auto-Reload alle 60 s.
+// Auto-Scroll (gleichmäßig oder blockweise) + Auto-Reload nach abgeschlossenem Zyklus.
 (function() {
-  var PERIOD = 60000;     // ms bis Reload
-  var SPEED  = 32;        // px/s Scrollgeschwindigkeit
-  var PAUSE  = 2500;      // ms Pause an den Rändern
+  var cfg = {
+    mode:  <?= json_encode($mon_scroll_mode) ?>,
+    speed: <?= json_encode($mon_scroll_speed) ?>,
+    pause: <?= (int)$mon_block_pause ?>
+  };
+  var SPEED_MAP = { slow: 14, medium: 28, fast: 52 }; // px/s
+  var SPEED  = SPEED_MAP[cfg.speed] || 28;
+  var PERIOD = 60000;     // ms: frühestens nach so langer Zeit neu laden (am Zyklusende)
+  var EDGE_PAUSE = 2500;  // ms Pause an den Rändern (gleichmäßiger Modus)
   var loaded = Date.now();
   function maxScroll() { return Math.max(0, document.documentElement.scrollHeight - window.innerHeight); }
   function reloadNow() { location.reload(); }
@@ -369,31 +453,64 @@ $teilnehmer_kopf = $is_team ? 'Mannschaft' : ($is_doubles ? 'Doppel' : 'Spieler'
 
   if (maxScroll() <= 4) { setTimeout(reloadNow, PERIOD); return; }
 
-  var pos = 0, phase = 'pauseTop', phaseStart = performance.now(), last = performance.now();
-  function step(now) {
-    var dt = now - last; last = now;
+  // ── Blockweise: zu jedem Abschnitt scrollen und dort verweilen ──────────────
+  var blocks = Array.prototype.slice.call(document.querySelectorAll('.mon-block'));
+  if (cfg.mode === 'block' && blocks.length) {
+    var DWELL = Math.max(1, cfg.pause) * 1000;
+    var idx = 0, phase = 'to', pos = window.scrollY || 0, last = performance.now(), dwellStart = 0;
+    function targetFor(i) { return Math.min(maxScroll(), Math.max(0, blocks[i].offsetTop - 14)); }
+    var target = targetFor(0);
+    function step(now) {
+      var dt = now - last; last = now;
+      if (phase === 'to') {
+        var dir = target > pos ? 1 : -1;
+        pos += dir * SPEED * dt / 1000;
+        if ((dir > 0 && pos >= target) || (dir < 0 && pos <= target)) {
+          pos = target; phase = 'dwell'; dwellStart = now;
+        }
+        window.scrollTo(0, pos);
+      } else if (phase === 'dwell') {
+        if (now - dwellStart >= DWELL) {
+          idx++;
+          if (idx >= blocks.length) {
+            if (Date.now() - loaded >= PERIOD) { reloadNow(); return; }
+            idx = 0;
+          }
+          target = targetFor(idx); phase = 'to';
+        }
+      }
+      requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+    return;
+  }
+
+  // ── Gleichmäßig: langsam runter, kurze Pause, wieder hoch ───────────────────
+  var pos = 0, sphase = 'pauseTop', phaseStart = performance.now(), slast = performance.now();
+  function sstep(now) {
+    var dt = now - slast; slast = now;
     var max = maxScroll();
-    if (phase === 'pauseTop') {
-      if (now - phaseStart >= PAUSE) phase = 'down';
-    } else if (phase === 'down') {
+    if (sphase === 'pauseTop') {
+      if (now - phaseStart >= EDGE_PAUSE) sphase = 'down';
+    } else if (sphase === 'down') {
       pos += SPEED * dt / 1000;
-      if (pos >= max) { pos = max; phase = 'pauseBottom'; phaseStart = now; }
+      if (pos >= max) { pos = max; sphase = 'pauseBottom'; phaseStart = now; }
       window.scrollTo(0, pos);
-    } else if (phase === 'pauseBottom') {
-      if (now - phaseStart >= PAUSE) phase = 'up';
-    } else if (phase === 'up') {
+    } else if (sphase === 'pauseBottom') {
+      if (now - phaseStart >= EDGE_PAUSE) sphase = 'up';
+    } else if (sphase === 'up') {
       pos -= SPEED * dt / 1000;
       if (pos <= 0) {
         pos = 0; window.scrollTo(0, 0);
         if (Date.now() - loaded >= PERIOD) { reloadNow(); return; }
-        phase = 'pauseTop'; phaseStart = now;
+        sphase = 'pauseTop'; phaseStart = now;
       } else {
         window.scrollTo(0, pos);
       }
     }
-    requestAnimationFrame(step);
+    requestAnimationFrame(sstep);
   }
-  requestAnimationFrame(step);
+  requestAnimationFrame(sstep);
 })();
 </script>
 </body>

@@ -737,6 +737,23 @@ function monitor(array $p): void {
     ] + $data);
 }
 
+// Einstellungen der Monitoransicht speichern (eigenes Register „Monitor").
+function monitor_settings(array $p): void {
+    require_edit();
+    csrf_verify();
+    $cid = (int)$p['id'];
+    $show_schedule = post('monitor_show_schedule') ? 1 : 0;
+    $speed = in_array(post('monitor_scroll_speed'), ['slow', 'medium', 'fast'], true) ? post('monitor_scroll_speed') : 'medium';
+    $mode  = post('monitor_scroll_mode') === 'block' ? 'block' : 'smooth';
+    $pause = max(1, min(120, (int)post('monitor_block_pause', 5)));
+    db_execute(
+        "UPDATE competition SET monitor_show_schedule=?, monitor_scroll_speed=?, monitor_scroll_mode=?, monitor_block_pause=? WHERE id=?",
+        [$show_schedule, $speed, $mode, $pause, $cid]
+    );
+    flash('success', 'Monitor-Einstellungen gespeichert.');
+    redirect('competition/' . $cid . '#tab-monitor');
+}
+
 function settings(array $p): void {
     require_edit();
     csrf_verify();
