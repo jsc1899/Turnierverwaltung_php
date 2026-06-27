@@ -32,6 +32,7 @@ ob_start(); ?>
 <!-- Header -->
 <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
   <h2 class="mb-0"><i class="bi bi-diagram-3 me-2"></i><?= e($c['name']) ?></h2>
+  <?php if (can_edit()): ?>
   <span class="badge fs-6 <?= $phase_colors[$c['phase']] ?? 'bg-secondary' ?>">
     <?= $phase_labels[$c['phase']] ?? e($c['phase']) ?>
   </span>
@@ -43,6 +44,7 @@ ob_start(); ?>
   <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle fs-6">
     <i class="bi bi-lock"></i> geschlossen
   </span>
+  <?php endif; ?>
   <?php endif; ?>
 
   <?php if (can_edit()): ?>
@@ -140,6 +142,7 @@ ob_start(); ?>
       <i class="bi bi-diagram-3 me-1"></i>Bewerb
     </button>
   </li>
+  <?php if (can_edit()): ?>
   <li class="nav-item" role="presentation">
     <button class="nav-link" id="tab-players-btn"
             data-bs-toggle="tab" data-bs-target="#tab-players" type="button" role="tab">
@@ -153,6 +156,7 @@ ob_start(); ?>
       <?php if ($c['max_players']): ?><span class="text-muted small">/ <?= (int)$c['max_players'] ?></span><?php endif; ?>
     </button>
   </li>
+  <?php endif; ?>
   <?php if ((can_edit() && !$locked)): ?>
   <li class="nav-item" role="presentation">
     <button class="nav-link" id="tab-settings-btn"
@@ -993,6 +997,7 @@ ob_start(); ?>
 <?php if ($groups): ?>
     <!-- Export-Links -->
     <div class="d-flex gap-2 mb-3">
+      <?php if (can_edit()): ?>
       <a href="<?= url('competition/'.$c['id'].'/pdf/groups') ?>" class="btn btn-outline-danger btn-sm" target="_blank">
         <i class="bi bi-file-earmark-pdf me-1"></i>Gruppen PDF
       </a>
@@ -1008,6 +1013,7 @@ ob_start(); ?>
       <a href="<?= url('competition/'.$c['id'].'/pdf/court-plans') ?>" class="btn btn-outline-secondary btn-sm" target="_blank">
         <i class="bi bi-geo-alt me-1"></i><?= e($court_sg) ?>pläne
       </a>
+      <?php endif; ?>
       <?php endif; ?>
       <?php if ($is_team && (int)($c['team_size'] ?? 0) > 1 && ($c['team_result_mode'] ?? 'wins') !== 'total'): ?>
       <button type="button" class="btn btn-outline-secondary btn-sm ms-auto toggle-duels-btn" onclick="toggleAllDuels()">
@@ -1073,6 +1079,7 @@ ob_start(); ?>
     <div class="card shadow-sm mb-4" id="grp-<?= (int)$g['id'] ?>" style="scroll-margin-top:1rem">
       <div class="card-header fw-semibold d-flex align-items-center">
         <span><i class="bi bi-people me-1"></i><?= e($g['name']) ?></span>
+        <?php if (can_edit()): ?>
         <span class="ms-auto btn-group btn-group-sm">
           <a href="<?= url('competition/'.$c['id'].'/pdf/groups/'.$g['id']) ?>" class="btn btn-outline-danger" target="_blank" title="Gruppen-PDF dieser Gruppe">
             <i class="bi bi-file-earmark-pdf"></i>
@@ -1091,6 +1098,7 @@ ob_start(); ?>
           </a>
           <?php endif; ?>
         </span>
+        <?php endif; ?>
       </div>
       <div class="card-body p-0">
         <div class="grp-normal-view">
@@ -1245,7 +1253,8 @@ ob_start(); ?>
             $has_p2 = $is_team ? !empty($m['team2_id']) : !empty($m['player2_id']);
             if (!$has_p1 || !$has_p2) continue;
             // Spielplatz kompakt links neben der Begegnungszeile (gleiche Zeile wie Teams/Felder).
-            $court_pre = !empty($m['court_no'])
+            // Nur für admin/editor – für Gäste/Reader ausgeblendet.
+            $court_pre = (!empty($m['court_no']) && can_edit())
               ? '<span class="badge bg-light text-secondary border flex-shrink-0" style="white-space:nowrap;margin-top:3px"><i class="bi bi-geo-alt"></i> ' . e($court_sg) . ' ' . (int)$m['court_no'] . '</span>'
               : '';
           ?>
@@ -1422,8 +1431,7 @@ ob_start(); ?>
                 else                  { $cls1 = ' score-draw'; $cls2 = ' score-draw'; }
             }
           ?>
-          <div class="mb-2" style="display:grid;grid-template-columns:64px 1fr 56px 1.2rem 56px 1fr 64px;align-items:center;column-gap:4px">
-            <div></div>
+          <div class="mb-2" style="display:grid;grid-template-columns:1fr 56px 1.2rem 56px 1fr 64px;align-items:center;column-gap:4px">
             <span class="text-end small text-truncate"><?= e($m['p1name']) ?></span>
             <input type="number" name="matches[<?= $m['id'] ?>][score1]" min="0"
                    form="grp-form-<?= $g['id'] ?>"<?= $m['played'] ? ' readonly' : '' ?>
@@ -1467,14 +1475,12 @@ ob_start(); ?>
                 else                  { $cls1 = ' score-draw'; $cls2 = ' score-draw'; }
             }
           ?>
-          <div class="mb-2" style="display:grid;grid-template-columns:64px 1fr 56px 1.2rem 56px 1fr 64px;align-items:center;column-gap:4px">
-            <div></div>
+          <div class="mb-2" style="display:grid;grid-template-columns:1fr 56px 1.2rem 56px 1fr;align-items:center;column-gap:4px">
             <span class="text-end small text-truncate"><?= e($m['p1name']) ?></span>
             <span class="score-box<?= $cls1 ?>"><?= $m['played'] ? (int)$m['score1'] : '' ?></span>
             <span class="text-center">:</span>
             <span class="score-box<?= $cls2 ?>"><?= $m['played'] ? (int)$m['score2'] : '' ?></span>
             <span class="small text-truncate"><?= e($m['p2name']) ?></span>
-            <div></div>
           </div>
           <?php endif; ?>
           <?php endif; ?>
@@ -1512,6 +1518,7 @@ ob_start(); ?>
     <?php if ($ko_rounds || $third_place_match): ?>
     <!-- KO-Phase -->
     <div class="d-flex gap-2 align-items-center mb-3">
+      <?php if (can_edit()): ?>
       <a href="<?= url('competition/'.$c['id'].'/pdf/ko') ?>" class="btn btn-outline-danger btn-sm" target="_blank">
         <i class="bi bi-file-earmark-pdf me-1"></i>KO PDF
       </a>
@@ -1527,6 +1534,7 @@ ob_start(); ?>
       <a href="<?= url('competition/'.$c['id'].'/pdf/court-plans') ?>" class="btn btn-outline-secondary btn-sm" target="_blank">
         <i class="bi bi-geo-alt me-1"></i><?= e($court_sg) ?>pläne
       </a>
+      <?php endif; ?>
       <?php endif; ?>
       <?php if ($is_team && (int)($c['team_size'] ?? 0) > 1 && ($c['team_result_mode'] ?? 'wins') !== 'total'): ?>
       <button type="button" class="btn btn-outline-secondary btn-sm ms-auto toggle-duels-btn" onclick="toggleAllDuels()">
@@ -1591,7 +1599,7 @@ ob_start(); ?>
         <div class="ko-round" style="display:flex;flex-direction:column;justify-content:space-around;width:<?= $ko_col_w ?>px;flex-shrink:0;height:100%;padding:0 8px">
           <?php foreach ($round['matches'] as $m): $ko_match_num++; ?>
           <div class="ko-match" style="border:1px solid #dee2e6;border-radius:6px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.07);overflow:<?= ($ko_use_duels || $ko_use_sets) ? 'visible' : 'hidden' ?>">
-            <div style="font-size:.65rem;color:#9e9e9e;padding:1px 6px;border-bottom:1px solid #f5f5f5;background:#fafafa">Spiel <?= $ko_match_num ?><?php if (!empty($m['court_no'])): ?> · <?= e($court_sg) ?> <?= (int)$m['court_no'] ?><?php endif; ?></div>
+            <div style="font-size:.65rem;color:#9e9e9e;padding:1px 6px;border-bottom:1px solid #f5f5f5;background:#fafafa">Spiel <?= $ko_match_num ?><?php if (!empty($m['court_no']) && can_edit()): ?> · <?= e($court_sg) ?> <?= (int)$m['court_no'] ?><?php endif; ?></div>
             <!-- Spieler 1 -->
             <?php $isFirstRound = ($ri === 0); ?>
             <div class="d-flex align-items-center gap-1 px-2 <?= ($m['played'] && $m['score1'] > $m['score2']) ? 'bg-success-subtle fw-semibold' : '' ?>"
@@ -1860,7 +1868,7 @@ ob_start(); ?>
           </div>
           <?php foreach ($third_place_match['matches'] as $m): ?>
           <div class="ko-match" style="border:1px solid #ffc107;border-radius:6px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.07);overflow:<?= $ko_use_sets ? 'visible' : 'hidden' ?>">
-            <?php if (!empty($m['court_no'])): ?>
+            <?php if (!empty($m['court_no']) && can_edit()): ?>
             <div style="font-size:.65rem;color:#9e9e9e;padding:1px 6px;border-bottom:1px solid #f5f5f5;background:#fafafa"><?= e($court_sg) ?> <?= (int)$m['court_no'] ?></div>
             <?php endif; ?>
             <div class="d-flex align-items-center gap-1 px-2 <?= ($m['played'] && $m['score1'] > $m['score2']) ? 'bg-success-subtle fw-semibold' : '' ?>"
@@ -1966,6 +1974,7 @@ ob_start(); ?>
     <?php if ($cross_blocks): ?>
     <!-- ═══ Kreuzspiele / Platzierungs-Brackets ═════════════════════════════════ -->
     <div class="d-flex gap-2 mb-3 align-items-center">
+      <?php if (can_edit()): ?>
       <a href="<?= url('competition/'.$c['id'].'/pdf/cross') ?>" class="btn btn-outline-danger btn-sm" target="_blank">
         <i class="bi bi-file-earmark-pdf me-1"></i>Platzierungs-PDF
       </a>
@@ -1981,6 +1990,7 @@ ob_start(); ?>
       <a href="<?= url('competition/'.$c['id'].'/pdf/court-plans') ?>" class="btn btn-outline-secondary btn-sm" target="_blank">
         <i class="bi bi-geo-alt me-1"></i><?= e($court_sg) ?>pläne
       </a>
+      <?php endif; ?>
       <?php endif; ?>
     </div>
     <?php $cross_editable = (can_edit() && !$locked); ?>
@@ -2000,7 +2010,7 @@ ob_start(); ?>
               if (!$has1 && !$has2) continue; ?>
             <div class="ko-match" style="border:1px solid #dee2e6;border-radius:6px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.06)">
               <div style="font-size:.62rem;color:#9e9e9e;padding:1px 6px;border-bottom:1px solid #f5f5f5;background:#fafafa">
-                <?= e($m['place_label']) ?><?php if (!empty($m['court_no'])): ?> · <?= e($court_sg) ?> <?= (int)$m['court_no'] ?><?php endif; ?>
+                <?= e($m['place_label']) ?><?php if (!empty($m['court_no']) && can_edit()): ?> · <?= e($court_sg) ?> <?= (int)$m['court_no'] ?><?php endif; ?>
               </div>
               <div class="d-flex align-items-center gap-1 px-2 <?= ($m['played'] && $m['score1'] > $m['score2']) ? 'bg-success-subtle fw-semibold' : '' ?>"
                    style="min-height:30px;border-bottom:1px solid #f0f0f0">
@@ -2044,6 +2054,7 @@ echo in_array($c['phase'], ['ko', 'done'], true) ? $__ko_html . $__groups_html :
 
 <?php if ($c['mode'] === 'double_ko' && ($dko_wb || $dko_lb || $dko_gf)): ?>
 <!-- ═══ Doppel-KO-Bracket ════════════════════════════════════════════════════ -->
+<?php if (can_edit()): ?>
 <div class="d-flex gap-2 align-items-center mb-3">
   <a href="<?= url('competition/'.$c['id'].'/pdf/ko') ?>" class="btn btn-outline-danger btn-sm" target="_blank">
     <i class="bi bi-file-earmark-pdf me-1"></i>KO PDF
@@ -2062,6 +2073,7 @@ echo in_array($c['phase'], ['ko', 'done'], true) ? $__ko_html . $__groups_html :
   </a>
   <?php endif; ?>
 </div>
+<?php endif; ?>
 <?php $wb_num_map = []; // wird im WB-Block befüllt; hier vorbelegen für LB-Block
 
 // Helper: render one DKO match card
@@ -2075,7 +2087,7 @@ function _dko_match_card(array $m, string $form_id, bool $editable, ?int $match_
     $o = '<div class="ko-match" style="border:1px solid #dee2e6;border-radius:6px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.07);overflow:hidden;min-width:' . $min_w . 'px">';
     $hdr = [];
     if ($match_num !== null) $hdr[] = 'Spiel ' . $match_num;
-    if (!empty($m['court_no'])) $hdr[] = $court_sg . ' ' . (int)$m['court_no'];
+    if (!empty($m['court_no']) && can_edit()) $hdr[] = $court_sg . ' ' . (int)$m['court_no'];
     if ($hdr) {
         $o .= '<div style="font-size:.65rem;color:#9e9e9e;padding:1px 6px;border-bottom:1px solid #f5f5f5;background:#fafafa">' . implode(' · ', $hdr) . '</div>';
     }
