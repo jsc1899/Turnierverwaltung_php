@@ -137,10 +137,35 @@
     }
     document.addEventListener('shown.bs.tab', function(e) {
       if (e.target.closest('.modal')) return;
+      if (e.target.closest('.no-hash')) return;   // z.B. Gruppen-Tabs nicht in die URL schreiben
       var t = e.target.getAttribute('data-bs-target');
       if (t) history.replaceState(null, '', t);
     });
   });
+})();
+// Scroll-Position über „echte" Reloads (Formular-Submits, die neu laden) bewahren, damit
+// die Seite nach dem Speichern nicht nach oben springt. js-ajax-Formulare laden ohnehin
+// nicht neu und werden übersprungen.
+(function() {
+  document.addEventListener('submit', function(e) {
+    var f = e.target;
+    // js-ajax & inline-Ergebnis-Formulare laden nicht neu → kein Scroll-Merken nötig
+    if (!f || !f.classList || f.classList.contains('js-ajax') || f.classList.contains('js-inline-clear') || f.classList.contains('js-bracket-clear')) return;
+    if (e.defaultPrevented) return;   // z.B. data-confirm abgelehnt
+    try {
+      sessionStorage.setItem('scrollRestore', JSON.stringify({
+        p: location.pathname, y: window.scrollY || window.pageYOffset || 0, t: Date.now()
+      }));
+    } catch (_) {}
+  });
+  function restore() {
+    var raw; try { raw = sessionStorage.getItem('scrollRestore'); sessionStorage.removeItem('scrollRestore'); } catch (_) { return; }
+    if (!raw) return;
+    var d; try { d = JSON.parse(raw); } catch (_) { return; }
+    if (!d || d.p !== location.pathname || (Date.now() - d.t) > 15000 || !d.y) return;
+    window.scrollTo(0, d.y);
+  }
+  window.addEventListener('load', function() { setTimeout(restore, 0); });
 })();
 (function() {
   function cellVal(row, idx) {
