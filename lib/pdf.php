@@ -173,24 +173,26 @@ function generate_competition_aushang_pdf(int $cid): void {
             $team_rows = db_fetchall(
                 "SELECT t.name, t.captain FROM group_team gt JOIN `team` t ON t.id=gt.team_id
                  WHERE gt.group_id=? ORDER BY t.name", [$gid]);
+            // Teamname fett, Kapitän (falls vorhanden) in Klammern normal. members enthält
+            // fertiges, bereits escaptes HTML (Render unten ohne erneutes e()).
             $g['members'] = array_map(function ($r) {
-                $name = (string)$r['name'];
+                $html = '<strong>' . e((string)$r['name']) . '</strong>';
                 $cap  = trim((string)($r['captain'] ?? ''));
-                return $cap !== '' ? $name . ' (' . $cap . ')' : $name;
+                return $cap !== '' ? $html . ' (' . e($cap) . ')' : $html;
             }, $team_rows);
         } elseif ($is_doubles) {
-            $g['members'] = array_column(db_fetchall(
+            $g['members'] = array_map(fn($n) => e($n), array_column(db_fetchall(
                 "SELECT TRIM(CONCAT(
                     COALESCE(p1.firstname,''), IF(COALESCE(p1.firstname,'')!='',' ',''), p1.name, ' / ',
                     COALESCE(p2.firstname,''), IF(COALESCE(p2.firstname,'')!='',' ',''), p2.name)) AS name
                  FROM group_double gd JOIN `double` dd ON dd.id=gd.double_id
                  LEFT JOIN player p1 ON p1.id=dd.player1_id LEFT JOIN player p2 ON p2.id=dd.player2_id
-                 WHERE gd.group_id=? ORDER BY name", [$gid]), 'name');
+                 WHERE gd.group_id=? ORDER BY name", [$gid]), 'name'));
         } else {
-            $g['members'] = array_column(db_fetchall(
+            $g['members'] = array_map(fn($n) => e($n), array_column(db_fetchall(
                 "SELECT TRIM(CONCAT(p.name, IF(COALESCE(p.firstname,'')!='', CONCAT(' ', p.firstname), ''))) AS name
                  FROM group_player gp JOIN player p ON p.id=gp.player_id
-                 WHERE gp.group_id=? ORDER BY p.name, p.firstname", [$gid]), 'name');
+                 WHERE gp.group_id=? ORDER BY p.name, p.firstname", [$gid]), 'name'));
         }
         $total += count($g['members']);
     }
@@ -273,7 +275,7 @@ function generate_competition_aushang_pdf(int $cid): void {
                     $html .= '<div class="grp-name">' . e($g['name'])
                            . ' <span class="grp-cnt">(' . count($g['members']) . ')</span></div>';
                     if ($g['members']) {
-                        $html .= '<div class="grp-list">' . implode('<br>', array_map('e', $g['members'])) . '</div>';
+                        $html .= '<div class="grp-list">' . implode('<br>', $g['members']) . '</div>';
                     } else {
                         $html .= '<div style="color:#6b7280;font-size:9pt">— noch keine Teilnehmer —</div>';
                     }

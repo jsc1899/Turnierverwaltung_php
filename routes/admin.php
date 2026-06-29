@@ -96,7 +96,7 @@ function save_design(array $p): void {
     require_admin();
     csrf_verify();
     $theme   = $_POST['theme'] ?? 'default';
-    $allowed = ['default', 'dunkel', 'elegant', 'modern', 'klassisch'];
+    $allowed = ['default', 'dunkel', 'elegant', 'modern', 'klassisch', 'sport'];
     if (in_array($theme, $allowed, true)) {
         set_setting('theme', $theme);
         flash('success', 'Design gespeichert.');

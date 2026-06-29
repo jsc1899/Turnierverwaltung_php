@@ -479,6 +479,12 @@ ob_start(); ?>
         <input type="number" name="num_courts" class="form-control form-control-sm" style="width:90px"
                value="<?= (int)($c['num_courts'] ?? 0) ?>" min="0" max="20">
       </div>
+      <div class="col-auto">
+        <label class="form-label">ab Nr. <span class="text-muted small">(Start)</span></label>
+        <input type="number" name="court_start" class="form-control form-control-sm" style="width:90px"
+               value="<?= (int)($c['court_start'] ?? 1) ?>" min="1" max="200"
+               title="Ab welcher <?= e($court_sg) ?>-Nummer gezählt wird (Standard 1).">
+      </div>
       <div class="col-auto d-flex align-items-end pb-1">
         <div class="form-check">
           <input class="form-check-input" type="checkbox" name="schedule_enabled" id="schedule_enabled"
@@ -524,11 +530,15 @@ ob_start(); ?>
         <button class="btn btn-primary btn-sm">Speichern</button>
       </div>
     </form>
-    <?php if ((int)($c['num_courts'] ?? 0) > 0 && !empty($groups)): ?>
+    <?php if ((int)($c['num_courts'] ?? 0) > 0 && !empty($groups)):
+      $cstart = max(1, (int)($c['court_start'] ?? 1));
+      $chi    = $cstart + (int)$c['num_courts'] - 1;
+      $cex    = $cstart . ',' . ($cstart + 1);
+    ?>
     <div class="card shadow-sm mt-3">
       <div class="card-header fw-semibold py-2">
         <i class="bi bi-geo-alt me-1"></i><?= e($court_pl) ?> pro Gruppe
-        <span class="text-muted small fw-normal">(<?= (int)$c['num_courts'] ?> <?= e($court_pl) ?> · z.B. „1,2")</span>
+        <span class="text-muted small fw-normal">(Nr. <?= $cstart ?>–<?= $chi ?> · z.B. „<?= e($cex) ?>")</span>
       </div>
       <div class="card-body py-2">
         <form method="post" action="<?= url('competition/'.$c['id'].'/courts') ?>" class="row g-2 align-items-end">
@@ -537,7 +547,7 @@ ob_start(); ?>
           <div class="col-auto">
             <label class="form-label small mb-0"><?= e($g2['name']) ?></label>
             <input type="text" name="courts[<?= (int)$g2['id'] ?>]" class="form-control form-control-sm" style="width:110px"
-                   value="<?= e($g2['courts'] ?? '') ?>" placeholder="z.B. 1,2">
+                   value="<?= e($g2['courts'] ?? '') ?>" placeholder="z.B. <?= e($cex) ?>">
           </div>
           <?php endforeach; ?>
           <div class="col-auto">

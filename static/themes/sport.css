@@ -1,0 +1,115 @@
+/* ── Sportlich-Theme: Grün/Gold (angelehnt an Turnier-Eventseite) ───────────── */
+
+:root {
+  --bs-primary: #1A7D3C;
+  --bs-primary-rgb: 26, 125, 60;
+  --bs-link-color: #13632F;
+  --bs-link-color-rgb: 19, 99, 47;
+  --bs-link-hover-color: #0d4a23;
+  --bs-warning: #F2B400;
+  --bs-warning-rgb: 242, 180, 0;
+}
+
+body {
+  background: #F6F7F4 !important;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
+  color: #16181a;
+}
+
+/* Kräftige Display-Überschriften (Anton) für die großen Titel + Marke */
+h1, h2, .navbar-brand {
+  font-family: 'Anton', 'Montserrat', sans-serif;
+  font-weight: 400;
+  letter-spacing: .5px;
+  color: #13632F;
+}
+.navbar-brand { font-size: 1.5rem; letter-spacing: 1px; color: #fff !important; }
+
+/* Navbar – dunkelgrün */
+.navbar.bg-primary {
+  background: #13632F !important;
+  box-shadow: 0 2px 14px rgba(13, 74, 35, .35);
+}
+
+/* Buttons */
+.btn-primary {
+  --bs-btn-bg: #1A7D3C;
+  --bs-btn-border-color: #1A7D3C;
+  --bs-btn-hover-bg: #13632F;
+  --bs-btn-hover-border-color: #13632F;
+  --bs-btn-active-bg: #0d4a23;
+  --bs-btn-active-border-color: #0d4a23;
+}
+.btn-outline-primary {
+  --bs-btn-color: #13632F;
+  --bs-btn-border-color: #1A7D3C;
+  --bs-btn-hover-bg: #1A7D3C;
+  --bs-btn-hover-border-color: #1A7D3C;
+  --bs-btn-active-bg: #13632F;
+}
+/* Gold-Button (z.B. .btn-warning) als Akzent mit dunklem Text */
+.btn-warning {
+  --bs-btn-bg: #F2B400;
+  --bs-btn-border-color: #F2B400;
+  --bs-btn-color: #3a2d00;
+  --bs-btn-hover-bg: #ffc41a;
+  --bs-btn-hover-border-color: #ffc41a;
+  --bs-btn-hover-color: #3a2d00;
+}
+
+/* Cards – heller Rahmen, grüner Kopf-Akzent */
+.card {
+  border-radius: 14px !important;
+  border: 1px solid #E6E7E2 !important;
+  box-shadow: 0 1px 6px rgba(13, 74, 35, .06);
+  background: #fff;
+}
+.card-header {
+  border-radius: 14px 14px 0 0 !important;
+  background: #1A7D3C;
+  color: #fff;
+  border-bottom: 1px solid #13632F;
+  font-weight: 700;
+}
+.card-header a, .card-header .text-muted, .card-header i { color: #fff !important; }
+/* Icon-Buttons (z.B. PDF/Match-Cards) auf grünem Header: hell/ghost */
+.card-header .btn-outline-danger,
+.card-header .btn-outline-secondary {
+  --bs-btn-color: #fff;
+  --bs-btn-border-color: rgba(255,255,255,.55);
+  --bs-btn-hover-bg: #fff;
+  --bs-btn-hover-color: #13632F;
+  --bs-btn-hover-border-color: #fff;
+  --bs-btn-active-bg: #fff;
+  --bs-btn-active-color: #13632F;
+}
+
+/* Badges */
+.badge.bg-primary { background: #1A7D3C !important; }
+.badge.bg-warning { background: #F2B400 !important; color: #3a2d00 !important; }
+
+/* Tabs */
+.nav-tabs .nav-link.active { color: #13632F; border-bottom-color: #1A7D3C; font-weight: 700; }
+
+/* Tabellen */
+.table-light th, .table > thead.table-light th { background: #eef3ef; }
+.match-row:hover { background: #F6F7F4; }
+
+/* Aufstiegsplätze: grüner Hintergrund + Gold-Akzentkante */
+.row-advance       { --bs-table-bg: #eafaef; box-shadow: inset 3px 0 0 #F2B400; }
+.row-advance:hover { --bs-table-bg: #dff3e6; }
+
+/* Bracket-Overrides */
+.bracket-col-header { background: #13632F; color: #fff; }
+.bracket-match { background: #fff; border-color: #E6E7E2; }
+.bracket-match::after { background: #F2B400; }
+.bracket-player.winner { background: #eafaef; color: #13632F; font-weight: 700; }
+.bracket-score { color: #1A7D3C; }
+
+/* Drag & Drop / Gruppen */
+.group-drag-card { background: #fff; border-color: #E6E7E2; }
+.group-drag-header { background: #13632F; color: #fff; }
+.drag-player-item { background: #F6F7F4; border-color: #E6E7E2; }
+.drag-player-item.sortable-chosen { background: #eafaef; border-color: #1A7D3C; }
+.ko-drag-row { background: #F6F7F4; border-color: #E6E7E2; }
+.ko-drag-row.sortable-chosen { background: #eafaef; border-color: #1A7D3C; }

@@ -30,6 +30,12 @@ $themes = [
         'primary' => '#5c4a1e',
         'swatches'=> ['#5c4a1e', '#8b6914', '#f5f0e8'],
     ],
+    'sport'    => [
+        'name'    => 'Sportlich',
+        'desc'    => 'Sattes Grün mit Gold-Akzenten und kräftigen Anton-Überschriften — Event-Look.',
+        'primary' => '#13632F',
+        'swatches'=> ['#1A7D3C', '#F2B400', '#F6F7F4'],
+    ],
 ];
 
 ob_start(); ?>

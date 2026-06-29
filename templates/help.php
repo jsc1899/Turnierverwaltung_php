@@ -179,7 +179,7 @@ ob_start(); ?>
         <li><strong>separate Seite für Match-Cards</strong> — Druckt jede Match-Card sowie jede Team- und Bahnplan-Übersicht auf einer eigenen Seite (statt mehrere pro Seite)</li>
         <li><strong>Setzungen anzeigen (KO)</strong> — Nur in KO-/Doppel-KO-Modi: blendet die Setzungslabels (z.B. „5-8") ein</li>
         <li><strong>Max. Teilnehmer</strong> — Obergrenze (0 = unbegrenzt)</li>
-        <li><strong>Spielplätze</strong> — Anzahl paralleler Plätze (0 = aus); die Bezeichnung richtet sich nach der Sportart (Bahn, Tisch, Spielfeld, Tennisplatz …); siehe <a href="#spielplaetze">Spielplätze</a></li>
+        <li><strong>Spielplätze</strong> — Anzahl paralleler Plätze (0 = aus) sowie die <strong>Start-Nummer</strong> (<em>ab Nr.</em>, Standard 1), ab der die Plätze nummeriert werden (z.B. ab 5 → Plätze 5, 6, …); die Bezeichnung richtet sich nach der Sportart (Bahn, Tisch, Spielfeld, Tennisplatz …); siehe <a href="#spielplaetze">Spielplätze</a></li>
         <li><strong>Zeitplan</strong> — Berechnet Uhrzeiten je Runde; nur aktivierbar, wenn Spielplätze und Spielrunden aktiv sind; siehe <a href="#zeitplan">Zeitplan &amp; Pausen</a></li>
         <li><strong>Nennung offen</strong> — Ob der Bewerb im öffentlichen Anmeldeformular wählbar ist</li>
       </ul>
@@ -413,10 +413,10 @@ ob_start(); ?>
       <h2 class="h4 border-bottom pb-2">Spielplätze</h2>
       <p>Optional kann jedem Bewerb eine Anzahl paralleler <strong>Spielplätze</strong> zugewiesen werden. Mit <em>Spielplätze = 0</em> (Standard) ist die Funktion deaktiviert.</p>
       <ul>
-        <li>Die Anzahl der Plätze wird in den <strong>Bewerbseinstellungen</strong> gesetzt (Feld <em>Spielplätze</em>).</li>
+        <li>Die Anzahl der Plätze wird in den <strong>Bewerbseinstellungen</strong> gesetzt (Feld <em>Spielplätze</em>). Mit dem Feld <strong>ab Nr.</strong> kann zusätzlich festgelegt werden, ab welcher Platznummer gezählt wird (Standard 1; z.B. 5 → Plätze 5, 6, …) — praktisch, wenn parallel laufende Bewerbe unterschiedliche Plätze einer Halle nutzen.</li>
         <li>In der Gruppenphase sind die Plätze an Gruppen gebunden: beim Auslosen erhält jede Gruppe automatisch einen gleichmäßigen Block (z.B. bei 6 Plätzen und 3 Gruppen → 1+2, 3+4, 5+6). Die Begegnungen rotieren über die Plätze ihrer Gruppe.</li>
         <li>Die Platzzuordnung je Gruppe ist manuell editierbar — über das Feld <strong>Plätze</strong> bei jeder Gruppe (komma-separiert, z.B. „1,2"). Nach dem Speichern werden die Plätze neu verteilt.</li>
-        <li>KO- und Kreuzspiele nutzen den gesamten Platz-Pool; das Finale erhält Platz 1.</li>
+        <li>KO- und Kreuzspiele nutzen den gesamten Platz-Pool; das Finale erhält den ersten Platz (Start-Nummer).</li>
         <li>Der zugewiesene Platz erscheint in der Web-Ansicht (Gruppe und KO) sowie in allen Spielplan- und Spielkarten-PDFs.</li>
         <li><strong>Sportabhängige Bezeichnung:</strong> Je nach Sportart des Turniers heißt der Platz <em>Tisch</em> (Tischtennis), <em>Tennisplatz</em> (Tennis), <em>Spielfeld</em> (Fußball), <em>Bahn</em> (Cornhole) oder allgemein <em>Platz</em>.</li>
         <li><strong>Bahnpläne-PDF:</strong> Pro Spielplatz die Spielreihenfolge der aktuellen Phase samt der zugehörigen Spielkarten (siehe <a href="#exporte">PDF-Export</a>).</li>

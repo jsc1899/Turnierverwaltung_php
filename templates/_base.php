@@ -20,6 +20,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Lato:wght@400;600&display=swap" rel="stylesheet">
+  <?php elseif ($active_theme === 'sport'): ?>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <?php endif; ?>
   <link rel="stylesheet" href="<?= url('static/style.css') ?>">
   <link rel="stylesheet" href="<?= url('static/themes/' . $active_theme . '.css') ?>">
@@ -251,7 +255,10 @@
           var m = form.closest('.modal');
           if (m && window.bootstrap) { var inst = bootstrap.Modal.getInstance(m); if (inst) inst.hide(); }
         }
-        if (!hasErr) { try { form.reset(); } catch (e) {} }
+        // Nur explizit markierte Formulare leeren (z.B. „Neu"-Formulare). Edit-Formulare,
+        // deren Felder per JS befüllt werden (z.B. Profil-Popup), dürfen NICHT zurückgesetzt
+        // werden — sonst verschwinden die Werte trotz erfolgreichem Speichern.
+        if (!hasErr && form.dataset.ajaxReset !== undefined) { try { form.reset(); } catch (e) {} }
         if (btn) btn.disabled = false;
       })
       .catch(function() { alert('Speichern fehlgeschlagen.'); if (btn) btn.disabled = false; });

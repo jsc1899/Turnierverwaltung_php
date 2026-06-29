@@ -566,7 +566,7 @@ ob_start(); ?>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <form method="post" action="<?= url('player/new') ?>" class="js-ajax" data-refresh="#tab-spieler" data-modal-close>
+        <form method="post" action="<?= url('player/new') ?>" class="js-ajax" data-refresh="#tab-spieler" data-modal-close data-ajax-reset>
           <?= csrf_field() ?>
           <div class="mb-2">
             <label class="form-label">Nachname <span class="text-danger">*</span></label>

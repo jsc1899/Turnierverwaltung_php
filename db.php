@@ -358,6 +358,7 @@ function init_db(): void {
         "ALTER TABLE competition ADD COLUMN match_card_mode VARCHAR(10) NOT NULL DEFAULT 'fields'",
         "ALTER TABLE competition ADD COLUMN mc_separate_page TINYINT(1) NOT NULL DEFAULT 0",
         "ALTER TABLE competition ADD COLUMN round_limit INT NOT NULL DEFAULT 0",
+        "ALTER TABLE competition ADD COLUMN court_start INT NOT NULL DEFAULT 1",
         "ALTER TABLE competition ADD COLUMN monitor_show_schedule TINYINT(1) NOT NULL DEFAULT 0",
         "ALTER TABLE competition ADD COLUMN monitor_scroll_speed VARCHAR(8) NOT NULL DEFAULT 'medium'",
         "ALTER TABLE competition ADD COLUMN monitor_scroll_mode VARCHAR(8) NOT NULL DEFAULT 'smooth'",

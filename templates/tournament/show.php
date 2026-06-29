@@ -524,6 +524,11 @@ $nennung_badge = $pending_count + $change_count;
               <label class="form-label"><?= e(court_label($t['sport'] ?? '', true)) ?> <span class="text-muted small">(0 = aus)</span></label>
               <input type="number" name="num_courts" class="form-control" value="0" min="0" max="20">
             </div>
+            <div class="col-sm-3">
+              <label class="form-label">ab Nr. <span class="text-muted small">(Start)</span></label>
+              <input type="number" name="court_start" class="form-control" value="1" min="1" max="200"
+                     title="Ab welcher Platznummer gezählt wird (Standard 1).">
+            </div>
             <div class="col-sm-3 d-flex align-items-end pb-1">
               <div class="form-check">
                 <input class="form-check-input" type="checkbox" name="schedule_enabled" id="new_schedule_enabled" onchange="newToggleSchedule()">
