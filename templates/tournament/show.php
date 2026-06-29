@@ -98,6 +98,12 @@ $nennung_badge = $pending_count + $change_count;
       <i class="bi bi-gear me-1"></i>Einstellungen
     </button>
   </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tab-monitor-btn"
+            data-bs-toggle="tab" data-bs-target="#tab-monitor" type="button" role="tab">
+      <i class="bi bi-display me-1"></i>Monitor
+    </button>
+  </li>
   <?php endif; ?>
 </ul>
 
@@ -317,6 +323,79 @@ $nennung_badge = $pending_count + $change_count;
       </form>
     </div>
   </div><!-- /tab-settings -->
+  <?php endif; ?>
+
+  <?php if (can_edit()): ?>
+  <!-- ── Tab: Monitor ───────────────────────────────────────────────────────── -->
+  <div class="tab-pane fade p-3" id="tab-monitor" role="tabpanel">
+    <?php $mon_sel = array_filter(array_map('intval', explode(',', (string)($t['monitor_competitions'] ?? '')))); ?>
+    <form method="post" action="<?= url('tournament/' . $t['id'] . '/monitor-settings') ?>" class="row g-3 align-items-end">
+      <?= csrf_field() ?>
+      <div class="col-12">
+        <a href="<?= url('tournament/' . $t['id'] . '/monitor') ?>" target="_blank" class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-display me-1"></i>Turnier-Monitor öffnen
+        </a>
+        <span class="text-muted small ms-2">Mehrere Bewerbe nebeneinander – je Bewerb eine Spalte (Gruppen &amp; Spielplan untereinander).</span>
+      </div>
+      <div class="col-auto d-flex align-items-end pb-1">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="monitor_show_schedule" id="t_monitor_show_schedule"
+                 <?= !empty($t['monitor_show_schedule']) ? 'checked' : '' ?>>
+          <label class="form-check-label" for="t_monitor_show_schedule">Spielplan in der Gruppenphase anzeigen</label>
+        </div>
+      </div>
+      <div class="col-auto">
+        <label class="form-label">Scrollgeschwindigkeit</label>
+        <select name="monitor_scroll_speed" class="form-select form-select-sm">
+          <option value="slow"  <?= ($t['monitor_scroll_speed'] ?? 'medium') === 'slow'   ? ' selected' : '' ?>>Langsam</option>
+          <option value="medium"<?= ($t['monitor_scroll_speed'] ?? 'medium') === 'medium' ? ' selected' : '' ?>>Mittel</option>
+          <option value="fast"  <?= ($t['monitor_scroll_speed'] ?? 'medium') === 'fast'   ? ' selected' : '' ?>>Schnell</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <label class="form-label">Scrollmodus</label>
+        <select name="monitor_scroll_mode" class="form-select form-select-sm" id="t_monitor_scroll_mode">
+          <option value="smooth"<?= ($t['monitor_scroll_mode'] ?? 'smooth') === 'smooth' ? ' selected' : '' ?>>Gleichmäßig</option>
+          <option value="block" <?= ($t['monitor_scroll_mode'] ?? 'smooth') === 'block'  ? ' selected' : '' ?>>Blockweise</option>
+        </select>
+      </div>
+      <div class="col-auto" id="t-field-block-pause"<?= ($t['monitor_scroll_mode'] ?? 'smooth') !== 'block' ? ' style="display:none"' : '' ?>>
+        <label class="form-label">Verweildauer je Block (Sek.)</label>
+        <input type="number" name="monitor_block_pause" class="form-control form-control-sm" style="width:120px"
+               min="1" max="120" value="<?= (int)($t['monitor_block_pause'] ?? 5) ?>">
+      </div>
+      <div class="col-12">
+        <label class="form-label d-block mb-1">Anzuzeigende Bewerbe</label>
+        <?php if (empty($comp_info)): ?>
+        <div class="text-muted">Noch keine Bewerbe vorhanden.</div>
+        <?php else: ?>
+        <?php foreach ($comp_info as $ci): $cc = $ci['comp']; ?>
+        <div class="form-check form-check-inline">
+          <input class="form-check-input" type="checkbox" name="monitor_competitions[]" value="<?= (int)$cc['id'] ?>"
+                 id="moncomp_<?= (int)$cc['id'] ?>" <?= (!$mon_sel || in_array((int)$cc['id'], $mon_sel, true)) ? 'checked' : '' ?>>
+          <label class="form-check-label" for="moncomp_<?= (int)$cc['id'] ?>"><?= e($cc['name']) ?></label>
+        </div>
+        <?php endforeach; ?>
+        <div class="form-text">Ohne Auswahl werden alle Bewerbe angezeigt.</div>
+        <?php endif; ?>
+      </div>
+      <div class="col-12">
+        <button class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>Speichern</button>
+      </div>
+    </form>
+    <div class="form-text mt-2">
+      Jeder ausgewählte Bewerb wird in einer eigenen Spalte als eingebettete Monitoransicht dargestellt;
+      Gruppentabellen und Spielplan stehen untereinander und scrollen je Spalte automatisch durch.
+    </div>
+    <script>
+    (function() {
+      var sel = document.getElementById('t_monitor_scroll_mode');
+      var fld = document.getElementById('t-field-block-pause');
+      if (!sel || !fld) return;
+      sel.addEventListener('change', function() { fld.style.display = this.value === 'block' ? '' : 'none'; });
+    })();
+    </script>
+  </div><!-- /tab-monitor -->
   <?php endif; ?>
 
 </div><!-- /tab-content -->

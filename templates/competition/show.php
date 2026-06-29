@@ -233,12 +233,23 @@ ob_start(); ?>
                min="1" max="120" value="<?= (int)($c['monitor_block_pause'] ?? 5) ?>">
       </div>
       <div class="col-auto">
+        <label class="form-label">Gruppentabellen nebeneinander</label>
+        <select name="monitor_max_cols" class="form-select form-select-sm">
+          <option value="0"<?= (int)($c['monitor_max_cols'] ?? 0) === 0 ? ' selected' : '' ?>>Automatisch</option>
+          <?php for ($n = 1; $n <= 8; $n++): ?>
+          <option value="<?= $n ?>"<?= (int)($c['monitor_max_cols'] ?? 0) === $n ? ' selected' : '' ?>>max. <?= $n ?></option>
+          <?php endfor; ?>
+        </select>
+      </div>
+      <div class="col-auto">
         <button class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>Speichern</button>
       </div>
     </form>
     <div class="form-text mt-2">
       Beim <strong>blockweisen</strong> Scrollen wird nacheinander zu jedem Abschnitt (Endplatzierung,
       Gruppen, KO-/Finalrunden-Bereiche) gescrollt und dort die eingestellte Zeit verweilt.
+      <br><strong>Gruppentabellen nebeneinander</strong>: begrenzt die Anzahl der Tabellen pro Reihe;
+      bei weniger Gruppen werden die Tabellen nicht breiter dargestellt. „Automatisch" füllt die volle Breite.
     </div>
     <script>
     (function() {

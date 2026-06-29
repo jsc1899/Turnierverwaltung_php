@@ -200,6 +200,54 @@ function delete(array $p): void {
     redirect('');
 }
 
+// Turnier-Monitor: mehrere Bewerbe nebeneinander (je Bewerb eine Spalte als eingebettete
+// Bewerbs-Monitoransicht). Öffentlich wie tournament/show().
+function monitor(array $p): void {
+    $t = db_fetch("SELECT * FROM tournament WHERE id = ?", [$p['id']]);
+    if (!$t) { redirect(''); return; }
+    if (!$t['is_public'] && !can_edit()) {
+        flash('warning', 'Dieses Turnier ist nicht öffentlich sichtbar.');
+        redirect('');
+        return;
+    }
+    $all = db_fetchall("SELECT id, name FROM competition WHERE tournament_id = ? ORDER BY sort_order ASC, id", [$p['id']]);
+    $sel = array_filter(array_map('intval', explode(',', (string)($t['monitor_competitions'] ?? ''))));
+    // Auswahl in der Reihenfolge der Bewerbsliste; ohne Auswahl alle anzeigen.
+    $comps = $sel
+        ? array_values(array_filter($all, fn($c) => in_array((int)$c['id'], $sel, true)))
+        : $all;
+    render('tournament/monitor', [
+        'page_title'        => $t['name'] . ' — Monitor',
+        't'                 => $t,
+        'comps'             => $comps,
+        'mon_show_schedule' => !empty($t['monitor_show_schedule']),
+        'mon_scroll_speed'  => in_array($t['monitor_scroll_speed'] ?? 'medium', ['slow','medium','fast'], true) ? $t['monitor_scroll_speed'] : 'medium',
+        'mon_scroll_mode'   => ($t['monitor_scroll_mode'] ?? 'smooth') === 'block' ? 'block' : 'smooth',
+        'mon_block_pause'   => max(1, (int)($t['monitor_block_pause'] ?? 5)),
+    ]);
+}
+
+// Einstellungen des Turnier-Monitors speichern (Register „Monitor" auf Turnierebene).
+function monitor_settings(array $p): void {
+    require_edit();
+    csrf_verify();
+    $tid = (int)$p['id'];
+    $show_schedule = post('monitor_show_schedule') ? 1 : 0;
+    $speed = in_array(post('monitor_scroll_speed'), ['slow', 'medium', 'fast'], true) ? post('monitor_scroll_speed') : 'medium';
+    $mode  = post('monitor_scroll_mode') === 'block' ? 'block' : 'smooth';
+    $pause = max(1, min(120, (int)post('monitor_block_pause', 5)));
+    // Ausgewählte Bewerbe (nur tatsächlich zu diesem Turnier gehörende IDs übernehmen)
+    $valid = array_map(fn($c) => (int)$c['id'], db_fetchall("SELECT id FROM competition WHERE tournament_id=?", [$tid]));
+    $picked = array_values(array_intersect(array_map('intval', (array)post('monitor_competitions', [])), $valid));
+    $comp_csv = implode(',', $picked);
+    db_execute(
+        "UPDATE tournament SET monitor_show_schedule=?, monitor_scroll_speed=?, monitor_scroll_mode=?, monitor_block_pause=?, monitor_competitions=? WHERE id=?",
+        [$show_schedule, $speed, $mode, $pause, $comp_csv, $tid]
+    );
+    flash('success', 'Monitor-Einstellungen gespeichert.');
+    redirect('tournament/' . $tid . '#tab-monitor');
+}
+
 function ausschreibung(array $p): void {
     $t = db_fetch("SELECT ausschreibung, is_public FROM tournament WHERE id=?", [$p['id']]);
     if (!$t || !$t['ausschreibung']) {

@@ -9,12 +9,39 @@
  */
 $phase_labels = ['setup'=>'Einrichtung','group'=>'Gruppenphase','ko'=>'KO-Phase','done'=>'Beendet'];
 $phase_colors = ['setup'=>'secondary','group'=>'warning','ko'=>'info','done'=>'success'];
+$sport_icons  = ['tischtennis'=>'🏓','tennis'=>'🎾','fussball'=>'⚽','cornhole'=>'🫘'];
+$sport_labels = ['tischtennis'=>'Tischtennis','tennis'=>'Tennis','fussball'=>'Fußball','cornhole'=>'Cornhole'];
+$active_theme = get_setting('theme', 'default');
 
-// Monitor-Einstellungen (Register „Monitor")
-$mon_show_schedule = !empty($c['monitor_show_schedule']);
-$mon_scroll_speed  = in_array($c['monitor_scroll_speed'] ?? 'medium', ['slow','medium','fast'], true) ? $c['monitor_scroll_speed'] : 'medium';
-$mon_scroll_mode   = ($c['monitor_scroll_mode'] ?? 'smooth') === 'block' ? 'block' : 'smooth';
-$mon_block_pause   = max(1, (int)($c['monitor_block_pause'] ?? 5));
+// Embed-Modus (Turnier-Monitor): einspaltig, schlanker Kopf, Einstellungen per Query-Parameter.
+$embed = !empty($embed);
+$ov_sched = $ov_sched ?? null;
+$ov_speed = $ov_speed ?? null;
+$ov_mode  = $ov_mode  ?? null;
+$ov_pause = $ov_pause ?? null;
+
+// Monitor-Einstellungen (Register „Monitor") – Overrides (Query) haben Vorrang vor den Bewerbswerten.
+$mon_show_schedule = $ov_sched !== null ? (bool)$ov_sched : !empty($c['monitor_show_schedule']);
+$mon_scroll_speed  = ($ov_speed !== null && in_array($ov_speed, ['slow','medium','fast'], true)) ? $ov_speed
+                     : (in_array($c['monitor_scroll_speed'] ?? 'medium', ['slow','medium','fast'], true) ? $c['monitor_scroll_speed'] : 'medium');
+$mon_scroll_mode   = $ov_mode !== null ? ($ov_mode === 'block' ? 'block' : 'smooth')
+                     : (($c['monitor_scroll_mode'] ?? 'smooth') === 'block' ? 'block' : 'smooth');
+$mon_block_pause   = $ov_pause !== null ? max(1, min(120, (int)$ov_pause)) : max(1, (int)($c['monitor_block_pause'] ?? 5));
+// Im Embed-Modus immer einspaltig (Gruppen + Spielplan untereinander), sonst die Bewerbseinstellung.
+$mon_max_cols      = $embed ? 1 : max(0, min(8, (int)($c['monitor_max_cols'] ?? 0))); // 0 = automatisch
+$grp_count         = is_array($groups ?? null) ? count($groups) : 0;
+// Spielplan „daneben" (eigene Slot-Spalte) nur, wenn jede Gruppe samt Spielplan-Spalte in die
+// eingestellte Maximalspaltenzahl passt: 2 × Gruppenzahl ≤ N. (Im Embed-Modus nie.)
+$mon_beside        = (!$embed && $mon_max_cols > 0 && $grp_count > 0 && 2 * $grp_count <= $mon_max_cols);
+// Mehrere Gruppen untereinander → Tabellen NICHT einzeln fixieren (sonst läuft beim Scrollen die
+// untere Tabelle in die obere). Nur die Titelzeile bleibt fix, der gesamte Inhalt scrollt zusammen.
+// Gestapelt wird einspaltig (Embed / max_cols=1) oder wenn im Spaltenlimit mehr Gruppen als
+// Spalten vorhanden sind (Umbruch in mehrere Reihen).
+$mon_stack_scroll  = ($grp_count > 1) && (
+    $embed
+    || $mon_max_cols === 1
+    || ($mon_max_cols > 1 && !$mon_beside && $grp_count > $mon_max_cols)
+);
 
 // Markierung der Aufstiegsplätze (analog show.php)
 $highlight_count = (int)($c['advance_count'] ?? 0);
@@ -46,23 +73,23 @@ $matchLine = function(array $m, string $label = '') use ($winner): string {
 };
 
 // Ein read-only KO-Kästchen für den Turnierbaum (zwei Teilnehmerzeilen, Sieger hervorgehoben).
-$bracketBox = function(array $m, string $label = '', string $border = '#dee2e6') use ($winner): string {
+$bracketBox = function(array $m, string $label = '', string $border = 'var(--bs-border-color)') use ($winner): string {
     $w = $winner($m);
     $hdr = $label !== ''
-        ? '<div style="font-size:.8rem;color:#9aa5b1;padding:2px 10px;border-bottom:1px solid #f3f5f7;background:#fafbfc">' . e($label) . '</div>'
+        ? '<div style="font-size:.8rem;color:var(--bs-secondary-color);padding:2px 10px;border-bottom:1px solid var(--bs-border-color);background:var(--bs-tertiary-bg)">' . e($label) . '</div>'
         : '';
     $row = function($name, int $pid, $score, bool $isWin, bool $border_bottom): string {
         $nm = ($pid && trim((string)$name) !== '') ? e($name) : '<span class="text-muted fst-italic">—</span>';
-        $bg = $isWin ? 'background:#d1e7dd;' : '';
+        $bg = $isWin ? 'background:#d1e7dd;color:#0a3622;' : '';
         $fw = $isWin ? 'font-weight:700;' : '';
         $sc = $score !== null ? '<span class="ms-auto" style="flex-shrink:0;font-weight:700;font-size:1.05rem">' . (int)$score . '</span>' : '';
-        return '<div class="d-flex align-items-center gap-2 px-2" style="min-height:42px;' . ($border_bottom ? 'border-bottom:1px solid #f0f0f0;' : '') . $bg . $fw . '">'
+        return '<div class="d-flex align-items-center gap-2 px-2" style="min-height:42px;' . ($border_bottom ? 'border-bottom:1px solid var(--bs-border-color);' : '') . $bg . $fw . '">'
              . '<span class="flex-grow-1 text-truncate" style="min-width:0;font-size:1.02rem" title="' . e((string)$name) . '">' . $nm . '</span>'
              . $sc . '</div>';
     };
     $s1 = !empty($m['played']) ? (int)$m['score1'] : null;
     $s2 = !empty($m['played']) ? (int)$m['score2'] : null;
-    return '<div class="ko-match" style="border:1px solid ' . $border . ';border-radius:8px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.07);overflow:hidden">'
+    return '<div class="ko-match" style="border:1px solid ' . $border . ';border-radius:8px;background:var(--bs-body-bg);box-shadow:0 1px 3px rgba(0,0,0,.07);overflow:hidden">'
          . $hdr
          . $row($m['p1name'] ?? '', (int)($m['player1_id'] ?? 0), $s1, $w === 1, true)
          . $row($m['p2name'] ?? '', (int)($m['player2_id'] ?? 0), $s2, $w === 2, false)
@@ -132,90 +159,157 @@ $has_ko = !empty($ko_rounds) || !empty($third_place_match) || !empty($cross_bloc
        || !empty($dko_wb) || !empty($dko_lb) || !empty($dko_gf);
 $teilnehmer_kopf = $is_team ? 'Mannschaft' : ($is_doubles ? 'Doppel' : 'Spieler');
 ?><!doctype html>
-<html lang="de">
+<html lang="de"<?= $active_theme === 'dunkel' ? ' data-bs-theme="dark"' : '' ?>>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?= e($c['name']) ?> — Monitor</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <?php if ($active_theme === 'elegant'): ?>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <?php elseif ($active_theme === 'modern'): ?>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <?php elseif ($active_theme === 'klassisch'): ?>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Lato:wght@400;600&display=swap" rel="stylesheet">
+  <?php elseif ($active_theme === 'sport'): ?>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <?php endif; ?>
+  <link rel="stylesheet" href="<?= url('static/style.css') ?>">
+  <link rel="stylesheet" href="<?= url('static/themes/' . $active_theme . '.css') ?>">
   <link rel="icon" type="image/x-icon" href="<?= url('static/favicon.ico') ?>">
   <style>
-    html { font-size: 22px; }
-    body { background:#f4f6f9; color:#1f2933; }
-    .monitor-wrap { max-width: 1900px; margin: 0 auto; padding: 1rem 1.6rem 5rem; }
-    .mon-head { display:flex; align-items:center; flex-wrap:wrap; gap:1rem; border-bottom:3px solid #dee2e6; padding-bottom:.6rem; margin-bottom:1.2rem; }
-    .mon-head h1 { font-size:2.1rem; font-weight:800; margin:0; }
-    .mon-head .sub { font-size:1.2rem; color:#6b7280; }
-    .mon-clock { margin-left:auto; font-size:1.2rem; color:#6b7280; white-space:nowrap; }
+    html { font-size: 18px; }
+    body { background: var(--bs-secondary-bg); color: var(--bs-body-color); }
+    .monitor-wrap { width: 100%; margin: 0 auto; padding: 0 1.6rem; }
+    .mon-head { position:sticky; top:0; z-index:10; background:var(--bs-secondary-bg); display:flex; align-items:center; flex-wrap:wrap; gap:1rem; border-bottom:3px solid var(--bs-border-color); padding:1rem 0; margin-bottom:0; box-shadow:0 6px 10px -8px rgba(0,0,0,.35); }
+    .mon-head h1 { font-size:2.1rem; font-weight:800; margin:0; display:flex; align-items:center; flex-wrap:wrap; gap:.6rem; }
+    .mon-head .sport-ic { font-size:2.4rem; line-height:1; }
+    .mon-head .sep { color:var(--bs-secondary-color); font-weight:400; }
+    .mon-clock { margin-left:auto; font-size:1.2rem; color:var(--bs-secondary-color); white-space:nowrap; }
     .mon-section-title { font-size:1.5rem; font-weight:700; margin:1.6rem 0 .8rem; display:flex; align-items:center; gap:.5rem; }
 
     /* Endplatzierung */
     .mon-podium { display:flex; flex-wrap:wrap; gap:1rem; }
-    .mon-podium .item { text-align:center; padding:.8rem 1.4rem; border:2px solid #ffe08a; border-radius:.7rem; background:#fffdf3; min-width:160px; }
+    .mon-podium .item { text-align:center; padding:.8rem 1.4rem; border:2px solid #ffe08a; border-radius:.7rem; background:rgba(255,224,138,.12); min-width:160px; }
     .mon-podium .rank { font-size:2.2rem; line-height:1; }
     .mon-podium .nm { font-weight:700; font-size:1.15rem; margin-top:.3rem; }
-    .mon-podium .club { color:#6b7280; font-size:.9rem; }
+    .mon-podium .club { color:var(--bs-secondary-color); font-size:.9rem; }
     .mon-rest { columns: 2; column-gap:2.5rem; margin-top:1rem; font-size:1.05rem; }
     .mon-rest div { break-inside:avoid; padding:.15rem 0; }
-    .mon-rest .rk { display:inline-block; min-width:2.2rem; text-align:right; color:#6b7280; font-weight:600; margin-right:.5rem; }
+    .mon-rest .rk { display:inline-block; min-width:2.2rem; text-align:right; color:var(--bs-secondary-color); font-weight:600; margin-right:.5rem; }
 
     /* Gruppen-Raster */
-    .grp-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(620px, 1fr)); gap:1.3rem; }
-    .grp-card { border:1px solid #d8dee6; border-radius:.7rem; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.05); }
-    .grp-card .hd { background:#eef2f7; padding:.5rem 1rem; font-size:1.3rem; font-weight:700; border-radius:.7rem .7rem 0 0; }
+<?php $slotW = $mon_max_cols > 0 ? '(100% - ' . ($mon_max_cols - 1) . ' * 1.3rem) / ' . $mon_max_cols : ''; ?>
+<?php if ($mon_beside): ?>
+    /* Spielplan in der nächsten Spalte: Gruppenblock = 2 Slots breit, Tabelle | Spielplan nebeneinander */
+    .grp-grid { display:flex; flex-wrap:wrap; align-items:flex-start; gap:1.3rem; }
+    .grp-grid > .grp-card { flex:0 0 calc(<?= $slotW ?> * 2 + 1.3rem); max-width:calc(<?= $slotW ?> * 2 + 1.3rem); min-width:0;
+                            display:flex; flex-wrap:nowrap; align-items:flex-start; gap:1.3rem; }
+    .grp-card > .grp-sticky { flex:1 1 0; min-width:0; }
+    .grp-card > .mon-sched  { flex:1 1 0; min-width:0; border-top:0; }
+<?php elseif ($mon_max_cols > 0): ?>
+    /* Feste Spaltenzahl: 1 Slot je Gruppe, Spielplan unter der Tabelle (kein Strecken bei weniger Gruppen) */
+    .grp-grid { display:flex; flex-wrap:wrap; align-items:flex-start; gap:1.3rem; }
+    .grp-grid > .grp-card { flex:0 0 calc(<?= $slotW ?>); max-width:calc(<?= $slotW ?>); min-width:0; display:block; }
+<?php else: ?>
+    /* Automatisch: volle Breite füllen, Spielplan unter der Tabelle */
+    .grp-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(440px, 1fr)); gap:1.3rem; }
+    .grp-card { display:block; }
+<?php endif; ?>
+    .grp-card { border:1px solid var(--bs-border-color); border-radius:.7rem; background:var(--bs-body-bg); box-shadow:0 1px 3px rgba(0,0,0,.05); }
+    /* Gruppenkopf + Tabelle bleiben oben fixiert; nur der Spielplan scrollt/steht daneben */
+    .grp-sticky { position:sticky; top:var(--head-h, 92px); z-index:3; background:var(--bs-body-bg); border-radius:.7rem .7rem 0 0; box-shadow:0 6px 8px -6px rgba(0,0,0,.28); }
+<?php if ($mon_stack_scroll): ?>
+    /* Mehrere Gruppen untereinander: Tabellen nicht einzeln fixieren – alles scrollt zusammen */
+    .grp-sticky { position:static; box-shadow:none; }
+<?php endif; ?>
+    /* Per JS gesetzt: Tabelle zu hoch für den sichtbaren Bereich → nicht fixieren, sonst ist das
+       untere Tabellenende beim Scrollen unerreichbar. */
+    .grp-sticky.grp-sticky-off { position:static !important; box-shadow:none; }
+    .grp-card .hd { padding:.5rem 1rem; font-size:1.3rem; font-weight:700; border-radius:.7rem .7rem 0 0; }
     table.mon-tbl { width:100%; border-collapse:collapse; font-size:1.05rem; margin:0; }
-    table.mon-tbl th, table.mon-tbl td { padding:.45rem .55rem; border-bottom:1px solid #eceff3; text-align:center; }
+    table.mon-tbl th, table.mon-tbl td { padding:.45rem .55rem; border-bottom:1px solid var(--bs-border-color); text-align:center; }
     /* Zahlenspalten nie umbrechen; nur die Namensspalte darf umbrechen */
     table.mon-tbl th, table.mon-tbl td:not(.nm) { white-space:nowrap; }
-    table.mon-tbl th { background:#f8fafc; font-size:.85rem; text-transform:uppercase; letter-spacing:.02em; color:#6b7280; }
+    table.mon-tbl th { background:var(--bs-tertiary-bg); font-size:.85rem; text-transform:uppercase; letter-spacing:.02em; color:var(--bs-secondary-color); }
     table.mon-tbl td.nm, table.mon-tbl th.nm { text-align:left; width:99%; overflow-wrap:anywhere; }
     table.mon-tbl td.pts { font-weight:800; }
-    table.mon-tbl tr.adv td { background:#e8f7ec; }
-    table.mon-tbl td.rk { font-weight:700; color:#374151; }
-    .nm .club { color:#9aa5b1; font-size:.85rem; margin-left:.4rem; }
+    table.mon-tbl tr.adv td { background:rgba(25,135,84,.14); }
+    table.mon-tbl td.rk { font-weight:700; color:var(--bs-emphasis-color); }
+    .nm .club { color:var(--bs-secondary-color); font-size:.85rem; margin-left:.4rem; }
 
     /* KO / Kreuz / Doppel-KO */
-    .mon-ko-cols { display:grid; grid-template-columns: repeat(auto-fit, minmax(560px, 1fr)); gap:1.3rem; }
-    .mon-ko-round { border:1px solid #d8dee6; border-radius:.7rem; background:#fff; }
-    .mon-ko-round .rhd { background:#eef2f7; padding:.45rem 1rem; font-weight:700; font-size:1.15rem; border-radius:.7rem .7rem 0 0; }
+    .mon-ko-cols { display:grid; grid-template-columns: repeat(auto-fit, minmax(440px, 1fr)); gap:1.3rem; }
+    .mon-ko-round { border:1px solid var(--bs-border-color); border-radius:.7rem; background:var(--bs-body-bg); }
+    .mon-ko-round .rhd { background:var(--bs-tertiary-bg); padding:.45rem 1rem; font-weight:700; font-size:1.15rem; border-radius:.7rem .7rem 0 0; }
     .mon-ko-round .rbody { padding:.5rem .9rem; }
-    .mon-ko-match { display:grid; grid-template-columns: 1fr auto 1fr; align-items:center; gap:.7rem; padding:.35rem 0; border-bottom:1px solid #f1f3f6; }
+    .mon-ko-match { display:grid; grid-template-columns: 1fr auto 1fr; align-items:center; gap:.7rem; padding:.35rem 0; border-bottom:1px solid var(--bs-border-color); }
     .mon-ko-match:last-child { border-bottom:0; }
     .mon-ko-name { font-size:1.05rem; min-width:0; overflow-wrap:anywhere; }
     .mon-ko-score { font-size:1rem; letter-spacing:.05em; }
-    .mon-ko-lbl { grid-column:1 / -1; font-size:.8rem; color:#9aa5b1; }
+    .mon-ko-lbl { grid-column:1 / -1; font-size:.8rem; color:var(--bs-secondary-color); }
     .mon-ko-block-title { font-size:1.2rem; font-weight:700; margin:.4rem 0; }
     .mon-block { scroll-margin-top: 14px; }
-    /* Spielplan je Gruppe (optional) */
-    .mon-sched { padding:.45rem .8rem; border-top:1px solid #eef2f7; }
-    .mon-sched-round { text-align:center; font-weight:700; font-size:.92rem; color:#5a6573; border-top:1px solid #e6eaef; margin-top:.4rem; padding-top:.3rem; }
+    /* Spielplan je Gruppe (optional) – darunter (Standard) oder als eigene Spalte daneben */
+    .mon-sched { padding:.45rem .8rem; border-top:1px solid var(--bs-border-color); }
+    .mon-sched-round { text-align:center; font-weight:700; font-size:.92rem; color:var(--bs-secondary-color); border-top:1px solid var(--bs-border-color); margin-top:.4rem; padding-top:.3rem; }
     .mon-sched-round:first-child { border-top:0; margin-top:0; padding-top:0; }
     .mon-sched-pause { text-align:center; font-weight:700; font-size:.85rem; color:#856404; background:#fff3cd; border-radius:.3rem; padding:.2rem; margin:.35rem 0; }
     /* Begegnung mit farbigen Ergebnis-Kästchen (wie Webansicht) */
     .mon-sched-row { display:grid; grid-template-columns:1fr 2.4rem .6rem 2.4rem 1fr; align-items:center; gap:.4rem; padding:.25rem 0; }
     .mon-sched-row .nm { font-size:1.02rem; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .mon-sched-row .nm1 { text-align:right; }
-    .mon-sched-row .sep { text-align:center; color:#9aa5b1; }
+    .mon-sched-row .sep { text-align:center; color:var(--bs-secondary-color); }
     .mon-sched-row .sbox { display:inline-flex; align-items:center; justify-content:center; min-height:30px; font-weight:700;
-                           border:1px solid #ced4da; border-radius:.25rem; background:#fff; }
-    .mon-sched-row .score-win  { background:#d1e7dd; border-color:#a3cfbb; }
-    .mon-sched-row .score-loss { background:#f8d7da; border-color:#e9a3ac; }
-    .mon-sched-row .score-draw { background:#cfe2ff; border-color:#9ec5fe; }
+                           border:1px solid var(--bs-border-color); border-radius:.25rem; background:var(--bs-body-bg); }
+    .mon-sched-row .score-win  { background:#d1e7dd; border-color:#a3cfbb; color:#0a3622; }
+    .mon-sched-row .score-loss { background:#f8d7da; border-color:#e9a3ac; color:#58151c; }
+    .mon-sched-row .score-draw { background:#cfe2ff; border-color:#9ec5fe; color:#08315e; }
+
+    /* Embed-Modus (Turnier-Monitor, je Spalte ein iframe): kompakter Kopf, schmaler Rand */
+    body.embed { background:var(--bs-body-bg); scrollbar-width:none; -ms-overflow-style:none; }
+    body.embed::-webkit-scrollbar { width:0; height:0; display:none; }
+    body.embed .monitor-wrap { padding:0 .7rem; }
+    body.embed .mon-head { padding:.5rem 0; margin-bottom:.8rem; }
+    body.embed .mon-head h1 { font-size:1.45rem; }
+    body.embed .mon-section-title { font-size:1.2rem; margin:1rem 0 .6rem; }
+    /* In schmalen Spalten kompaktere Tabellen, damit alle Spalten (inkl. Pkt) passen */
+    body.embed table.mon-tbl { font-size:.92rem; }
+    body.embed table.mon-tbl th, body.embed table.mon-tbl td { padding:.32rem .35rem; }
+    body.embed .grp-card .hd { font-size:1.1rem; padding:.4rem .7rem; }
+    body.embed .mon-sched-row .nm { font-size:.92rem; }
   </style>
 </head>
-<body>
+<body<?= $embed ? ' class="embed"' : '' ?>>
 <div class="monitor-wrap">
 
   <div class="mon-head">
-    <div>
-      <h1><?= e($c['name']) ?></h1>
-      <div class="sub"><?= $t ? e($t['name']) : '' ?></div>
-    </div>
-    <span class="badge fs-5 text-bg-<?= $phase_colors[$c['phase']] ?? 'secondary' ?>">
-      <?= e(phase_label($c['phase'], $c['mode'] ?? null)) ?>
-    </span>
+    <h1>
+      <?php if (!$embed && $t): ?>
+        <?php if (!empty($t['sport']) && isset($sport_labels[$t['sport']])): ?>
+          <?php if ($t['sport'] === 'cornhole'): ?>
+          <img src="<?= url('static/cornhole_icon.svg') ?>" height="48" style="vertical-align:middle" alt="Cornhole">
+          <?php else: ?>
+          <span class="sport-ic" title="<?= e($sport_labels[$t['sport']]) ?>"><?= $sport_icons[$t['sport']] ?></span>
+          <?php endif; ?>
+        <?php endif; ?>
+        <span><?= e($t['name']) ?></span>
+        <span class="sep">–</span>
+      <?php endif; ?>
+      <span><?= e($c['name']) ?></span>
+    </h1>
+    <?php if (!$embed): ?>
     <span class="mon-clock"><i class="bi bi-clock"></i> Stand: <?= date('H:i') ?> Uhr</span>
+    <?php endif; ?>
   </div>
 
   <?php if (!empty($places) && !empty($comp_complete)): ?>
@@ -242,11 +336,11 @@ $teilnehmer_kopf = $is_team ? 'Mannschaft' : ($is_doubles ? 'Doppel' : 'Spieler'
   <?php endif; ?>
 
   <?php if (!empty($groups) && !$has_ko): // nur aktuelle Stage: Gruppen ausblenden, sobald Finalrunde läuft ?>
-  <div class="mon-section-title"><i class="bi bi-table"></i>Gruppen</div>
   <div class="grp-grid">
     <?php foreach ($groups as $gi): $g = $gi['group']; $standings = $gi['standings']; ?>
     <div class="grp-card mon-block">
-      <div class="hd"><?= e($g['name']) ?></div>
+      <div class="grp-sticky">
+      <div class="hd card-header"><?= e($g['name']) ?></div>
       <table class="mon-tbl">
         <thead>
           <tr>
@@ -272,6 +366,7 @@ $teilnehmer_kopf = $is_team ? 'Mannschaft' : ($is_doubles ? 'Doppel' : 'Spieler'
           <?php endforeach; ?>
         </tbody>
       </table>
+      </div>
       <?php if ($mon_show_schedule && !empty($gi['matches'])): ?>
       <div class="mon-sched">
         <?php
@@ -302,7 +397,6 @@ $teilnehmer_kopf = $is_team ? 'Mannschaft' : ($is_doubles ? 'Doppel' : 'Spieler'
   <?php endif; ?>
 
   <?php if ($has_ko): ?>
-  <div class="mon-section-title"><i class="bi bi-diagram-3"></i>Finalrunde</div>
 
   <?php if (!empty($cross_blocks)): // groups_cross ?>
   <?php foreach ($cross_blocks as $blk): ?>
@@ -449,13 +543,36 @@ $teilnehmer_kopf = $is_team ? 'Mannschaft' : ($is_doubles ? 'Doppel' : 'Spieler'
       bracket.style.marginBottom = (overflow > 0 ? overflow + 12 : 0) + 'px';
     }
   }
+  // Höhe des fixierten Kopfs messen → Andockpunkt der Gruppentabellen (--head-h).
+  function setHeadOffset() {
+    var h = document.querySelector('.mon-head');
+    if (!h) return;
+    var mb = parseFloat(getComputedStyle(h).marginBottom) || 0;
+    document.documentElement.style.setProperty('--head-h', (h.offsetHeight + mb) + 'px');
+  }
+  // Tabellen, die (fast) nicht in den sichtbaren Bereich passen, nicht fixieren – sonst ist das
+  // untere Tabellenende beim Scrollen unerreichbar. Dann scrollt der ganze Block mit.
+  function adjustTallTables() {
+    var head = document.querySelector('.mon-head');
+    var headH = head ? head.getBoundingClientRect().height : 0;
+    var avail = window.innerHeight - headH;
+    var cols = document.querySelectorAll('.grp-sticky');
+    for (var i = 0; i < cols.length; i++) {
+      var el = cols[i];
+      // Zum Messen ggf. kurz die Off-Markierung ignorieren (offsetHeight ist davon unabhängig).
+      var tooTall = el.offsetHeight > (avail - 48);
+      el.classList.toggle('grp-sticky-off', tooTall);
+    }
+  }
   function drawAll() {
+    setHeadOffset();
+    adjustTallTables();
     positionThird();
     drawWB(document.getElementById('mon-ko-bracket'),     document.getElementById('mon-ko-svg'));
     drawWB(document.getElementById('mon-dko-wb-bracket'),  document.getElementById('mon-dko-wb-svg'));
     drawLB(document.getElementById('mon-dko-lb-bracket'),  document.getElementById('mon-dko-lb-svg'));
   }
-  window.addEventListener('load', drawAll);
+  window.addEventListener('load', function(){ drawAll(); setTimeout(drawAll, 400); });
   window.addEventListener('resize', drawAll);
   document.addEventListener('DOMContentLoaded', function(){ setTimeout(drawAll, 50); });
 })();

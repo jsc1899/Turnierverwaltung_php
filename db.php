@@ -363,6 +363,13 @@ function init_db(): void {
         "ALTER TABLE competition ADD COLUMN monitor_scroll_speed VARCHAR(8) NOT NULL DEFAULT 'medium'",
         "ALTER TABLE competition ADD COLUMN monitor_scroll_mode VARCHAR(8) NOT NULL DEFAULT 'smooth'",
         "ALTER TABLE competition ADD COLUMN monitor_block_pause INT NOT NULL DEFAULT 5",
+        "ALTER TABLE competition ADD COLUMN monitor_max_cols INT NOT NULL DEFAULT 0",
+        // Turnier-Monitor (mehrere Bewerbe nebeneinander)
+        "ALTER TABLE tournament ADD COLUMN monitor_show_schedule TINYINT(1) NOT NULL DEFAULT 0",
+        "ALTER TABLE tournament ADD COLUMN monitor_scroll_speed VARCHAR(8) NOT NULL DEFAULT 'medium'",
+        "ALTER TABLE tournament ADD COLUMN monitor_scroll_mode VARCHAR(8) NOT NULL DEFAULT 'smooth'",
+        "ALTER TABLE tournament ADD COLUMN monitor_block_pause INT NOT NULL DEFAULT 5",
+        "ALTER TABLE tournament ADD COLUMN monitor_competitions TEXT",
     ];
     foreach ($migrations as $sql) {
         try { $pdo->exec($sql); } catch (\PDOException $e) { /* Spalte/Typ bereits korrekt */ }

@@ -103,6 +103,8 @@ $routes = [
     ['POST',     '/tournaments/reorder',                      'tournament',  'reorder'],
     ['POST',     '/tournament/{tid}/competitions/reorder',    'tournament',  'reorder_competitions'],
     ['GET',      '/tournament/{id}/ausschreibung', 'tournament', 'ausschreibung'],
+    ['GET',      '/tournament/{id}/monitor',           'tournament', 'monitor'],
+    ['POST',     '/tournament/{id}/monitor-settings',  'tournament', 'monitor_settings'],
 
     // Registrations (public + admin)
     ['GET|POST', '/tournament/{id}/register',                        'registration', 'register_form'],

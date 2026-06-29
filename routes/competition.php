@@ -758,10 +758,17 @@ function monitor(array $p): void {
     $is_doubles = !empty($c['is_doubles']);
     $is_team    = !empty($c['is_team']);
     $data = competition_view_data($c, $is_team, $is_doubles);
+    // Embed-Modus (Turnier-Monitor): einspaltig, schlanker Kopf, Einstellungen via Query-Parameter.
+    $embed = get_param('embed') === '1';
     render('competition/monitor', [
         'page_title' => $c['name'] . ' — Monitor',
         'c' => $c, 't' => $t,
         'is_team' => $is_team, 'is_doubles' => $is_doubles,
+        'embed'    => $embed,
+        'ov_sched' => array_key_exists('sched', $_GET) ? (get_param('sched') === '1') : null,
+        'ov_speed' => array_key_exists('speed', $_GET) ? (string)get_param('speed') : null,
+        'ov_mode'  => array_key_exists('mode',  $_GET) ? (string)get_param('mode')  : null,
+        'ov_pause' => array_key_exists('pause', $_GET) ? (int)get_param('pause')     : null,
     ] + $data);
 }
 
@@ -774,9 +781,10 @@ function monitor_settings(array $p): void {
     $speed = in_array(post('monitor_scroll_speed'), ['slow', 'medium', 'fast'], true) ? post('monitor_scroll_speed') : 'medium';
     $mode  = post('monitor_scroll_mode') === 'block' ? 'block' : 'smooth';
     $pause = max(1, min(120, (int)post('monitor_block_pause', 5)));
+    $max_cols = max(0, min(8, (int)post('monitor_max_cols', 0)));
     db_execute(
-        "UPDATE competition SET monitor_show_schedule=?, monitor_scroll_speed=?, monitor_scroll_mode=?, monitor_block_pause=? WHERE id=?",
-        [$show_schedule, $speed, $mode, $pause, $cid]
+        "UPDATE competition SET monitor_show_schedule=?, monitor_scroll_speed=?, monitor_scroll_mode=?, monitor_block_pause=?, monitor_max_cols=? WHERE id=?",
+        [$show_schedule, $speed, $mode, $pause, $max_cols, $cid]
     );
     flash('success', 'Monitor-Einstellungen gespeichert.');
     redirect('competition/' . $cid . '#tab-monitor');
