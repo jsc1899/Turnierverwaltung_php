@@ -4,42 +4,42 @@ $phase_colors = ['setup'=>'bg-secondary','group'=>'bg-warning text-dark','ko'=>'
 $locked = ($t && (int)($t['is_done'] ?? 0) === 1) || $c['phase'] === 'done';
 $court_sg = court_label($t['sport'] ?? '');          // Spielplatz-Bezeichnung je Sportart (Singular)
 $court_pl = court_label($t['sport'] ?? '', true);    // Plural (Einstellungen)
+$sport_icons  = ['tischtennis'=>'🏓','tennis'=>'🎾','fussball'=>'⚽','cornhole'=>'🫘'];
+$sport_labels = ['tischtennis'=>'Tischtennis','tennis'=>'Tennis','fussball'=>'Fußball','cornhole'=>'Cornhole'];
+// Abschnittsüberschriften (Gruppen / KO-Runde / Kreuzspiele) nur zeigen, wenn der Bewerb
+// mehr als eine Phase gleichzeitig darstellt (Gruppen UND Finalrunde).
+$show_section_titles = !empty($groups)
+    && (!empty($ko_rounds) || !empty($third_place_match) || !empty($cross_blocks));
 
 ob_start(); ?>
-<nav aria-label="breadcrumb" class="mb-3">
-  <ol class="breadcrumb">
-    <li class="breadcrumb-item"><a href="<?= url() ?>">Turniere</a></li>
-    <?php if ($t): ?>
-    <li class="breadcrumb-item"><a href="<?= url('tournament/' . $t['id']) ?>"><?= e($t['name']) ?></a></li>
-    <?php endif; ?>
-    <li class="breadcrumb-item active"><?= e($c['name']) ?></li>
-  </ol>
-</nav>
-
-<?php if (is_admin() && !$locked): ?>
-<!-- Test-Hilfe: füllt offene Ergebnisfelder zufällig aus (nur Admin) -->
-<div class="mb-3 d-flex flex-wrap align-items-center gap-2" id="test-tools"
-     data-duels-bulk-url="<?= e(url('competition/'.$c['id'].'/duels/bulk')) ?>">
-  <button type="button" class="btn btn-outline-warning btn-sm" onclick="fillTestResults(false)">
-    <i class="bi bi-dice-5 me-1"></i>Testergebnisse eintragen
-  </button>
-  <button type="button" class="btn btn-outline-warning btn-sm" onclick="fillTestResults(true)">
-    <i class="bi bi-dice-5 me-1"></i>Testergebnisse eintragen &amp; speichern
-  </button>
-  <form method="post" action="<?= url('competition/'.$c['id'].'/results/clear-phase') ?>"
-        data-confirm="Alle eingetragenen Ergebnisse der aktuellen Phase entfernen?" class="m-0">
-    <?= csrf_field() ?>
-    <button class="btn btn-outline-danger btn-sm"><i class="bi bi-eraser me-1"></i>Testergebnisse entfernen</button>
-  </form>
+<div class="d-flex justify-content-end mb-3">
+  <a href="<?= url($t ? 'tournament/' . $t['id'] : '') ?>" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Zurück
+  </a>
 </div>
-<?php endif; ?>
+<!-- Titel: Turniername (verlinkt, mit Sportart-Symbol) – Bewerbname -->
+<h2 class="mb-4 d-flex align-items-center flex-wrap gap-2">
+  <?php if ($t): ?>
+  <a href="<?= url('tournament/' . $t['id']) ?>" class="text-decoration-none text-reset d-inline-flex align-items-center">
+    <?php if (!empty($t['sport']) && isset($sport_labels[$t['sport']])): ?>
+      <?php if ($t['sport'] === 'cornhole'): ?>
+      <img src="<?= url('static/cornhole_icon.svg') ?>" height="52" class="me-2" style="vertical-align:middle" alt="Cornhole">
+      <?php else: ?>
+      <span class="me-2" style="font-size:3rem;line-height:1" title="<?= e($sport_labels[$t['sport']]) ?>"><?= $sport_icons[$t['sport']] ?></span>
+      <?php endif; ?>
+    <?php endif; ?>
+    <?= e($t['name']) ?>
+  </a>
+  <span class="text-muted">-</span>
+  <?php endif; ?>
+  <span><?= e($c['name']) ?></span>
+</h2>
 
 <!-- Header -->
 <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
-  <h2 class="mb-0"><i class="bi bi-diagram-3 me-2"></i><?= e($c['name']) ?></h2>
   <?php if (can_edit()): ?>
   <span class="badge fs-6 <?= $phase_colors[$c['phase']] ?? 'bg-secondary' ?>">
-    <?= $phase_labels[$c['phase']] ?? e($c['phase']) ?>
+    <?= e(phase_label($c['phase'], $c['mode'] ?? null)) ?>
   </span>
   <?php if ($t && $t['registrations_open'] && $c['registrations_open']): ?>
   <span class="badge bg-success-subtle text-success border border-success-subtle fs-6">
@@ -84,6 +84,18 @@ ob_start(); ?>
       <?= csrf_field() ?>
       <button class="btn btn-outline-warning btn-sm"><i class="bi bi-arrow-counterclockwise me-1"></i><?= e($reset_ko_lbl) ?></button>
     </form>
+    <?php endif; ?>
+    <?php if (is_admin() && !$locked): ?>
+    <span id="test-tools" data-duels-bulk-url="<?= e(url('competition/'.$c['id'].'/duels/bulk')) ?>" class="d-inline-flex gap-2">
+      <button type="button" class="btn btn-outline-warning btn-sm" onclick="fillTestResults(true)" title="Testergebnisse eintragen &amp; speichern">
+        <i class="bi bi-dice-5"></i>
+      </button>
+      <form method="post" action="<?= url('competition/'.$c['id'].'/results/clear-phase') ?>"
+            data-confirm="Alle eingetragenen Ergebnisse der aktuellen Phase entfernen?" class="m-0">
+        <?= csrf_field() ?>
+        <button class="btn btn-outline-danger btn-sm" title="Testergebnisse entfernen"><i class="bi bi-eraser"></i></button>
+      </form>
+    </span>
     <?php endif; ?>
     <?php if (!$locked): ?>
     <form method="post" action="<?= url('competition/'.$c['id'].'/delete') ?>"
@@ -140,6 +152,7 @@ ob_start(); ?>
 <?php endif; ?>
 
 <!-- ═══ Registerkarten: Bewerb + Spieler [+ Einstellungen] ═════════════════ -->
+<?php if (can_edit()): /* Gäste/Reader haben nur den Bewerb-Tab → Leiste ausblenden, Inhalt direkt zeigen */ ?>
 <ul class="nav nav-tabs mb-0" id="comp-tabs" role="tablist">
   <li class="nav-item" role="presentation">
     <button class="nav-link active" id="tab-competition-btn"
@@ -179,7 +192,8 @@ ob_start(); ?>
   </li>
   <?php endif; ?>
 </ul>
-<div class="tab-content border border-top-0 rounded-bottom mb-4">
+<?php endif; ?>
+<div class="tab-content<?= can_edit() ? ' border border-top-0 rounded-bottom' : '' ?> mb-4">
 
   <?php if (can_edit()): ?>
   <!-- Tab: Monitor -->
@@ -1114,13 +1128,13 @@ ob_start(); ?>
     <?php if ($has_open_tie): ?>
     <div class="d-inline-flex align-items-center gap-2" tabindex="0" data-bs-toggle="tooltip"
          title="Bitte zuerst alle Tabellengleichstände auflösen.">
-      <button class="btn btn-primary opacity-50" disabled style="cursor:not-allowed"><i class="bi bi-trophy me-1"></i>KO-Phase auslosen</button>
+      <button class="btn btn-primary opacity-50" disabled style="cursor:not-allowed"><i class="bi bi-trophy me-1"></i>KO-Runde auslosen</button>
       <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i></span>
     </div>
     <?php else: ?>
     <form method="post" action="<?= url('competition/'.$c['id'].'/draw/ko') ?>">
       <?= csrf_field() ?>
-      <button class="btn btn-primary"><i class="bi bi-trophy me-1"></i>KO-Phase auslosen</button>
+      <button class="btn btn-primary"><i class="bi bi-trophy me-1"></i>KO-Runde auslosen</button>
     </form>
     <?php endif; ?>
   </div>
@@ -1164,7 +1178,7 @@ ob_start(); ?>
 
     <!-- Abschnitts-Kopf Gruppen: Überschrift links, Gesamtexporte & Steuerung rechts -->
     <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-      <h4 class="h5 mb-0"><i class="bi bi-people me-2 text-primary"></i>Gruppen</h4>
+      <?php if ($show_section_titles): ?><h4 class="h5 mb-0"><i class="bi bi-people me-2 text-primary"></i>Gruppen</h4><?php endif; ?>
       <div class="d-flex align-items-center gap-2 ms-auto">
         <?php if (can_edit()): ?>
         <span class="btn-group btn-group-sm">
@@ -1667,7 +1681,7 @@ ob_start(); ?>
     <?php if ($ko_rounds || $third_place_match): ?>
     <!-- KO-Phase -->
     <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-      <h4 class="h5 mb-0"><i class="bi bi-trophy me-2 text-warning"></i>KO-Runde</h4>
+      <?php if ($show_section_titles): ?><h4 class="h5 mb-0"><i class="bi bi-trophy me-2 text-warning"></i>KO-Runde</h4><?php endif; ?>
       <div class="d-flex align-items-center gap-2 ms-auto">
         <?php if (can_edit()): ?>
         <span class="btn-group btn-group-sm">
@@ -2137,7 +2151,7 @@ ob_start(); ?>
     <?php if ($cross_blocks): ?>
     <!-- ═══ Kreuzspiele / Platzierungs-Brackets ═════════════════════════════════ -->
     <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-      <h4 class="h5 mb-0"><i class="bi bi-trophy me-2 text-warning"></i>Kreuzspiele</h4>
+      <?php if ($show_section_titles): ?><h4 class="h5 mb-0"><i class="bi bi-trophy me-2 text-warning"></i>Kreuzspiele</h4><?php endif; ?>
       <?php if (can_edit()): ?>
       <span class="btn-group btn-group-sm ms-auto">
         <a href="<?= url('competition/'.$c['id'].'/pdf/cross') ?>" class="btn btn-outline-danger" target="_blank" title="Platzierungs-PDF"><i class="bi bi-file-earmark-pdf"></i></a>
@@ -2251,7 +2265,7 @@ echo in_array($c['phase'], ['ko', 'done'], true) ? $__ko_html . $__gap . $__grou
 <?php if ($c['mode'] === 'double_ko' && ($dko_wb || $dko_lb || $dko_gf)): ?>
 <!-- ═══ Doppel-KO-Bracket ════════════════════════════════════════════════════ -->
 <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-  <h4 class="h5 mb-0"><i class="bi bi-diagram-2 me-2 text-warning"></i>Doppel-KO</h4>
+  <?php if ($show_section_titles): ?><h4 class="h5 mb-0"><i class="bi bi-diagram-2 me-2 text-warning"></i>Doppel-KO</h4><?php endif; ?>
   <?php if (can_edit()): ?>
   <span class="btn-group btn-group-sm ms-auto">
     <a href="<?= url('competition/'.$c['id'].'/pdf/ko') ?>" class="btn btn-outline-danger" target="_blank" title="KO-PDF"><i class="bi bi-file-earmark-pdf"></i></a>

@@ -7,12 +7,9 @@ $info_html     = $info_html    ?? 'Ein Spieler wird übersprungen, wenn bereits 
                   . 'Bestehende Einträge werden nicht verändert.';
 $has_created   = isset($created);
 ob_start(); ?>
-<nav aria-label="breadcrumb" class="mb-3">
-  <ol class="breadcrumb">
-    <li class="breadcrumb-item"><a href="<?= url('players') ?>">Spielerregister</a></li>
-    <li class="breadcrumb-item active">Importieren</li>
-  </ol>
-</nav>
+<div class="d-flex justify-content-end mb-3">
+  <a href="<?= url('players') ?>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Zurück</a>
+</div>
 
 <div class="row justify-content-center">
   <div class="col-lg-7">

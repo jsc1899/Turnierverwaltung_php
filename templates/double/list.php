@@ -1,12 +1,8 @@
 <?php
 ob_start(); ?>
-<nav aria-label="breadcrumb" class="mb-3">
-  <ol class="breadcrumb">
-    <li class="breadcrumb-item"><a href="<?= url() ?>">Turniere</a></li>
-    <li class="breadcrumb-item"><a href="<?= url('tournament/' . $t['id']) ?>"><?= e($t['name']) ?></a></li>
-    <li class="breadcrumb-item active">Doppel</li>
-  </ol>
-</nav>
+<div class="d-flex justify-content-end mb-3">
+  <a href="<?= url('tournament/' . $t['id']) ?>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Zurück</a>
+</div>
 
 <div class="d-flex align-items-center gap-3 mb-4">
   <h2 class="mb-0"><i class="bi bi-people-fill me-2"></i>Doppel</h2>

@@ -371,7 +371,7 @@ ob_start(); ?>
       </ol>
       <div class="alert alert-info small mt-2">
         <i class="bi bi-info-circle me-1"></i>
-        Solange ein offener Tabellengleichstand besteht, ist die Schaltfläche <strong>KO-Phase auslosen</strong> gesperrt. Der Gleichstand muss zuerst über <strong>Tabellengleichstand – Positionen festlegen</strong> aufgelöst werden.
+        Solange ein offener Tabellengleichstand besteht, ist die Schaltfläche <strong>KO-Runde auslosen</strong> gesperrt. Der Gleichstand muss zuerst über <strong>Tabellengleichstand – Positionen festlegen</strong> aufgelöst werden.
       </div>
 
       <h5 id="ko" class="mt-3">KO-Runde (nach Gruppenphase)</h5>

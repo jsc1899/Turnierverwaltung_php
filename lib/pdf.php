@@ -831,7 +831,7 @@ function generate_team_strips_pdf(int $cid, ?int $gid = null): void {
         $sc_cells_r = '<td class="mid">&nbsp;</td>' . str_repeat('<td>&nbsp;</td>', $ncols + 1);
 
         $sections = [
-            'KO-Phase'    => array_values(array_filter($kom, fn($m) => $grpkey($m['bracket']) < 2)),
+            'KO-Runde'    => array_values(array_filter($kom, fn($m) => $grpkey($m['bracket']) < 2)),
             'Kreuzspiele' => array_values(array_filter($kom, fn($m) => $grpkey($m['bracket']) === 2)),
         ];
         foreach ($sections as $secname => $sms) {
@@ -1189,7 +1189,7 @@ function generate_ko_pdf(int $cid): void {
     }
 
     $html  = pdf_css();
-    $html .= '<h2 style="margin-top:0">' . e($c['name']) . ' — KO-Phase</h2>';
+    $html .= '<h2 style="margin-top:0">' . e($c['name']) . ' — KO-Runde</h2>';
     if ($t) $html .= '<div class="meta">' . e($t['name']) . '</div>';
 
     foreach ($rounds as $r => $rmatches) {
@@ -1214,7 +1214,7 @@ function generate_ko_pdf(int $cid): void {
 
     $pdf = mpdf();
     $pdf->WriteHTML($html);
-    $pdf->Output('KO-Phase.pdf', \Mpdf\Output\Destination::INLINE);
+    $pdf->Output('KO-Runde.pdf', \Mpdf\Output\Destination::INLINE);
     exit;
 }
 

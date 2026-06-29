@@ -1432,7 +1432,7 @@ function draw_ko(array $p): void {
         }
         $grp_matches = db_fetchall("SELECT * FROM `match` WHERE group_id=? AND played=1", [$g['id']]);
         if (!empty(tied_ids_at_boundary($st, (int)$c['advance_count'], $grp_matches, $p1c, $p2c, _parse_points_mode($c['points_mode'] ?? null)))) {
-            flash('warning', 'Bitte zuerst alle Tabellengleichstände auflösen, bevor die KO-Phase ausgelost wird.');
+            flash('warning', 'Bitte zuerst alle Tabellengleichstände auflösen, bevor die KO-Runde ausgelost wird.');
             redirect('competition/' . $cid);
             return;
         }
@@ -1460,7 +1460,7 @@ function draw_ko(array $p): void {
 
     $kind = $is_team ? 'Teams' : ($is_doubles ? 'Doppel' : 'Spieler');
     if ($n < 2) {
-        flash('danger', "Nicht genug $kind für KO-Phase.");
+        flash('danger', "Nicht genug $kind für KO-Runde.");
         redirect('competition/' . $cid);
         return;
     }
@@ -1607,7 +1607,8 @@ function reset_ko(array $p): void {
     $has_groups = db_fetch("SELECT COUNT(*) as n FROM grp WHERE competition_id=?", [$cid])['n'];
     db_execute("UPDATE competition SET phase=? WHERE id=?",
         [$has_groups ? 'group' : 'setup', $cid]);
-    flash('info', 'KO-Phase zurückgesetzt.');
+    $mode = db_fetch("SELECT mode FROM competition WHERE id=?", [$cid])['mode'] ?? '';
+    flash('info', ($mode === 'groups_cross' ? 'Kreuzspiele' : 'KO-Runde') . ' zurückgesetzt.');
     redirect('competition/' . $cid);
 }
 

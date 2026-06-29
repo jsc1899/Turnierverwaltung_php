@@ -881,7 +881,7 @@ function calcDoubleSkill() {
 
 var phaseLabels = {
   'setup': 'Vorbereitung', 'group': 'Gruppenphase',
-  'ko': 'KO-Phase', 'done': 'Abgeschlossen'
+  'ko': 'KO-Runde', 'done': 'Abgeschlossen'
 };
 
 document.addEventListener('DOMContentLoaded', function() {

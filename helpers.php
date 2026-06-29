@@ -151,6 +151,20 @@ function upload_file(string $field, array $allowed_exts = ['pdf', 'jpg', 'jpeg',
 // ── Spielplatz-Bezeichnung je Sportart ─────────────────────────────────────────
 // Tischtennis=Tisch, Tennis=Tennisplatz, Fußball=Spielfeld, Cornhole=Bahn, sonst Platz.
 
+/**
+ * Anzeigename der Bewerbs-Phase. Bei Modus 'groups_cross' heißt die Endrunde
+ * „Kreuzspiele" statt „KO-Runde".
+ */
+function phase_label(string $phase, ?string $mode = null): string {
+    switch ($phase) {
+        case 'setup': return 'Einrichtung';
+        case 'group': return 'Gruppenphase';
+        case 'ko':    return $mode === 'groups_cross' ? 'Kreuzspiele' : 'KO-Runde';
+        case 'done':  return 'Beendet';
+        default:      return $phase;
+    }
+}
+
 function court_label(string $sport = '', bool $plural = false): string {
     $map = [
         'tischtennis' => ['Tisch',       'Tische'],

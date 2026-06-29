@@ -3,12 +3,9 @@ $sport_icons  = ['tischtennis'=>'🏓','tennis'=>'🎾','fussball'=>'⚽','cornh
 $sport_labels = ['tischtennis'=>'Tischtennis','tennis'=>'Tennis','fussball'=>'Fußball','cornhole'=>'Cornhole'];
 $locked = (int)($t['is_done'] ?? 0) === 1;
 ob_start(); ?>
-<nav aria-label="breadcrumb" class="mb-3">
-  <ol class="breadcrumb">
-    <li class="breadcrumb-item"><a href="<?= url() ?>">Turniere</a></li>
-    <li class="breadcrumb-item active"><?= e($t['name']) ?></li>
-  </ol>
-</nav>
+<div class="d-flex justify-content-end mb-3">
+  <a href="<?= url() ?>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Zurück</a>
+</div>
 
 <!-- Header -->
 <div class="d-flex align-items-start gap-3 mb-4 flex-wrap">
@@ -170,7 +167,7 @@ $nennung_badge = $pending_count + $change_count;
               <?php $phase_labels = ['setup'=>'Einrichtung','group'=>'Gruppenphase','ko'=>'KO-Phase','done'=>'Beendet']; ?>
               <?php $phase_colors = ['setup'=>'bg-secondary','group'=>'bg-warning text-dark','ko'=>'bg-info text-dark','done'=>'bg-success']; ?>
               <span class="badge <?= $phase_colors[$c['phase']] ?? 'bg-secondary' ?>">
-                <?= $phase_labels[$c['phase']] ?? e($c['phase']) ?>
+                <?= e(phase_label($c['phase'], $c['mode'] ?? null)) ?>
               </span>
               <?php if ($t['registrations_open'] && $c['registrations_open']): ?>
               <span class="badge bg-success-subtle text-success border border-success-subtle">

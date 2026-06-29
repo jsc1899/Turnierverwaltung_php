@@ -30,7 +30,7 @@
   <link rel="icon" type="image/x-icon" href="<?= url('static/favicon.ico') ?>">
 </head>
 <body>
-<nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 sticky-top">
   <div class="container">
     <a class="navbar-brand d-flex align-items-center gap-2" href="<?= url() ?>">
       <img src="<?= url('static/logo_unionsaxen.jpg') ?>"

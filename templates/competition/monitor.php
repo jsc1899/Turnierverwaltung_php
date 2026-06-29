@@ -213,7 +213,7 @@ $teilnehmer_kopf = $is_team ? 'Mannschaft' : ($is_doubles ? 'Doppel' : 'Spieler'
       <div class="sub"><?= $t ? e($t['name']) : '' ?></div>
     </div>
     <span class="badge fs-5 text-bg-<?= $phase_colors[$c['phase']] ?? 'secondary' ?>">
-      <?= e($phase_labels[$c['phase']] ?? $c['phase']) ?>
+      <?= e(phase_label($c['phase'], $c['mode'] ?? null)) ?>
     </span>
     <span class="mon-clock"><i class="bi bi-clock"></i> Stand: <?= date('H:i') ?> Uhr</span>
   </div>
