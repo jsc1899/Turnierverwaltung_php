@@ -3034,11 +3034,13 @@ function positionThirdPlace() {
     var col = tp.closest('.ko-round'); if (!col) return;
     var fin = col.querySelector('.ko-match'); if (!fin) return;  // erstes .ko-match = Finale
     tp.style.top = (fin.offsetTop + fin.offsetHeight + 16) + 'px';
-    // Bracket-Höhe ggf. erweitern, damit das Platz-3-Spiel nicht überlappt
+    // Platz unterhalb reservieren OHNE die Bracket-Höhe zu ändern → das per space-around
+    // zentrierte Finale bleibt stabil (Höhe ändern würde es verschieben → instabile Darstellung,
+    // je nachdem wie oft die Funktion läuft).
     var bracket = col.closest('[id^="ko-bracket-"]');
     if (bracket) {
-      var need = tp.offsetTop + tp.offsetHeight;
-      if (need > bracket.offsetHeight) bracket.style.height = need + 'px';
+      var overflow = (tp.offsetTop + tp.offsetHeight) - bracket.offsetHeight;
+      bracket.style.marginBottom = (overflow > 0 ? overflow + 12 : 0) + 'px';
     }
   });
 }
@@ -3057,6 +3059,9 @@ function drawAllBrackets() {
   });
 }
 document.addEventListener('DOMContentLoaded', drawAllBrackets);
+// Nach vollständigem Laden (Schriftarten/Layout fertig) erneut zeichnen → korrekte Maße
+// auch beim Aktualisieren der Seite.
+window.addEventListener('load', function() { setTimeout(drawAllBrackets, 0); });
 window.addEventListener('resize', drawAllBrackets);
 // Brackets in zunächst versteckten Tabs (Doppel-KO: WB/LB/GF) erst beim Anzeigen korrekt zeichnen
 document.addEventListener('shown.bs.tab', drawAllBrackets);
