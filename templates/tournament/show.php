@@ -336,7 +336,18 @@ $nennung_badge = $pending_count + $change_count;
       <div class="modal-body">
         <form method="post" action="<?= url('tournament/' . $t['id'] . '/competition/new') ?>">
           <?= csrf_field() ?>
+          <style>
+            #newCompetitionModal .row > .col-12:has(> .opt-head) { margin-top:1.25rem; }
+            #newCompetitionModal .row > .col-12:has(> .opt-head):first-child { margin-top:0; }
+            #newCompetitionModal .opt-head {
+              font-size:.8rem; font-weight:600; text-transform:uppercase; letter-spacing:.03em;
+              color:#6c757d; border-bottom:1px solid var(--bs-border-color); padding-bottom:.25rem; margin-bottom:.1rem;
+            }
+          </style>
           <div class="row g-3">
+
+            <!-- ── Allgemein ── -->
+            <div class="col-12"><div class="opt-head"><i class="bi bi-info-circle me-1"></i>Allgemein</div></div>
             <div class="col-sm-6">
               <label class="form-label">Bewerbsname <span class="text-danger">*</span></label>
               <input type="text" name="name" class="form-control" placeholder="z.B. Herren A" required>
@@ -349,17 +360,19 @@ $nennung_badge = $pending_count + $change_count;
                 <option value="team">Teambewerb</option>
               </select>
             </div>
-            <div class="col-sm-6" id="new-team-size-wrap" style="display:none">
-              <label class="form-label">Spiele pro Team</label>
-              <input type="number" name="team_size" class="form-control" value="0" min="0" max="20">
+            <div class="col-sm-3">
+              <label class="form-label">Max. Teilnehmer <span class="text-muted small">(0 = ∞)</span></label>
+              <input type="number" name="max_players" class="form-control" value="0" min="0">
             </div>
-            <div class="col-sm-6" id="new-team-result-wrap" style="display:none">
-              <label class="form-label">Begegnungsergebnis</label>
-              <select name="team_result_mode" class="form-select">
-                <option value="wins" selected>Je Einzelsieg 1 Punkt</option>
-                <option value="sum">Einzelergebnisse aufsummieren</option>
-              </select>
+            <div class="col-sm-3 d-flex align-items-end pb-1">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="registrations_open" id="new_regs_open" checked>
+                <label class="form-check-label" for="new_regs_open">Nennung offen</label>
+              </div>
             </div>
+
+            <!-- ── Spielmodus & Format ── -->
+            <div class="col-12"><div class="opt-head"><i class="bi bi-diagram-3 me-1"></i>Spielmodus &amp; Format</div></div>
             <div class="col-sm-6">
               <label class="form-label">Spielmodus</label>
               <select name="mode" class="form-select" id="comp-mode-select" onchange="toggleGroupSettings()">
@@ -371,36 +384,10 @@ $nennung_badge = $pending_count + $change_count;
             <div class="col-sm-3" id="new-group-size-wrap">
               <label class="form-label">Gruppengröße</label>
               <select name="group_size" class="form-select" onchange="newToggleCross()">
-                <?php foreach (range(3, 20) as $s): ?>
+                <?php foreach (range(3, 24) as $s): ?>
                 <option value="<?= $s ?>"<?= $s === 4 ? ' selected' : '' ?>><?= $s ?> Teilnehmer</option>
                 <?php endforeach; ?>
               </select>
-            </div>
-            <div class="col-12" id="new-cross-wrap" style="display:none">
-              <label class="form-label">Kreuzspiele – Paarungen je Rang</label>
-              <div class="d-flex flex-wrap gap-3">
-                <?php for ($t = 1; $t <= 5; $t++): ?>
-                <div class="new-cross-tier" data-tier="<?= $t ?>">
-                  <div class="small text-muted mb-1">Rang <?= 2*$t-1 ?>+<?= 2*$t ?></div>
-                  <select name="cross_config[]" class="form-select form-select-sm" style="width:auto">
-                    <option value="x">über Kreuz</option>
-                    <option value="s">getrennt</option>
-                  </select>
-                </div>
-                <?php endfor; ?>
-              </div>
-            </div>
-            <div class="col-sm-3 d-flex align-items-end pb-1" id="new-byes-wrap">
-              <div class="form-check">
-                <input class="form-check-input" type="checkbox" name="show_byes" id="new_show_byes">
-                <label class="form-check-label" for="new_show_byes">Spielrunden anzeigen</label>
-              </div>
-            </div>
-            <div class="col-sm-3 d-flex align-items-end pb-1" id="new-forcebyes-wrap">
-              <div class="form-check">
-                <input class="form-check-input" type="checkbox" name="force_byes" id="new_force_byes">
-                <label class="form-check-label" for="new_force_byes">Spielfreie Runde garantieren</label>
-              </div>
             </div>
             <div class="col-sm-3" id="new-finalrunde-wrap">
               <label class="form-label">Finalrunde</label>
@@ -418,17 +405,81 @@ $nennung_badge = $pending_count + $change_count;
                 <option value="2">2 (Erste &amp; Zweite)</option>
               </select>
             </div>
+            <div class="col-sm-3" id="new-round-limit-wrap" style="display:none">
+              <label class="form-label">Rundenanzahl <span class="text-muted small">(0 = alle)</span></label>
+              <input type="number" name="round_limit" class="form-control" min="0" max="50" placeholder="alle"
+                     title="Spielplan nur für so viele Runden erstellen (leer/0 = vollständiger Spielplan).">
+            </div>
             <div class="col-sm-6 d-flex align-items-end pb-1" id="new-third-place-wrap">
               <div class="form-check">
                 <input class="form-check-input" type="checkbox" name="third_place" id="new_third_place">
                 <label class="form-check-label" for="new_third_place">Platz-3-Spiel</label>
               </div>
             </div>
+            <div class="col-sm-3 d-flex align-items-end pb-1" id="new-show-seeding-wrap" style="display:none !important">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="show_seeding" id="new_show_seeding" checked>
+                <label class="form-check-label" for="new_show_seeding">Setzungen anzeigen (KO)</label>
+              </div>
+            </div>
+            <div class="col-12" id="new-cross-wrap" style="display:none">
+              <label class="form-label">Kreuzspiele – Paarungen je Rang</label>
+              <div class="d-flex flex-wrap gap-3">
+                <?php for ($t = 1; $t <= 5; $t++): ?>
+                <div class="new-cross-tier" data-tier="<?= $t ?>">
+                  <div class="small text-muted mb-1">Rang <?= 2*$t-1 ?>+<?= 2*$t ?></div>
+                  <select name="cross_config[]" class="form-select form-select-sm" style="width:auto">
+                    <option value="x">über Kreuz</option>
+                    <option value="s">getrennt</option>
+                  </select>
+                </div>
+                <?php endfor; ?>
+              </div>
+            </div>
+
+            <!-- ── Mannschaft (Teambewerb) ── -->
+            <div class="col-12" id="new-sec-team" style="display:none"><div class="opt-head"><i class="bi bi-people me-1"></i>Mannschaft</div></div>
+            <div class="col-sm-6" id="new-team-size-wrap" style="display:none">
+              <label class="form-label">Spiele pro Team</label>
+              <input type="number" name="team_size" class="form-control" value="0" min="0" max="20">
+            </div>
+            <div class="col-sm-6" id="new-team-result-wrap" style="display:none">
+              <label class="form-label">Begegnungsergebnis</label>
+              <select name="team_result_mode" class="form-select">
+                <option value="wins" selected>Je Einzelsieg 1 Punkt</option>
+                <option value="sum">Einzelergebnisse aufsummieren</option>
+                <option value="total">Nur Gesamtergebnis eingeben</option>
+              </select>
+            </div>
+            <div class="col-sm-6" id="new-matchcard-wrap" style="display:none">
+              <label class="form-label">Match-Cards</label>
+              <select name="match_card_mode" class="form-select">
+                <option value="fields" selected>mit Spielerfelder</option>
+                <option value="compact">ohne Spielerfelder</option>
+              </select>
+            </div>
+            <div class="col-sm-3 d-flex align-items-end pb-1" id="new-kickoff-wrap" style="display:none">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="kickoff_enabled" id="new_kickoff_enabled">
+                <label class="form-check-label" for="new_kickoff_enabled">Anwurf auslosen</label>
+              </div>
+            </div>
+
+            <!-- ── Wertung & Setzung ── -->
+            <div class="col-12"><div class="opt-head"><i class="bi bi-trophy me-1"></i>Wertung &amp; Setzung</div></div>
+            <div class="col-sm-6" id="new-scoremode-wrap">
+              <label class="form-label">Ergebniserfassung</label>
+              <select name="score_mode" class="form-select">
+                <option value="match" selected>Spielergebnis</option>
+                <option value="sets">Satzergebnisse</option>
+                <option value="sets_grp">Gruppe Sätze, KO Spielergebnis</option>
+              </select>
+            </div>
             <div class="col-sm-6">
               <label class="form-label">Setzungsreihenfolge</label>
               <select name="seeding_order" class="form-select">
-                <option value="desc" selected>Höhere Stärke = stärker</option>
-                <option value="asc">Niedrigere Stärke = stärker (Tennis)</option>
+                <option value="desc" selected>Höhere Spielstärke = stärker</option>
+                <option value="asc">Niedrigere Spielstärke = stärker</option>
                 <option value="random">Zufällig (keine Setzung)</option>
               </select>
             </div>
@@ -439,30 +490,76 @@ $nennung_badge = $pending_count + $change_count;
                 <option value="diff">Punkte – Differenz – Direktes Duell</option>
               </select>
             </div>
-            <div class="col-sm-3 d-flex align-items-end pb-1">
+            <div class="col-sm-6">
+              <label class="form-label">Punktevergabe</label>
+              <select name="points_mode" class="form-select">
+                <option value="2-1-0" selected>Sieg 2 – Unentsch. 1 – Niederl. 0</option>
+                <option value="3-1-0">Sieg 3 – Unentsch. 1 – Niederl. 0</option>
+                <option value="3-2-1">Sieg 3 – Unentsch. 2 – Niederl. 1</option>
+              </select>
+            </div>
+
+            <!-- ── Spielplan & Zeit ── -->
+            <div class="col-12"><div class="opt-head"><i class="bi bi-calendar3 me-1"></i>Spielplan &amp; Zeit</div></div>
+            <div class="col-sm-3 d-flex align-items-end pb-1" id="new-byes-wrap">
               <div class="form-check">
-                <input class="form-check-input" type="checkbox" name="show_skill" id="new_show_skill">
-                <label class="form-check-label" for="new_show_skill">Spielstärke anzeigen (Gruppe)</label>
+                <input class="form-check-input" type="checkbox" name="show_byes" id="new_show_byes">
+                <label class="form-check-label" for="new_show_byes">Spielrunden anzeigen</label>
               </div>
             </div>
-            <div class="col-sm-3 d-flex align-items-end pb-1" id="new-show-seeding-wrap" style="display:none !important">
+            <div class="col-sm-3 d-flex align-items-end pb-1" id="new-forcebyes-wrap">
               <div class="form-check">
-                <input class="form-check-input" type="checkbox" name="show_seeding" id="new_show_seeding" checked>
-                <label class="form-check-label" for="new_show_seeding">Setzungen anzeigen (KO)</label>
+                <input class="form-check-input" type="checkbox" name="force_byes" id="new_force_byes">
+                <label class="form-check-label" for="new_force_byes">Spielfreie Runde garantieren</label>
               </div>
             </div>
-            <div class="col-sm-3">
-              <label class="form-label">Max. Teilnehmer <span class="text-muted small">(0 = ∞)</span></label>
-              <input type="number" name="max_players" class="form-control" value="0" min="0">
+            <div class="col-sm-6" id="new-schedule-mode-wrap">
+              <label class="form-label">Spielplan-Erstellung</label>
+              <select name="schedule_mode" class="form-select">
+                <option value="random" selected>Zufällig</option>
+                <option value="position">Nach Position</option>
+              </select>
             </div>
             <div class="col-sm-3">
               <label class="form-label"><?= e(court_label($t['sport'] ?? '', true)) ?> <span class="text-muted small">(0 = aus)</span></label>
               <input type="number" name="num_courts" class="form-control" value="0" min="0" max="20">
             </div>
-            <div class="col-sm-6 d-flex align-items-end pb-1">
+            <div class="col-sm-3 d-flex align-items-end pb-1">
               <div class="form-check">
-                <input class="form-check-input" type="checkbox" name="registrations_open" id="new_regs_open" checked>
-                <label class="form-check-label" for="new_regs_open">Nennung offen</label>
+                <input class="form-check-input" type="checkbox" name="schedule_enabled" id="new_schedule_enabled" onchange="newToggleSchedule()">
+                <label class="form-check-label" for="new_schedule_enabled"
+                       title="Nur wirksam mit Spielplätzen (&gt;0) und „Spielrunden anzeigen".">Zeitplan</label>
+              </div>
+            </div>
+            <div class="col-12" id="new-schedule-fields" style="display:none">
+              <div class="row g-2 align-items-end">
+                <div class="col-auto">
+                  <label class="form-label">Spieldauer/Runde <span class="text-muted small">(Min.)</span></label>
+                  <input type="number" name="schedule_duration" class="form-control" style="max-width:150px" min="1" max="600" placeholder="z.B. 15">
+                </div>
+                <div class="col-auto">
+                  <label class="form-label">Startzeit</label>
+                  <input type="time" name="schedule_start" class="form-control" style="max-width:150px">
+                </div>
+                <div class="col-12">
+                  <small class="text-muted">Wirksam nur mit aktivierten Spielplätzen (&gt;0) und „Spielrunden anzeigen".</small>
+                </div>
+              </div>
+            </div>
+
+            <!-- ── Anzeige & Druck ── -->
+            <div class="col-12"><div class="opt-head"><i class="bi bi-printer me-1"></i>Anzeige &amp; Druck</div></div>
+            <div class="col-sm-4 d-flex align-items-end pb-1">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="show_skill" id="new_show_skill">
+                <label class="form-check-label" for="new_show_skill">Spielstärke anzeigen (Gruppe)</label>
+              </div>
+            </div>
+            <div class="col-sm-4 d-flex align-items-end pb-1">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="mc_separate_page" id="new_mc_separate_page">
+                <label class="form-check-label" for="new_mc_separate_page"
+                       title="Match-Cards, Teampläne und Bahnpläne: jede Karte bzw. Übersicht auf einer eigenen Seite.">separate Seite für Match-Cards</label>
               </div>
             </div>
           </div>
@@ -543,10 +640,19 @@ function openImageModal(src) {
 function toggleTeamSize() {
   var sel  = document.getElementById('new-comp-type-select');
   var show = (sel && sel.value === 'team');
-  ['new-team-size-wrap', 'new-team-result-wrap'].forEach(function(id) {
+  // Team-spezifische Felder nur im Teambewerb
+  ['new-sec-team', 'new-team-size-wrap', 'new-team-result-wrap', 'new-matchcard-wrap', 'new-kickoff-wrap'].forEach(function(id) {
     var wrap = document.getElementById(id);
     if (wrap) wrap.style.display = show ? '' : 'none';
   });
+  // Ergebniserfassung (Sätze) nur im Einzel-/Doppelbewerb
+  var sm = document.getElementById('new-scoremode-wrap');
+  if (sm) sm.style.display = show ? 'none' : '';
+}
+function newToggleSchedule() {
+  var cb   = document.getElementById('new_schedule_enabled');
+  var wrap = document.getElementById('new-schedule-fields');
+  if (wrap) wrap.style.display = (cb && cb.checked) ? '' : 'none';
 }
 // Ausblenden mit !important, da manche Wrapper die Klasse d-flex (display:flex !important) tragen.
 function _setVis(el, cond) {
@@ -559,7 +665,7 @@ function toggleGroupSettings() {
   var mode = sel ? sel.value : 'groups_ko';
   var isGroups = (mode === 'groups_ko');
   // Gruppen-bezogene Felder (Größe, Spielrunden, Finalrunde) nur im Gruppenphase-Modus
-  ['new-group-size-wrap', 'new-byes-wrap', 'new-forcebyes-wrap', 'new-finalrunde-wrap'].forEach(function(id) {
+  ['new-group-size-wrap', 'new-byes-wrap', 'new-forcebyes-wrap', 'new-finalrunde-wrap', 'new-schedule-mode-wrap'].forEach(function(id) {
     _setVis(document.getElementById(id), isGroups);
   });
   // Setzungen anzeigen (KO) nur im KO-/Doppel-KO-Modus
@@ -574,6 +680,8 @@ function newToggleCross() {
   var frVal = fr ? fr.value : 'ko';
   // Aufsteiger-Feld nur bei Finalrunde = KO-Runde
   _setVis(document.getElementById('new-advance-wrap'), isGroups && frVal === 'ko');
+  // Rundenanzahl-Feld nur bei reiner Gruppenphase (Finalrunde = nur Gruppenphase)
+  _setVis(document.getElementById('new-round-limit-wrap'), isGroups && frVal === 'none');
   // Kreuz-Konfig nur bei Finalrunde = Kreuzspiele
   var wrap = document.getElementById('new-cross-wrap');
   if (wrap) {

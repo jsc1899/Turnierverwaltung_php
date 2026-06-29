@@ -213,6 +213,25 @@ function group_pause_window(array $c, array $g): ?array {
     return ['after_round' => $p, 'start' => _min_to_hhmm($startMin), 'end' => _min_to_hhmm($startMin + (int)$g['pause_duration'])];
 }
 
+// Einheitliche Pausen-Info einer Gruppe – für Anzeige in Spielplan/Übersicht/PDFs.
+// Liefert ['after_round'=>N, 'label'=>'…'] oder null. Zwei Quellen, sich gegenseitig ausschließend:
+//  - aktiver Zeitplan → zeitbasierte Pause (group_pause_window), Label mit Uhrzeiten
+//  - ohne Zeitplan    → rundenbasierte Pause (grp.pause_after_round), Label „Pause nach Runde N"
+function group_pause_info(array $c, array $g): ?array {
+    $pw = group_pause_window($c, $g);
+    if ($pw) {
+        return ['after_round' => $pw['after_round'], 'label' => 'Pause · ' . $pw['start'] . ' – ' . $pw['end'] . ' Uhr'];
+    }
+    if (empty($c['schedule_enabled'])) {
+        $ra = (int)($g['pause_after_round'] ?? 0);
+        if ($ra >= 1) {
+            $lbl = trim((string)($g['pause_label'] ?? ''));
+            return ['after_round' => $ra, 'label' => $lbl !== '' ? $lbl : 'Pause'];
+        }
+    }
+    return null;
+}
+
 // Startzeit einer Runde inkl. Gruppen-Pause (Runden nach der Pause sind verschoben). '' wenn aus.
 function group_round_time(array $c, array $g, int $round): string {
     $min = schedule_round_minutes((string)($c['schedule_start'] ?? ''), (int)($c['schedule_duration'] ?? 0), $round);

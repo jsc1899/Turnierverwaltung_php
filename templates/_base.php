@@ -64,6 +64,7 @@
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item" href="<?= url('admin/users') ?>"><i class="bi bi-shield-lock me-1"></i>Benutzer</a></li>
             <li><a class="dropdown-item" href="<?= url('admin/design') ?>"><i class="bi bi-palette me-1"></i>Design</a></li>
+            <li><a class="dropdown-item" href="<?= url('admin/impressum') ?>"><i class="bi bi-file-text me-1"></i>Impressum</a></li>
             <?php $ver = get_git_version(); if ($ver !== ''): ?>
             <li><hr class="dropdown-divider"></li>
             <li><span class="dropdown-item-text text-muted small text-nowrap"><i class="bi bi-clock me-1"></i>Version: <?= e($ver) ?></span></li>
@@ -92,6 +93,13 @@
 
   <?= $content ?>
 </main>
+
+<?php $impressum = get_setting('impressum', ''); ?>
+<?php if (trim($impressum) !== ''): ?>
+<footer class="container text-center text-muted small py-3 border-top mt-4">
+  <?= nl2br(e($impressum)) ?>
+</footer>
+<?php endif; ?>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
@@ -155,8 +163,12 @@
     });
     rows.forEach(function(r) { tbody.appendChild(r); });
   }
-  document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('table[data-sortable] thead th:not(.no-sort)').forEach(function(th) {
+  // Idempotent: bindet Sortier-Header innerhalb von root (Default: ganze Seite). Nach einem
+  // AJAX-Refresh erneut aufrufbar (neue <th> ohne data-sort-bound werden frisch gebunden).
+  window.initSortable = function(root) {
+    (root || document).querySelectorAll('table[data-sortable] thead th:not(.no-sort)').forEach(function(th) {
+      if (th.dataset.sortBound) return;
+      th.dataset.sortBound = '1';
       var table = th.closest('table');
       var idx   = Array.from(th.parentElement.children).indexOf(th);
       var icon  = document.createElement('span');
@@ -171,6 +183,78 @@
         asc = !asc;
       });
     });
+  };
+  document.addEventListener('DOMContentLoaded', function() { window.initSortable(document); });
+})();
+
+// ── Generische Inline-AJAX-Schicht ───────────────────────────────────────────
+// Formulare mit class="js-ajax" werden ohne Reload gespeichert: POST per fetch,
+// dem Redirect wird gefolgt, die gelieferte Seite geparst und die in
+// data-refresh="#id, #id2" genannten Container im Live-DOM ersetzt. Flash-Meldungen
+// werden oben in <main> eingeblendet. Optional: data-modal-close (Modal schließen).
+(function() {
+  function showFlashes(doc) {
+    var main = document.querySelector('main');
+    var src  = doc.querySelector('main');
+    if (!main || !src) return [];
+    main.querySelectorAll(':scope > .alert.js-ajax-flash').forEach(function(a) { a.remove(); });
+    var alerts = Array.prototype.slice.call(src.querySelectorAll(':scope > .alert'));
+    alerts.reverse().forEach(function(a) {
+      a.classList.add('js-ajax-flash');
+      main.insertBefore(a, main.firstChild);
+      if (!a.classList.contains('alert-danger')) {
+        setTimeout(function() {
+          a.classList.remove('show');
+          setTimeout(function() { a.remove(); }, 200);
+        }, 3000);
+      }
+    });
+    return alerts;
+  }
+
+  function refresh(doc, sel) {
+    sel.split(',').forEach(function(s) {
+      s = s.trim(); if (!s) return;
+      var id    = s.charAt(0) === '#' ? s.slice(1) : s;
+      var fresh = doc.getElementById(id);
+      var live  = document.getElementById(id);
+      if (!fresh || !live) return;
+      live.innerHTML = fresh.innerHTML;
+      window.initSortable(live);
+      // Zähler im zugehörigen Tab-Button aktualisieren (ohne aktiven Zustand zu ändern).
+      var liveBtn  = document.querySelector('[data-bs-target="#' + id + '"]');
+      var freshBtn = doc.querySelector('[data-bs-target="#' + id + '"]');
+      if (liveBtn && freshBtn) liveBtn.innerHTML = freshBtn.innerHTML;
+      document.dispatchEvent(new CustomEvent('content:refreshed', { detail: { container: live } }));
+    });
+  }
+
+  document.addEventListener('submit', function(ev) {
+    var form = ev.target.closest('form.js-ajax');
+    if (!form) return;
+    if (ev.defaultPrevented) return;          // data-confirm wurde abgelehnt
+    ev.preventDefault();
+    var btn = form.querySelector('[type="submit"], button:not([type])');
+    if (btn) btn.disabled = true;
+    fetch(form.action, {
+      method: 'POST',
+      body: new FormData(form),
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+      .then(function(r) { return r.text(); })
+      .then(function(html) {
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        if (form.dataset.refresh) refresh(doc, form.dataset.refresh);
+        var alerts = showFlashes(doc);
+        var hasErr = alerts.some(function(a) { return a.classList.contains('alert-danger'); });
+        if (!hasErr && form.dataset.modalClose) {
+          var m = form.closest('.modal');
+          if (m && window.bootstrap) { var inst = bootstrap.Modal.getInstance(m); if (inst) inst.hide(); }
+        }
+        if (!hasErr) { try { form.reset(); } catch (e) {} }
+        if (btn) btn.disabled = false;
+      })
+      .catch(function() { alert('Speichern fehlgeschlagen.'); if (btn) btn.disabled = false; });
   });
 })();
 (function() {

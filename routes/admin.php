@@ -103,3 +103,16 @@ function save_design(array $p): void {
     }
     redirect('admin/design');
 }
+
+function impressum(array $p): void {
+    require_admin();
+    render('admin/impressum', ['page_title' => 'Impressum', 'impressum' => get_setting('impressum', '')]);
+}
+
+function save_impressum(array $p): void {
+    require_admin();
+    csrf_verify();
+    set_setting('impressum', trim((string)($_POST['impressum'] ?? '')));
+    flash('success', 'Impressum gespeichert.');
+    redirect('admin/impressum');
+}

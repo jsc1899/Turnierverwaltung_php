@@ -343,4 +343,110 @@ function save_sets(array $p): void {
     redirect('competition/' . $m['competition_id']);
 }
 
+// Löscht die Kind-Datensätze (Einzelspiele/Sätze) der übergebenen Matches.
+function _clear_match_children(array $mids, bool $has_duels, bool $has_sets): void {
+    if (!$mids) return;
+    $ph = implode(',', array_fill(0, count($mids), '?'));
+    if ($has_duels) db_execute("DELETE FROM team_match_duel WHERE match_id IN ($ph)", $mids);
+    if ($has_sets)  db_execute("DELETE FROM match_set WHERE match_id IN ($ph)", $mids);
+}
+
+// Entfernt alle eingetragenen Ergebnisse der AKTUELLEN Phase (Gruppe oder KO/Kreuz/Doppel-KO),
+// ohne die Auslosung anzutasten (Freilose bleiben erhalten). Nur für Admins.
+function clear_phase_results(array $p): void {
+    require_admin();
+    csrf_verify();
+    $cid = (int)$p['id'];
+    require_competition_open($cid);
+
+    $phase = db_fetch("SELECT phase FROM competition WHERE id=?", [$cid])['phase'] ?? null;
+    if (!in_array($phase, ['group', 'ko'], true)) {
+        flash('warning', 'In dieser Phase gibt es keine Ergebnisse zum Entfernen.');
+        redirect('competition/' . $cid);
+        return;
+    }
+
+    $pdo = get_db();
+    $pdo->beginTransaction();
+    try {
+        clear_phase_results_core($cid);
+        $pdo->commit();
+    } catch (\Throwable $ex) {
+        $pdo->rollBack();
+        throw $ex;
+    }
+    flash('success', 'Alle Ergebnisse der aktuellen Phase wurden entfernt.');
+    redirect('competition/' . $cid);
+}
+
+// Kernlogik (ohne Auth/CSRF/Redirect): leert die Ergebnisse der aktuellen Phase eines Bewerbs.
+function clear_phase_results_core(int $cid): void {
+    $c = db_fetch(
+        "SELECT phase, mode, is_doubles, is_team, team_size, score_mode FROM competition WHERE id=?",
+        [$cid]
+    );
+    if (!$c || !in_array($c['phase'], ['group', 'ko'], true)) return;
+    $phase = $c['phase'];
+
+    $is_team    = !empty($c['is_team']);
+    $is_doubles = !$is_team && !empty($c['is_doubles']);
+    $col1 = $is_team ? 'team1_id' : ($is_doubles ? 'double1_id' : 'player1_id');
+    $col2 = $is_team ? 'team2_id' : ($is_doubles ? 'double2_id' : 'player2_id');
+    $has_duels = !empty($c['team_size']);
+    $has_sets  = ($c['score_mode'] ?? 'match') !== 'match';
+
+    if ($phase === 'group') {
+            $mids = array_column(db_fetchall(
+                "SELECT id FROM `match` WHERE competition_id=? AND group_id IS NOT NULL", [$cid]), 'id');
+            db_execute(
+                "UPDATE `match` SET score1=NULL, score2=NULL, played=0, tiebreak_winner=0
+                 WHERE competition_id=? AND group_id IS NOT NULL", [$cid]);
+            _clear_match_children($mids, $has_duels, $has_sets);
+            foreach (db_fetchall("SELECT id FROM grp WHERE competition_id=?", [$cid]) as $g) {
+                _reset_group_tiebreak((int)$g['id']);
+            }
+        } else { // ko-Phase
+            $mode = $c['mode'] ?? 'groups_ko';
+            $mids = array_column(db_fetchall(
+                "SELECT id FROM `match` WHERE competition_id=? AND group_id IS NULL", [$cid]), 'id');
+
+            if ($mode === 'double_ko') {
+                // Alle DKO-Spiele leeren – nur Freilose der WB-Runde 1 (genau ein Teilnehmer) bleiben.
+                db_execute(
+                    "UPDATE `match` SET score1=NULL, score2=NULL, played=0, tiebreak_winner=0
+                     WHERE competition_id=? AND bracket IN ('W','L','GF')
+                       AND NOT (bracket='W' AND ko_round=1
+                                AND ((`$col1` IS NOT NULL AND `$col2` IS NULL)
+                                  OR (`$col1` IS NULL AND `$col2` IS NOT NULL)))",
+                    [$cid]);
+                _clear_match_children($mids, $has_duels, $has_sets);
+                require_once __DIR__ . '/../lib/double_ko_bracket.php';
+                recompute_double_ko($cid);
+            } elseif ($mode === 'groups_cross') {
+                // Platzierungs-Brackets: Ergebnisse leeren, Freilose lösen sich beim Recompute auf.
+                db_execute(
+                    "UPDATE `match` SET score1=NULL, score2=NULL, played=0, tiebreak_winner=0
+                     WHERE competition_id=? AND group_id IS NULL AND bracket LIKE 'C%'", [$cid]);
+                _clear_match_children($mids, $has_duels, $has_sets);
+                require_once __DIR__ . '/../lib/placement_bracket.php';
+                recompute_placement($cid);
+            } else {
+                // Einzel-KO: nur echte Erstrunden-Spiele (beide Teilnehmer) leeren – Freilose bleiben,
+                // recompute_ko_from leert die Folgerunden und rückt die Freilose neu vor.
+                $size = (int)(db_fetch(
+                    "SELECT MAX(ko_round) m FROM `match`
+                     WHERE competition_id=? AND group_id IS NULL AND bracket IS NULL", [$cid])['m'] ?? 0);
+                db_execute(
+                    "UPDATE `match` SET score1=NULL, score2=NULL, played=0, tiebreak_winner=0
+                     WHERE competition_id=? AND group_id IS NULL AND bracket IS NULL
+                       AND ko_round=? AND `$col1` IS NOT NULL AND `$col2` IS NOT NULL", [$cid, $size]);
+                _clear_match_children($mids, $has_duels, $has_sets);
+                if ($size >= 2) {
+                    require_once __DIR__ . '/../lib/ko_bracket.php';
+                    recompute_ko_from($cid, $size);
+                }
+            }
+    }
+}
+
 // _maybe_set_done() is defined in lib/ko_bracket.php (required above)

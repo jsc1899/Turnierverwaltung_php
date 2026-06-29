@@ -170,9 +170,14 @@ function generate_competition_aushang_pdf(int $cid): void {
     foreach ($groups as &$g) {
         $gid = (int)$g['id'];
         if ($is_team) {
-            $g['members'] = array_column(db_fetchall(
-                "SELECT t.name FROM group_team gt JOIN `team` t ON t.id=gt.team_id
-                 WHERE gt.group_id=? ORDER BY t.name", [$gid]), 'name');
+            $team_rows = db_fetchall(
+                "SELECT t.name, t.captain FROM group_team gt JOIN `team` t ON t.id=gt.team_id
+                 WHERE gt.group_id=? ORDER BY t.name", [$gid]);
+            $g['members'] = array_map(function ($r) {
+                $name = (string)$r['name'];
+                $cap  = trim((string)($r['captain'] ?? ''));
+                return $cap !== '' ? $name . ' (' . $cap . ')' : $name;
+            }, $team_rows);
         } elseif ($is_doubles) {
             $g['members'] = array_column(db_fetchall(
                 "SELECT TRIM(CONCAT(
@@ -544,17 +549,17 @@ function generate_groups_pdf(int $cid, ?int $gid = null): void {
                     $time = $rt !== '' ? ' &middot; ' . $rt . ' Uhr' : '';
                     return "<tr>$pre<td style='text-align:center;font-size:8pt;font-weight:bold;color:#374151;background:#f3f4f6;padding:0.8mm 2mm'>Runde " . (int)$r . $time . "</td><td $cell></td></tr>";
                 };
-                $gpause = group_pause_window($c, $g);
+                $gpause = group_pause_info($c, $g);
                 $pause_row = function ($pw) use ($colspan) {
-                    return "<tr><td colspan='$colspan' style='text-align:center;font-size:8pt;font-weight:bold;color:#856404;background:#fff3cd;padding:0.8mm 2mm'>Pause &middot; "
-                         . e($pw['start']) . ' &ndash; ' . e($pw['end']) . " Uhr</td></tr>";
+                    return "<tr><td colspan='$colspan' style='text-align:center;font-size:8pt;font-weight:bold;color:#856404;background:#fff3cd;padding:0.8mm 2mm'>"
+                         . e($pw['label']) . "</td></tr>";
                 };
                 foreach ($gmatches as $i => $gm) {
                     $cur_round = (int)($gm['round_no'] ?? 0);
-                    if ($show_byes && $cur_round !== $bye_prev) {
-                        if ($bye_prev !== null && isset($round_byes[$bye_prev])) $html .= $bye_row($round_byes[$bye_prev]);
+                    if (($show_byes || $gpause) && $cur_round !== $bye_prev) {
+                        if ($show_byes && $bye_prev !== null && isset($round_byes[$bye_prev])) $html .= $bye_row($round_byes[$bye_prev]);
                         if ($gpause && $bye_prev !== null && $bye_prev <= $gpause['after_round'] && $cur_round > $gpause['after_round']) $html .= $pause_row($gpause);
-                        if ($cur_round > 0) $html .= $round_row($cur_round);
+                        if ($show_byes && $cur_round > 0) $html .= $round_row($cur_round);
                     }
                     $bye_prev = $cur_round;
                     $odd = $i % 2 === 1 ? ' class="odd"' : '';
@@ -717,14 +722,14 @@ function generate_team_strips_pdf(int $cid, ?int $gid = null): void {
                 }
             }
 
-            $gpause     = group_pause_window($c, $g);
+            $gpause     = group_pause_info($c, $g);
             $strip_cols = 2 * $ncols + 9;  // Dg+B+Ge+An + (ncols+2) + Mannschaft + (ncols+2)
             $rowi = 0;
             foreach ($rows as $row) {
                 // Pause-Zeile direkt vor der ersten Runde nach der Pause.
                 if ($gpause && $row['dg'] !== '' && (int)$row['dg'] === $gpause['after_round'] + 1) {
-                    $html .= "<tr><td colspan='$strip_cols' style='text-align:center;font-weight:bold;color:#856404;background:#fff3cd;padding:1.5mm'>Pause &middot; "
-                           . e($gpause['start']) . ' &ndash; ' . e($gpause['end']) . " Uhr</td></tr>";
+                    $html .= "<tr><td colspan='$strip_cols' style='text-align:center;font-weight:bold;color:#856404;background:#fff3cd;padding:1.5mm'>"
+                           . e($gpause['label']) . "</td></tr>";
                 }
                 $alt = ($rowi % 2 === 1) ? ' class="alt"' : '';
                 $rowi++;
@@ -916,6 +921,7 @@ function generate_court_plans_pdf(int $cid, ?int $gid = null): void {
     $score_mode = $c['score_mode'] ?? 'match';
     // „ohne Spielerfelder": kompaktes Team-Layout auch für die angehängten Match-Cards.
     $compact = $is_team && $team_size > 0 && (($c['match_card_mode'] ?? 'fields') === 'compact');
+    $separate = !empty($c['mc_separate_page']);   // Übersicht + jede Match-Card auf eigener Seite
     // Card-Styles zusätzlich einbinden (Bahn-Übersicht + angehängte Match-Cards je Bahn).
     $html .= _match_card_styles(_match_card_min_h($is_team, $team_size, $score_mode));
 
@@ -951,7 +957,7 @@ function generate_court_plans_pdf(int $cid, ?int $gid = null): void {
         $params = [$cid];
     }
     $matches = db_fetchall(
-        "SELECT m.*, g.name AS gname, g.name AS group_name, g.pause_start, g.pause_duration, $name_sel
+        "SELECT m.*, g.name AS gname, g.name AS group_name, g.pause_start, g.pause_duration, g.pause_after_round, g.pause_label, $name_sel
          FROM `match` m
          LEFT JOIN grp g ON g.id=m.group_id
          $name_join
@@ -1045,10 +1051,10 @@ function generate_court_plans_pdf(int $cid, ?int $gid = null): void {
             // Pause-Zeile vor der ersten Runde nach der Gruppen-Pause.
             $cr = (int)($m['round_no'] ?? 0);
             if (!$pause_shown && $cr > 0) {
-                $gpw = group_pause_window($c, ['pause_start' => $m['pause_start'] ?? '', 'pause_duration' => $m['pause_duration'] ?? 0]);
+                $gpw = group_pause_info($c, ['pause_start' => $m['pause_start'] ?? '', 'pause_duration' => $m['pause_duration'] ?? 0, 'pause_after_round' => $m['pause_after_round'] ?? 0, 'pause_label' => $m['pause_label'] ?? '']);
                 if ($gpw && $cr === $gpw['after_round'] + 1 && ($prev_round === null || $prev_round <= $gpw['after_round'])) {
-                    $html .= "<tr><td colspan='5' style='text-align:center;font-weight:bold;color:#856404;background:#fff3cd;padding:1.2mm'>Pause &middot; "
-                           . e($gpw['start']) . ' &ndash; ' . e($gpw['end']) . " Uhr</td></tr>";
+                    $html .= "<tr><td colspan='5' style='text-align:center;font-weight:bold;color:#856404;background:#fff3cd;padding:1.2mm'>"
+                           . e($gpw['label']) . "</td></tr>";
                     $pause_shown = true;
                 }
             }
@@ -1073,17 +1079,23 @@ function generate_court_plans_pdf(int $cid, ?int $gid = null): void {
                . '</tr></table>';
 
         // Zugehörige Match-Cards dieser Bahn (nur Begegnungen mit beiden Teilnehmern).
-        $court_cards = '';
+        $court_card_list = [];
         foreach ($cms as $m) {
             $p1set = $is_team ? !empty($m['team1_id']) : ($is_doubles ? !empty($m['double1_id']) : !empty($m['player1_id']));
             $p2set = $is_team ? !empty($m['team2_id']) : ($is_doubles ? !empty($m['double2_id']) : !empty($m['player2_id']));
             if (!$p1set || !$p2set) continue;
-            $court_cards .= $compact
+            $court_card_list[] = $compact
                 ? _match_card_team_compact_html($m, $c, $team_size, $court_sg, e($label($m)), $start_by_group)
                 : _match_card_html($m, $c, $is_team, $is_doubles, $team_size, $score_mode, $court_sg, e($label($m)));
         }
-        if ($court_cards !== '') {
-            $html .= '<p class="bp-lbl" style="margin-top:5mm">' . e($court_sg) . ' ' . $court . ' &ndash; Match-Cards</p>' . $court_cards;
+        if ($court_card_list) {
+            $lbl = '<p class="bp-lbl" style="margin-top:5mm">' . e($court_sg) . ' ' . $court . ' &ndash; Match-Cards</p>';
+            if ($separate) {
+                // Bahn-Übersicht allein auf der Seite, danach jede Match-Card auf eigener Seite.
+                $html .= '<pagebreak />' . $lbl . implode('<pagebreak />', $court_card_list);
+            } else {
+                $html .= $lbl . implode('', $court_card_list);
+            }
         }
     }
 
@@ -1771,6 +1783,8 @@ function generate_match_cards_pdf(int $cid, ?int $gid = null): void {
     foreach (db_fetchall("SELECT bracket, COUNT(*) n FROM `match` WHERE competition_id=? AND group_id IS NULL AND bracket LIKE 'C%' AND ko_round=1 GROUP BY bracket", [$cid]) as $row) {
         $cross_S[$row['bracket']] = 2 * (int)$row['n'];
     }
+    $separate   = !empty($c['mc_separate_page']);  // jede Match-Card auf eigener Seite
+    $n_matches  = count($matches);
     $group_counters = [];
     foreach ($matches as $i => $m) {
         if ($m['group_name']) {
@@ -1802,6 +1816,7 @@ function generate_match_cards_pdf(int $cid, ?int $gid = null): void {
         $html .= $compact
             ? _match_card_team_compact_html($m, $c, $team_size, $court, $label, $start_by_group)
             : _match_card_html($m, $c, $is_team, $is_doubles, $team_size, $score_mode, $court, $label, $game_nr);
+        if ($separate && $i < $n_matches - 1) $html .= '<pagebreak />';
     }
 
     $pdf = mpdf(['margin_top' => 5, 'margin_bottom' => 5, 'margin_left' => 12, 'margin_right' => 12]);

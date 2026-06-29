@@ -144,6 +144,7 @@ $routes = [
     ['POST',     '/competition/{id}/doubles/remove-all',    'competition', 'remove_all_doubles'],
     ['POST',     '/competition/{id}/double/{did}/skill',     'competition', 'update_double_skill'],
     ['POST',     '/competition/{id}/team/add',               'competition', 'add_team'],
+    ['POST',     '/competition/{id}/teams/import-result',     'competition', 'import_teams_from_result'],
     ['POST',     '/competition/{id}/team/{tid}/remove',      'competition', 'remove_team'],
     ['POST',     '/competition/{id}/teams/remove-all',      'competition', 'remove_all_teams'],
     ['POST',     '/competition/{id}/team/{tid}/skill',       'competition', 'update_team_skill'],
@@ -156,6 +157,7 @@ $routes = [
     ['POST',     '/competition/{id}/groups/reorder',         'competition', 'groups_reorder'],
     ['POST',     '/competition/{id}/courts',                 'competition', 'save_courts'],
     ['POST',     '/competition/{id}/pauses',                 'competition', 'save_pauses'],
+    ['POST',     '/competition/{id}/round-pauses',           'competition', 'save_round_pauses'],
     ['POST',     '/competition/{id}/ko/reorder',             'competition', 'ko_reorder'],
     ['POST',     '/competition/{id}/seedings/save',          'competition', 'seedings_save'],
     ['POST',     '/group/{gid}/tiebreak',                   'competition', 'save_group_tiebreak'],
@@ -168,6 +170,7 @@ $routes = [
     ['POST',     '/match/{id}/sets',                 'match_result', 'save_sets'],
     ['POST',     '/ko-match/{id}/result',             'match_result', 'save_ko'],
     ['POST',     '/competition/{id}/results/bulk',    'match_result', 'save_bulk'],
+    ['POST',     '/competition/{id}/results/clear-phase', 'match_result', 'clear_phase_results'],
     ['POST',     '/competition/{id}/duels/bulk',      'match_result', 'save_duels_bulk'],
 
     // Players
@@ -232,6 +235,8 @@ $routes = [
     ['POST', '/admin/user/{id}/delete',   'admin', 'delete_user'],
     ['GET',  '/admin/design',             'admin', 'design'],
     ['POST', '/admin/design',             'admin', 'save_design'],
+    ['GET',  '/admin/impressum',          'admin', 'impressum'],
+    ['POST', '/admin/impressum',          'admin', 'save_impressum'],
 ];
 
 // ── Routing ───────────────────────────────────────────────────────────────────

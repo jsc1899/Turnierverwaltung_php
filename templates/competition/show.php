@@ -26,6 +26,11 @@ ob_start(); ?>
   <button type="button" class="btn btn-outline-warning btn-sm" onclick="fillTestResults(true)">
     <i class="bi bi-dice-5 me-1"></i>Testergebnisse eintragen &amp; speichern
   </button>
+  <form method="post" action="<?= url('competition/'.$c['id'].'/results/clear-phase') ?>"
+        data-confirm="Alle eingetragenen Ergebnisse der aktuellen Phase entfernen?" class="m-0">
+    <?= csrf_field() ?>
+    <button class="btn btn-outline-danger btn-sm"><i class="bi bi-eraser me-1"></i>Testergebnisse entfernen</button>
+  </form>
 </div>
 <?php endif; ?>
 
@@ -240,8 +245,25 @@ ob_start(); ?>
           && count($assigned) === 0 && count($assigned_doubles) === 0 && count($assigned_teams) === 0;
       $comp_type = !empty($c['is_team']) ? 'team' : (!empty($c['is_doubles']) ? 'doubles' : 'single');
     ?>
+    <?php
+      $ui_mode    = $c['mode'] === 'groups_cross' ? 'groups_ko' : $c['mode'];
+      $finalrunde = $c['mode'] === 'groups_cross' ? 'cross' : ((int)$c['advance_count'] >= 1 ? 'ko' : 'none');
+      $ts_editable = ($c['phase'] === 'setup') || !empty($group_no_results);
+      $is_ko_mode  = in_array($c['mode'], ['ko_only', 'double_ko'], true);
+    ?>
+    <style>
+      #tab-settings .opt-section { margin-top:1.5rem; }
+      #tab-settings .opt-section:first-of-type { margin-top:.25rem; }
+      #tab-settings .opt-section > .opt-head {
+        font-size:.8rem; font-weight:600; text-transform:uppercase; letter-spacing:.03em;
+        color:#6c757d; border-bottom:1px solid var(--bs-border-color); padding-bottom:.25rem; margin-bottom:.1rem;
+      }
+    </style>
     <form method="post" action="<?= url('competition/'.$c['id'].'/settings') ?>" class="row g-3 align-items-end">
       <?= csrf_field() ?>
+
+      <!-- ── Allgemein ── -->
+      <div class="col-12 opt-section"><div class="opt-head"><i class="bi bi-info-circle me-1"></i>Allgemein</div></div>
       <div class="col-auto">
         <label class="form-label">Bewerbsname</label>
         <input type="text" name="name" class="form-control form-control-sm" style="min-width:180px"
@@ -258,7 +280,108 @@ ob_start(); ?>
         <input type="hidden" name="comp_type" value="<?= $comp_type ?>">
         <?php endif; ?>
       </div>
-      <?php $ts_editable = ($c['phase'] === 'setup') || !empty($group_no_results); ?>
+      <div class="col-auto">
+        <label class="form-label">Max. Teilnehmer</label>
+        <input type="number" name="max_players" class="form-control form-control-sm" style="width:90px"
+               value="<?= (int)$c['max_players'] ?>" min="0">
+      </div>
+      <div class="col-auto d-flex align-items-end pb-1">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="registrations_open" id="regs_open"
+                 <?= $c['registrations_open'] ? 'checked' : '' ?>>
+          <label class="form-check-label" for="regs_open">Nennung offen</label>
+        </div>
+      </div>
+
+      <!-- ── Spielmodus & Format ── -->
+      <div class="col-12 opt-section"><div class="opt-head"><i class="bi bi-diagram-3 me-1"></i>Spielmodus &amp; Format</div></div>
+      <div class="col-auto">
+        <label class="form-label">Spielmodus</label>
+        <select name="mode" class="form-select form-select-sm" id="comp-mode-edit"<?= $c['phase'] !== 'setup' ? ' disabled' : '' ?>
+                onchange="editToggleCross()">
+          <option value="groups_ko"<?= $ui_mode === 'groups_ko' ? ' selected' : '' ?>>Gruppenphase</option>
+          <option value="ko_only"<?= $ui_mode === 'ko_only'   ? ' selected' : '' ?>>KO-Modus</option>
+          <option value="double_ko"<?= $ui_mode === 'double_ko' ? ' selected' : '' ?>>Doppel-KO Modus</option>
+        </select>
+        <?php if ($c['phase'] !== 'setup'): ?>
+        <input type="hidden" name="mode" value="<?= e($ui_mode) ?>">
+        <?php endif; ?>
+      </div>
+      <?php if (!$is_ko_mode): ?>
+      <div class="col-auto">
+        <label class="form-label">Gruppengröße</label>
+        <select name="group_size" class="form-select form-select-sm"<?= $c['phase'] !== 'setup' ? ' disabled' : '' ?>>
+          <?php foreach (range(3, 24) as $s): ?>
+          <option value="<?= $s ?>"<?= (int)$c['group_size'] === $s ? ' selected' : '' ?>><?= $s ?> Teilnehmer</option>
+          <?php endforeach; ?>
+        </select>
+        <?php if ($c['phase'] !== 'setup'): ?>
+        <input type="hidden" name="group_size" value="<?= (int)$c['group_size'] ?>">
+        <?php endif; ?>
+      </div>
+      <div class="col-auto" id="finalrunde-wrap">
+        <label class="form-label">Finalrunde</label>
+        <select name="finalrunde" id="finalrunde-edit" class="form-select form-select-sm" onchange="editToggleCross()">
+          <option value="none"<?= $finalrunde === 'none' ? ' selected' : '' ?>>nur Gruppenphase</option>
+          <option value="ko"<?= $finalrunde === 'ko'   ? ' selected' : '' ?>>KO-Runde</option>
+          <option value="cross"<?= $finalrunde === 'cross' ? ' selected' : '' ?>>Kreuzspiele</option>
+        </select>
+      </div>
+      <div class="col-auto" id="advance-wrap-edit" style="display:<?= $finalrunde === 'ko' ? '' : 'none' ?>">
+        <label class="form-label">Aufsteiger</label>
+        <select name="advance_count" id="advance_count" class="form-select form-select-sm">
+          <option value="1"<?= (int)$c['advance_count'] !== 2 ? ' selected' : '' ?>>1 (Gruppenerste)</option>
+          <option value="2"<?= (int)$c['advance_count'] === 2 ? ' selected' : '' ?>>2 (Erste &amp; Zweite)</option>
+        </select>
+      </div>
+      <div class="col-auto" id="field-round-limit" style="display:<?= $finalrunde === 'none' ? '' : 'none' ?>">
+        <label class="form-label">Rundenanzahl <span class="text-muted small">(0 = alle)</span></label>
+        <input type="number" name="round_limit" class="form-control form-control-sm" style="width:110px"
+               min="0" max="50" value="<?= (int)($c['round_limit'] ?? 0) ?: '' ?>" placeholder="alle"
+               title="Spielplan nur für so viele Runden erstellen (leer/0 = vollständiger Spielplan).">
+      </div>
+      <?php
+        $gs_cc = (int)$c['group_size']; $ntiers_cc = max(1, (int)ceil($gs_cc / 2));
+        $cfg_cc = ($c['cross_config'] ?? '') !== '' ? explode(',', $c['cross_config']) : [];
+      ?>
+      <div class="col-12" id="cross-config-wrap" style="display:<?= $finalrunde === 'cross' ? '' : 'none' ?>">
+        <label class="form-label">Kreuzspiele – Paarungen je Rang</label>
+        <div class="d-flex flex-wrap gap-3">
+          <?php for ($t = 1; $t <= $ntiers_cc; $t++):
+            $a = 2 * $t - 1; $b = 2 * $t;
+            $rl  = $b <= $gs_cc ? "Rang {$a}+{$b}" : "Rang {$a}";
+            $val = $cfg_cc[$t - 1] ?? 'x'; ?>
+          <div>
+            <div class="small text-muted mb-1"><?= $rl ?></div>
+            <select name="cross_config[]" class="form-select form-select-sm" style="width:auto">
+              <option value="x"<?= $val !== 's' ? ' selected' : '' ?>>über Kreuz</option>
+              <option value="s"<?= $val === 's' ? ' selected' : '' ?>>getrennt</option>
+            </select>
+          </div>
+          <?php endfor; ?>
+        </div>
+      </div>
+      <?php endif; ?>
+      <div class="col-auto d-flex align-items-end pb-1"
+           id="third_place_wrap"<?= ($is_ko_mode || $finalrunde === 'ko') ? '' : ' style="display:none !important"' ?>>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="third_place" id="third_place"
+                 <?= $c['third_place'] ? 'checked' : '' ?>>
+          <label class="form-check-label" for="third_place">Platz-3-Spiel</label>
+        </div>
+      </div>
+      <div class="col-auto d-flex align-items-end pb-1" id="show-seeding-wrap"<?= $is_ko_mode ? '' : ' style="display:none !important"' ?>>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="show_seeding" id="show_seeding"
+                 <?= ($c['show_seeding'] ?? 1) ? 'checked' : '' ?>>
+          <label class="form-check-label" for="show_seeding">Setzungen anzeigen (KO)</label>
+        </div>
+      </div>
+
+      <!-- ── Mannschaft (Teambewerb) ── -->
+      <div class="col-12 opt-section" id="sec-team-hd"<?= $comp_type !== 'team' ? ' style="display:none"' : '' ?>>
+        <div class="opt-head"><i class="bi bi-people me-1"></i>Mannschaft</div>
+      </div>
       <div class="col-auto" id="field-team-size"<?= $comp_type !== 'team' ? ' style="display:none"' : '' ?>>
         <label class="form-label">Spiele pro Team</label>
         <input type="number" name="team_size" class="form-control form-control-sm" style="width:90px"
@@ -289,6 +412,9 @@ ob_start(); ?>
           <option value="compact"<?= ($c['match_card_mode'] ?? 'fields') === 'compact' ? ' selected' : '' ?>>ohne Spielerfelder</option>
         </select>
       </div>
+
+      <!-- ── Wertung & Setzung ── -->
+      <div class="col-12 opt-section"><div class="opt-head"><i class="bi bi-trophy me-1"></i>Wertung &amp; Setzung</div></div>
       <?php if (!$is_team): ?>
       <div class="col-auto">
         <label class="form-label">Ergebniserfassung</label>
@@ -300,97 +426,10 @@ ob_start(); ?>
       </div>
       <?php endif; ?>
       <div class="col-auto">
-        <label class="form-label">Spielmodus</label>
-        <?php
-          $ui_mode    = $c['mode'] === 'groups_cross' ? 'groups_ko' : $c['mode'];
-          $finalrunde = $c['mode'] === 'groups_cross' ? 'cross' : ((int)$c['advance_count'] >= 1 ? 'ko' : 'none');
-        ?>
-        <select name="mode" class="form-select form-select-sm" id="comp-mode-edit"<?= $c['phase'] !== 'setup' ? ' disabled' : '' ?>
-                onchange="editToggleCross()">
-          <option value="groups_ko"<?= $ui_mode === 'groups_ko' ? ' selected' : '' ?>>Gruppenphase</option>
-          <option value="ko_only"<?= $ui_mode === 'ko_only'   ? ' selected' : '' ?>>KO-Modus</option>
-          <option value="double_ko"<?= $ui_mode === 'double_ko' ? ' selected' : '' ?>>Doppel-KO Modus</option>
-        </select>
-        <?php if ($c['phase'] !== 'setup'): ?>
-        <input type="hidden" name="mode" value="<?= e($ui_mode) ?>">
-        <?php endif; ?>
-      </div>
-      <?php if (!in_array($c['mode'], ['ko_only', 'double_ko'])): ?>
-      <div class="col-auto">
-        <label class="form-label">Gruppengröße</label>
-        <select name="group_size" class="form-select form-select-sm"<?= $c['phase'] !== 'setup' ? ' disabled' : '' ?>>
-          <?php foreach (range(3, 20) as $s): ?>
-          <option value="<?= $s ?>"<?= (int)$c['group_size'] === $s ? ' selected' : '' ?>><?= $s ?> Teilnehmer</option>
-          <?php endforeach; ?>
-        </select>
-        <?php if ($c['phase'] !== 'setup'): ?>
-        <input type="hidden" name="group_size" value="<?= (int)$c['group_size'] ?>">
-        <?php endif; ?>
-      </div>
-      <div class="col-auto" id="finalrunde-wrap">
-        <label class="form-label">Finalrunde</label>
-        <select name="finalrunde" id="finalrunde-edit" class="form-select form-select-sm" onchange="editToggleCross()">
-          <option value="none"<?= $finalrunde === 'none' ? ' selected' : '' ?>>nur Gruppenphase</option>
-          <option value="ko"<?= $finalrunde === 'ko'   ? ' selected' : '' ?>>KO-Runde</option>
-          <option value="cross"<?= $finalrunde === 'cross' ? ' selected' : '' ?>>Kreuzspiele</option>
-        </select>
-      </div>
-      <div class="col-auto" id="advance-wrap-edit" style="display:<?= $finalrunde === 'ko' ? '' : 'none' ?>">
-        <label class="form-label">Aufsteiger</label>
-        <select name="advance_count" id="advance_count" class="form-select form-select-sm">
-          <option value="1"<?= (int)$c['advance_count'] !== 2 ? ' selected' : '' ?>>1 (Gruppenerste)</option>
-          <option value="2"<?= (int)$c['advance_count'] === 2 ? ' selected' : '' ?>>2 (Erste &amp; Zweite)</option>
-        </select>
-      </div>
-      <div class="col-auto d-flex align-items-end pb-1">
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" name="show_byes" id="show_byes"
-                 <?= !empty($c['show_byes']) ? 'checked' : '' ?>>
-          <label class="form-check-label" for="show_byes">Spielrunden anzeigen</label>
-        </div>
-      </div>
-      <div class="col-auto d-flex align-items-end pb-1">
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" name="force_byes" id="force_byes"
-                 <?= !empty($c['force_byes']) ? 'checked' : '' ?>>
-          <label class="form-check-label" for="force_byes" title="Wirkt erst bei der nächsten Auslosung. Bei gerader Anzahl wird der Spielplan um eine Runde länger.">Spielfreie Runde garantieren</label>
-        </div>
-      </div>
-      <?php
-        $gs_cc = (int)$c['group_size']; $ntiers_cc = max(1, (int)ceil($gs_cc / 2));
-        $cfg_cc = ($c['cross_config'] ?? '') !== '' ? explode(',', $c['cross_config']) : [];
-      ?>
-      <div class="col-12" id="cross-config-wrap" style="display:<?= $finalrunde === 'cross' ? '' : 'none' ?>">
-        <label class="form-label">Kreuzspiele – Paarungen je Rang</label>
-        <div class="d-flex flex-wrap gap-3">
-          <?php for ($t = 1; $t <= $ntiers_cc; $t++):
-            $a = 2 * $t - 1; $b = 2 * $t;
-            $rl  = $b <= $gs_cc ? "Rang {$a}+{$b}" : "Rang {$a}";
-            $val = $cfg_cc[$t - 1] ?? 'x'; ?>
-          <div>
-            <div class="small text-muted mb-1"><?= $rl ?></div>
-            <select name="cross_config[]" class="form-select form-select-sm" style="width:auto">
-              <option value="x"<?= $val !== 's' ? ' selected' : '' ?>>über Kreuz</option>
-              <option value="s"<?= $val === 's' ? ' selected' : '' ?>>getrennt</option>
-            </select>
-          </div>
-          <?php endfor; ?>
-        </div>
-      </div>
-      <?php endif; ?>
-      <div class="col-auto d-flex align-items-end pb-1"
-           id="third_place_wrap"<?= (in_array($c['mode'], ['ko_only','double_ko'], true) || $finalrunde === 'ko') ? '' : ' style="display:none !important"' ?>>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" name="third_place" id="third_place"
-                 <?= $c['third_place'] ? 'checked' : '' ?>>
-          <label class="form-check-label" for="third_place">Platz-3-Spiel</label>
-        </div>
-      </div>
-      <div class="col-auto">
         <label class="form-label">Setzungsreihenfolge</label>
         <select name="seeding_order" class="form-select form-select-sm">
-          <option value="desc"<?= ($c['seeding_order'] ?? 'desc') === 'desc' ? ' selected' : '' ?>>Höhere Stärke = stärker</option>
-          <option value="asc"<?= ($c['seeding_order'] ?? 'desc') === 'asc'  ? ' selected' : '' ?>>Niedrigere Stärke = stärker (Tennis)</option>
+          <option value="desc"<?= ($c['seeding_order'] ?? 'desc') === 'desc' ? ' selected' : '' ?>>Höhere Spielstärke = stärker</option>
+          <option value="asc"<?= ($c['seeding_order'] ?? 'desc') === 'asc'  ? ' selected' : '' ?>>Niedrigere Spielstärke = stärker</option>
           <option value="random"<?= ($c['seeding_order'] ?? 'desc') === 'random' ? ' selected' : '' ?>>Zufällig (keine Setzung)</option>
         </select>
       </div>
@@ -409,25 +448,32 @@ ob_start(); ?>
           <option value="3-2-1"<?= ($c['points_mode'] ?? '2-1-0') === '3-2-1' ? ' selected' : '' ?>>Sieg 3 – Unentsch. 2 – Niederl. 1</option>
         </select>
       </div>
+
+      <!-- ── Spielplan & Zeit ── -->
+      <div class="col-12 opt-section"><div class="opt-head"><i class="bi bi-calendar3 me-1"></i>Spielplan &amp; Zeit</div></div>
+      <?php if (!$is_ko_mode): ?>
       <div class="col-auto d-flex align-items-end pb-1">
         <div class="form-check">
-          <input class="form-check-input" type="checkbox" name="show_skill" id="show_skill"
-                 <?= ($c['show_skill'] ?? 0) ? 'checked' : '' ?>>
-          <label class="form-check-label" for="show_skill">Spielstärke anzeigen (Gruppe)</label>
+          <input class="form-check-input" type="checkbox" name="show_byes" id="show_byes"
+                 <?= !empty($c['show_byes']) ? 'checked' : '' ?>>
+          <label class="form-check-label" for="show_byes">Spielrunden anzeigen</label>
         </div>
       </div>
-      <div class="col-auto d-flex align-items-end pb-1" id="show-seeding-wrap"<?= in_array($c['mode'], ['ko_only','double_ko'], true) ? '' : ' style="display:none !important"' ?>>
+      <div class="col-auto d-flex align-items-end pb-1">
         <div class="form-check">
-          <input class="form-check-input" type="checkbox" name="show_seeding" id="show_seeding"
-                 <?= ($c['show_seeding'] ?? 1) ? 'checked' : '' ?>>
-          <label class="form-check-label" for="show_seeding">Setzungen anzeigen (KO)</label>
+          <input class="form-check-input" type="checkbox" name="force_byes" id="force_byes"
+                 <?= !empty($c['force_byes']) ? 'checked' : '' ?>>
+          <label class="form-check-label" for="force_byes" title="Wirkt erst bei der nächsten Auslosung. Bei gerader Anzahl wird der Spielplan um eine Runde länger.">Spielfreie Runde garantieren</label>
         </div>
       </div>
       <div class="col-auto">
-        <label class="form-label">Max. Teilnehmer</label>
-        <input type="number" name="max_players" class="form-control form-control-sm" style="width:90px"
-               value="<?= (int)$c['max_players'] ?>" min="0">
+        <label class="form-label">Spielplan-Erstellung</label>
+        <select name="schedule_mode" class="form-select form-select-sm">
+          <option value="random"<?= ($c['schedule_mode'] ?? 'random') === 'random' ? ' selected' : '' ?>>Zufällig</option>
+          <option value="position"<?= ($c['schedule_mode'] ?? 'random') === 'position' ? ' selected' : '' ?>>Nach Position</option>
+        </select>
       </div>
+      <?php endif; ?>
       <div class="col-auto">
         <label class="form-label"><?= e($court_pl) ?> <span class="text-muted small">(0 = aus)</span></label>
         <input type="number" name="num_courts" class="form-control form-control-sm" style="width:90px"
@@ -455,14 +501,26 @@ ob_start(); ?>
           </div>
         </div>
       </div>
+
+      <!-- ── Anzeige & Druck ── -->
+      <div class="col-12 opt-section"><div class="opt-head"><i class="bi bi-printer me-1"></i>Anzeige &amp; Druck</div></div>
       <div class="col-auto d-flex align-items-end pb-1">
         <div class="form-check">
-          <input class="form-check-input" type="checkbox" name="registrations_open" id="regs_open"
-                 <?= $c['registrations_open'] ? 'checked' : '' ?>>
-          <label class="form-check-label" for="regs_open">Nennung offen</label>
+          <input class="form-check-input" type="checkbox" name="show_skill" id="show_skill"
+                 <?= ($c['show_skill'] ?? 0) ? 'checked' : '' ?>>
+          <label class="form-check-label" for="show_skill">Spielstärke anzeigen (Gruppe)</label>
         </div>
       </div>
-      <div class="col-auto">
+      <div class="col-auto d-flex align-items-end pb-1">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="mc_separate_page" id="mc_separate_page"
+                 <?= !empty($c['mc_separate_page']) ? 'checked' : '' ?>>
+          <label class="form-check-label" for="mc_separate_page"
+                 title="Match-Cards, Teampläne und Bahnpläne: jede Karte bzw. Übersicht auf einer eigenen Seite.">separate Seite für Match-Cards</label>
+        </div>
+      </div>
+
+      <div class="col-12">
         <button class="btn btn-primary btn-sm">Speichern</button>
       </div>
     </form>
@@ -516,6 +574,42 @@ ob_start(); ?>
       </div>
     </div>
     <?php endif; ?>
+    <?php if (empty($c['schedule_enabled']) && !empty($groups)): ?>
+    <div class="card shadow-sm mt-3">
+      <div class="card-header fw-semibold py-2">
+        <i class="bi bi-pause-circle me-1"></i>Pause pro Gruppe
+        <span class="text-muted small fw-normal">(Spielrunde, nach der die Pause sein soll; leer = keine Pause. Optionaler Text, sonst „Pause")</span>
+      </div>
+      <div class="card-body py-2">
+        <form method="post" action="<?= url('competition/'.$c['id'].'/round-pauses') ?>" class="row g-2 align-items-end">
+          <?= csrf_field() ?>
+          <?php foreach ($groups as $gi4): $g4 = $gi4['group'];
+            $max_round = 0;
+            foreach (($gi4['matches'] ?? []) as $mm4) { $max_round = max($max_round, (int)($mm4['round_no'] ?? 0)); }
+          ?>
+          <div class="col-auto">
+            <label class="form-label small mb-0"><?= e($g4['name']) ?></label>
+            <div class="d-flex gap-1">
+              <div class="input-group input-group-sm" style="width:150px">
+                <span class="input-group-text">nach Runde</span>
+                <input type="number" name="pause_after_round[<?= (int)$g4['id'] ?>]" class="form-control form-control-sm"
+                       min="1" max="<?= $max_round > 0 ? $max_round - 1 : 100 ?>"
+                       value="<?= (int)($g4['pause_after_round'] ?? 0) ?: '' ?>" placeholder="–"
+                       title="Pause nach dieser Spielrunde<?= $max_round > 0 ? ' (1–'.($max_round-1).')' : '' ?>">
+              </div>
+              <input type="text" name="pause_label[<?= (int)$g4['id'] ?>]" class="form-control form-control-sm" style="width:140px"
+                     value="<?= e($g4['pause_label'] ?? '') ?>" placeholder="Text (optional)" maxlength="255"
+                     title="Anzeigetext der Pause (leer = „Pause")">
+            </div>
+          </div>
+          <?php endforeach; ?>
+          <div class="col-auto">
+            <button class="btn btn-primary btn-sm">Pausen speichern</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <?php endif; ?>
   </div><!-- /tab-settings -->
   <?php endif; ?>
 
@@ -538,6 +632,7 @@ ob_start(); ?>
              placeholder="Filtern…" data-target="tbl-comp-doubles" aria-label="Doppel filtern">
       <?php if ($c['phase'] === 'setup' && (can_edit() && !$locked)): ?>
       <form method="post" action="<?= url('competition/'.$c['id'].'/doubles/remove-all') ?>"
+            class="js-ajax" data-refresh="#tab-players"
             data-confirm="Alle Doppel aus dem Bewerb entfernen?">
         <?= csrf_field() ?>
         <button class="btn btn-outline-danger btn-sm text-nowrap">
@@ -569,7 +664,7 @@ ob_start(); ?>
             <?php if ((can_edit() && !$locked)): ?>
             <div class="d-inline-flex flex-column align-items-center gap-1">
               <form method="post" action="<?= url('competition/'.$c['id'].'/double/'.$d['id'].'/skill') ?>"
-                    class="d-inline-flex align-items-center gap-1">
+                    class="d-inline-flex align-items-center gap-1 js-ajax" data-refresh="#tab-players">
                 <?= csrf_field() ?>
                 <input type="number" name="skill" value="<?= (int)$d_comp ?>"
                        min="0" class="form-control form-control-sm text-center<?= $d_diff ? ' border-warning' : '' ?>" style="width:5rem">
@@ -581,7 +676,8 @@ ob_start(); ?>
               <div class="d-flex align-items-center gap-1 small" style="color:#fd7e14">
                 <i class="bi bi-exclamation-triangle-fill"></i>
                 <span>Aktuell: <?= (int)$d_reg ?></span>
-                <form method="post" action="<?= url('competition/'.$c['id'].'/double/'.$d['id'].'/skill') ?>">
+                <form method="post" action="<?= url('competition/'.$c['id'].'/double/'.$d['id'].'/skill') ?>"
+                      class="js-ajax" data-refresh="#tab-players">
                   <?= csrf_field() ?>
                   <input type="hidden" name="skill" value="<?= (int)$d_reg ?>">
                   <button type="submit" class="btn btn-link btn-sm p-0 lh-1" style="color:#fd7e14" title="Auf aktuellen Wert vom Spielerregister setzen">
@@ -601,6 +697,7 @@ ob_start(); ?>
           <?php if ($c['phase'] === 'setup' && (can_edit() && !$locked)): ?>
           <td>
             <form method="post" action="<?= url('competition/'.$c['id'].'/double/'.$d['id'].'/remove') ?>"
+                  class="js-ajax" data-refresh="#tab-players"
                   data-confirm="Doppel aus dem Bewerb entfernen?">
               <?= csrf_field() ?>
               <button class="btn btn-outline-danger btn-sm py-0 px-1"><i class="bi bi-x"></i></button>
@@ -634,7 +731,7 @@ ob_start(); ?>
         </tbody>
       </table>
       <?php if (count($pairable) >= 2): ?>
-      <form method="post" action="<?= url('competition/'.$c['id'].'/double/pair') ?>" class="row g-2 align-items-end">
+      <form method="post" action="<?= url('competition/'.$c['id'].'/double/pair') ?>" class="row g-2 align-items-end js-ajax" data-refresh="#tab-players">
         <?= csrf_field() ?>
         <div class="col">
           <select name="player1_id" class="form-select form-select-sm" required>
@@ -666,7 +763,7 @@ ob_start(); ?>
     <?php if ($unassigned_doubles): ?>
     <div class="mt-3 pt-3 border-top">
       <h6 class="mb-2"><i class="bi bi-plus-circle me-1 text-primary"></i>Doppel hinzufügen</h6>
-      <form method="post" action="<?= url('competition/'.$c['id'].'/double/add') ?>">
+      <form method="post" action="<?= url('competition/'.$c['id'].'/double/add') ?>" class="js-ajax" data-refresh="#tab-players">
         <?= csrf_field() ?>
         <div class="d-flex gap-2 mb-1">
           <a href="#" class="small text-muted add-select-all">Alle</a>
@@ -713,6 +810,7 @@ ob_start(); ?>
              placeholder="Filtern…" data-target="tbl-comp-teams" aria-label="Teams filtern">
       <?php if ($c['phase'] === 'setup' && (can_edit() && !$locked)): ?>
       <form method="post" action="<?= url('competition/'.$c['id'].'/teams/remove-all') ?>"
+            class="js-ajax" data-refresh="#tab-players"
             data-confirm="Alle Teams aus dem Bewerb entfernen?">
         <?= csrf_field() ?>
         <button class="btn btn-outline-danger btn-sm text-nowrap">
@@ -741,7 +839,7 @@ ob_start(); ?>
           <td class="text-center" data-sort="<?= (float)$team['skill'] ?>">
             <?php if ((can_edit() && !$locked)): ?>
             <form method="post" action="<?= url('competition/'.$c['id'].'/team/'.$team['id'].'/skill') ?>"
-                  class="d-inline-flex align-items-center gap-1">
+                  class="d-inline-flex align-items-center gap-1 js-ajax" data-refresh="#tab-players">
               <?= csrf_field() ?>
               <input type="number" name="skill" value="<?= (int)$team['skill'] ?>"
                      step="1" min="0" class="form-control form-control-sm text-center" style="width:5rem">
@@ -759,6 +857,7 @@ ob_start(); ?>
           <?php if ($c['phase'] === 'setup' && (can_edit() && !$locked)): ?>
           <td>
             <form method="post" action="<?= url('competition/'.$c['id'].'/team/'.$team['id'].'/remove') ?>"
+                  class="js-ajax" data-refresh="#tab-players"
                   data-confirm="Team aus dem Bewerb entfernen?">
               <?= csrf_field() ?>
               <button class="btn btn-outline-danger btn-sm py-0 px-1"><i class="bi bi-x"></i></button>
@@ -778,7 +877,7 @@ ob_start(); ?>
     <?php if ($unassigned_teams): ?>
     <div class="mt-3 pt-3 border-top">
       <h6 class="mb-2"><i class="bi bi-plus-circle me-1 text-primary"></i>Teams hinzufügen</h6>
-      <form method="post" action="<?= url('competition/'.$c['id'].'/team/add') ?>">
+      <form method="post" action="<?= url('competition/'.$c['id'].'/team/add') ?>" class="js-ajax" data-refresh="#tab-players">
         <?= csrf_field() ?>
         <div class="d-flex gap-2 mb-1">
           <a href="#" class="small text-muted add-select-all">Alle</a>
@@ -806,6 +905,42 @@ ob_start(); ?>
       </a>
     </div>
     <?php endif; ?>
+
+    <?php if (!empty($import_sources)): $imp_max = max(array_column($import_sources, 'max_rank')); ?>
+    <div class="mt-3 pt-3 border-top">
+      <h6 class="mb-2"><i class="bi bi-magic me-1 text-primary"></i>Teilnehmer aus Ergebnis übernehmen
+        <span class="text-muted small fw-normal">(aus beendeter Gruppenphase)</span>
+      </h6>
+      <form method="post" action="<?= url('competition/'.$c['id'].'/teams/import-result') ?>" class="js-ajax" data-refresh="#tab-players">
+        <?= csrf_field() ?>
+        <div class="row g-2 align-items-end">
+          <div class="col-sm-7">
+            <label class="form-label small mb-0">Beendeter Bewerb</label>
+            <select name="source_cid" class="form-select form-select-sm" required>
+              <?php foreach ($import_sources as $isrc): ?>
+              <option value="<?= (int)$isrc['id'] ?>">
+                <?= e($isrc['name']) ?> (<?= (int)$isrc['groups'] ?> Gruppen, Plätze 1–<?= (int)$isrc['max_rank'] ?>)
+              </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+        </div>
+        <div class="mt-2">
+          <label class="form-label small mb-1">Zu übernehmende Gruppenplätze <span class="text-muted">(je Gruppe)</span></label>
+          <div class="d-flex flex-wrap gap-3">
+            <?php for ($r = 1; $r <= $imp_max; $r++): ?>
+            <label class="d-flex align-items-center gap-1 small user-select-none" style="cursor:pointer">
+              <input type="checkbox" name="ranks[]" value="<?= $r ?>" class="form-check-input mt-0">
+              Platz <?= $r ?>
+            </label>
+            <?php endfor; ?>
+          </div>
+          <div class="form-text">Die Spielstärke der übernommenen Teilnehmer wird auf den erreichten Gruppenplatz gesetzt. Nicht vorhandene Plätze werden ignoriert.</div>
+        </div>
+        <button class="btn btn-sm btn-primary mt-2"><i class="bi bi-magic me-1"></i>Übernehmen</button>
+      </form>
+    </div>
+    <?php endif; ?>
     <?php endif; ?>
 
     <?php else: ?>
@@ -826,6 +961,7 @@ ob_start(); ?>
              placeholder="Filtern…" data-target="tbl-comp-players" aria-label="Spieler filtern">
       <?php if ($c['phase'] === 'setup' && (can_edit() && !$locked) && $assigned): ?>
       <form method="post" action="<?= url('competition/'.$c['id'].'/players/remove-all') ?>"
+            class="js-ajax" data-refresh="#tab-players"
             data-confirm="Alle Spieler aus dem Bewerb entfernen?">
         <?= csrf_field() ?>
         <button class="btn btn-outline-danger btn-sm text-nowrap">
@@ -860,7 +996,7 @@ ob_start(); ?>
             <?php if ((can_edit() && !$locked)): ?>
             <div class="d-inline-flex flex-column align-items-center gap-1">
               <form method="post" action="<?= url('competition/'.$c['id'].'/player/'.$pl['id'].'/skill') ?>"
-                    class="d-inline-flex align-items-center gap-1">
+                    class="d-inline-flex align-items-center gap-1 js-ajax" data-refresh="#tab-players">
                 <?= csrf_field() ?>
                 <input type="number" name="skill"
                        value="<?= $is_tennis ? number_format($comp_skill, 1) : (int)$comp_skill ?>"
@@ -874,7 +1010,8 @@ ob_start(); ?>
               <div class="d-flex align-items-center gap-1 small" style="color:#fd7e14">
                 <i class="bi bi-exclamation-triangle-fill"></i>
                 <span>Aktuell: <?= $is_tennis ? number_format($reg_skill, 1) : (int)$reg_skill ?></span>
-                <form method="post" action="<?= url('competition/'.$c['id'].'/player/'.$pl['id'].'/skill') ?>">
+                <form method="post" action="<?= url('competition/'.$c['id'].'/player/'.$pl['id'].'/skill') ?>"
+                      class="js-ajax" data-refresh="#tab-players">
                   <?= csrf_field() ?>
                   <input type="hidden" name="skill" value="<?= $is_tennis ? number_format($reg_skill, 1, '.', '') : (int)$reg_skill ?>">
                   <button type="submit" class="btn btn-link btn-sm p-0 lh-1" style="color:#fd7e14" title="Auf aktuellen Wert vom Spielerregister setzen">
@@ -893,6 +1030,7 @@ ob_start(); ?>
           <?php if ($c['phase'] === 'setup' && (can_edit() && !$locked)): ?>
           <td>
             <form method="post" action="<?= url('competition/'.$c['id'].'/player/'.$pl['id'].'/remove') ?>"
+                  class="js-ajax" data-refresh="#tab-players"
                   data-confirm="Spieler aus dem Bewerb entfernen?">
               <?= csrf_field() ?>
               <button class="btn btn-outline-danger btn-sm py-0 px-1"><i class="bi bi-x"></i></button>
@@ -907,7 +1045,7 @@ ob_start(); ?>
     <?php if ($c['phase'] === 'setup' && (can_edit() && !$locked) && $unassigned): ?>
     <div class="mt-3 pt-3 border-top">
       <h6 class="mb-2"><i class="bi bi-plus-circle me-1 text-primary"></i>Spieler hinzufügen</h6>
-      <form method="post" action="<?= url('competition/'.$c['id'].'/player/add') ?>">
+      <form method="post" action="<?= url('competition/'.$c['id'].'/player/add') ?>" class="js-ajax" data-refresh="#tab-players">
         <?= csrf_field() ?>
         <div class="d-flex gap-2 mb-1">
           <a href="#" class="small text-muted add-select-all">Alle</a>
@@ -1041,7 +1179,7 @@ ob_start(); ?>
     <div id="grp-edit-toolbar" style="display:none"
          class="align-items-center gap-2 mb-3 p-2 rounded border border-warning-subtle bg-warning-subtle">
       <i class="bi bi-info-circle text-warning-emphasis"></i>
-      <span class="small">Spieler per Drag &amp; Drop zwischen Gruppen verschieben.</span>
+      <span class="small">Per Drag &amp; Drop zwischen Gruppen verschieben oder innerhalb der Gruppe an die gewünschte Position ziehen.</span>
       <div class="ms-auto d-flex gap-2">
         <button type="button" class="btn btn-success btn-sm" onclick="saveGrpReorder()">
           <i class="bi bi-save me-1"></i>Speichern
@@ -1227,10 +1365,10 @@ ob_start(); ?>
               $time = $rt !== '' ? ' &middot; <span class="text-primary">' . $rt . ' Uhr</span>' : '';
               return '<div class="text-center small fw-semibold text-secondary mt-2 mb-1 pt-1 border-top">Runde ' . (int)$r . $time . '</div>';
           };
-          $grp_pause   = group_pause_window($c, $g);
+          $grp_pause   = group_pause_info($c, $g);
           $render_pause = function ($pw) {
               return '<div class="text-center small fw-bold mt-2 mb-1 py-1 rounded" style="background:#fff3cd;color:#856404">'
-                   . '<i class="bi bi-pause-circle me-1"></i>Pause &middot; ' . e($pw['start']) . ' &ndash; ' . e($pw['end']) . ' Uhr</div>';
+                   . '<i class="bi bi-pause-circle me-1"></i>' . e($pw['label']) . '</div>';
           };
           if ($grp_editable && !$use_duels && !$use_sets): ?>
           <form id="grp-form-<?= $g['id'] ?>" method="post"
@@ -1240,13 +1378,13 @@ ob_start(); ?>
           <?php endif; ?>
           <?php foreach ($matches as $m):
             $cur_round = (int)($m['round_no'] ?? 0);
-            if ($show_byes && $cur_round !== $bye_prev_round) {
-                if ($bye_prev_round !== null && isset($round_byes[$bye_prev_round])) echo $render_bye($round_byes[$bye_prev_round]);
+            if (($show_byes || $grp_pause) && $cur_round !== $bye_prev_round) {
+                if ($show_byes && $bye_prev_round !== null && isset($round_byes[$bye_prev_round])) echo $render_bye($round_byes[$bye_prev_round]);
                 // Pause nach Runde P (zwischen Runde P und P+1).
                 if ($grp_pause && $bye_prev_round !== null && $bye_prev_round <= $grp_pause['after_round'] && $cur_round > $grp_pause['after_round']) {
                     echo $render_pause($grp_pause);
                 }
-                if ($cur_round > 0) echo $render_round($cur_round);
+                if ($show_byes && $cur_round > 0) echo $render_round($cur_round);
             }
             $bye_prev_round = $cur_round;
             $has_p1 = $is_team ? !empty($m['team1_id']) : !empty($m['player1_id']);
@@ -2416,6 +2554,17 @@ function grpDragStart(e) {
   setTimeout(function() { if (grpDragEl) grpDragEl.style.opacity = '0.4'; }, 0);
 }
 function grpDragEnd() { if (grpDragEl) grpDragEl.style.opacity = ''; grpDragEl = null; }
+// Ermittelt die Pill, VOR der eingefügt werden soll (anhand der vertikalen Cursor-Position).
+// Liefert null, wenn hinter der letzten Pill losgelassen wurde (= ans Ende anhängen).
+function grpDropTarget(panel, y) {
+  var pills = Array.prototype.slice.call(panel.querySelectorAll('.grp-player-pill'))
+    .filter(function(el) { return el !== grpDragEl; });
+  for (var i = 0; i < pills.length; i++) {
+    var box = pills[i].getBoundingClientRect();
+    if (y < box.top + box.height / 2) return pills[i];
+  }
+  return null;
+}
 function saveGrpReorder() {
   var form = document.getElementById('grp-reorder-form');
   form.querySelectorAll('input[name^="groups"]').forEach(function(el) { el.remove(); });
@@ -2556,6 +2705,7 @@ function editToggleCross() {
   };
   show('finalrunde-wrap', isGroups);
   show('advance-wrap-edit', isGroups && fr === 'ko');
+  show('field-round-limit', isGroups && fr === 'none');
   show('cross-config-wrap', isGroups && fr === 'cross');
   show('third_place_wrap', (mode === 'ko_only' || mode === 'double_ko') || (isGroups && fr === 'ko'));
   // Setzungen anzeigen (KO) nur im KO-/Doppel-KO-Modus
@@ -2617,7 +2767,11 @@ document.addEventListener('drop', function(e) {
     var panel = e.target.closest('.grp-edit-panel');
     if (panel) {
       e.preventDefault(); panel.style.borderColor = '#dee2e6'; panel.style.background = '';
-      if (grpDragEl.parentNode !== panel) panel.appendChild(grpDragEl);
+      // An die Position einfügen, über der losgelassen wurde (Sortieren innerhalb der Gruppe
+      // und zwischen Gruppen). Ohne Ziel-Pill ans Ende anhängen.
+      var after = grpDropTarget(panel, e.clientY);
+      if (after) panel.insertBefore(grpDragEl, after);
+      else panel.appendChild(grpDragEl);
     }
   }
   if (koDragEl) {
@@ -2743,7 +2897,7 @@ window.addEventListener('resize', drawAllBrackets);
 // ── Bewerbstyp → team_size- und Begegnungsergebnis-Feld ein-/ausblenden ──────────────────
 (function() {
   var sel = document.querySelector('select[name="comp_type"]');
-  var flds = ['field-team-size', 'field-team-result', 'field-kickoff', 'field-match-card'].map(function(id){ return document.getElementById(id); });
+  var flds = ['sec-team-hd', 'field-team-size', 'field-team-result', 'field-kickoff', 'field-match-card'].map(function(id){ return document.getElementById(id); });
   if (!sel) return;
   sel.addEventListener('change', function() {
     var show = this.value === 'team';

@@ -160,19 +160,23 @@ ob_start(); ?>
         <li><strong>Spiele pro Team</strong> — Nur bei Teambewerb; Anzahl der Einzel-Duelle pro Mannschaftsspiel (0 = direkte Gesamtergebnis-Eingabe, 1 = ein Einzel ohne Spielerauswahl; ab 2 wird pro Duel eine Spielerauswahl eingeblendet). Änderbar im Setup sowie in der Gruppenphase, solange noch kein Gruppenergebnis erfasst wurde; danach gesperrt</li>
         <li><strong>Begegnungsergebnis</strong> — Nur bei Teambewerb: <em>Je Einzelsieg 1 Punkt</em> (Summe der gewonnenen Duelle), <em>Einzelergebnisse aufsummieren</em> (Punkte aller Duelle addiert) oder <em>Nur Gesamtergebnis eingeben</em>. Bei den letzten beiden entfallen die Einzel-Spalten; bei <em>Nur Gesamtergebnis</em> werden im Web/Spielplan keine Einzelspiele erfasst (Spielkarten/Teampläne behalten aber Felder für die Einzelspiele)</li>
         <li><strong>Anwurf auslosen</strong> — Nur bei Teambewerb: legt je Gruppen-Begegnung zufällig, aber ausgeglichen fest, welches Team Anwurf hat (Anzeige auf Spielkarten und Teamplänen)</li>
+        <li><strong>Match-Cards</strong> — Nur bei Teambewerb: Layout der Spielkarten <em>mit Spielerfeldern</em> (nummerierte Einzelspiel-Zeilen) oder <em>ohne Spielerfelder</em> (kompakt, je Mannschaft Score-Spalten + Summe)</li>
         <li><strong>Ergebniserfassung</strong> — Nur bei Einzel-/Doppelbewerb: <em>Spielergebnis</em> (ein Endstand), <em>Satzergebnisse</em> (mehrere Sätze) oder <em>Gruppe Sätze, KO Spielergebnis</em></li>
         <li><strong>Spielmodus</strong> — <em>Gruppenphase</em>, <em>KO-Modus</em> (nur KO) oder <em>Doppel-KO Modus</em> (nach dem ersten Auslosen gesperrt)</li>
-        <li><strong>Gruppengröße</strong> — Anzahl Teilnehmer pro Gruppe (Gruppenphase), 3–20</li>
-        <li><strong>Finalrunde</strong> — Nur im Gruppenmodus: <em>nur Gruppenphase</em>, <em>KO-Runde</em> oder <em>Kreuzspiele</em> (vollständige Platzierungsrunde). Solange die Finalrunde noch nicht ausgelost ist, kann zwischen KO und Kreuzspielen gewechselt werden</li>
+        <li><strong>Gruppengröße</strong> — Anzahl Teilnehmer pro Gruppe (Gruppenphase), 3–24</li>
+        <li><strong>Finalrunde</strong> — Nur im Gruppenmodus: <em>nur Gruppenphase</em>, <em>KO-Runde</em> oder <em>Kreuzspiele</em> (vollständige Platzierungsrunde). Solange die Finalrunde noch nicht ausgelost ist, kann zwischen KO und Kreuzspielen gewechselt werden. Bei <em>nur Gruppenphase</em> wird keine Endplatzierung angezeigt (nur die Gruppentabellen)</li>
         <li><strong>Aufsteiger</strong> — Bei Finalrunde KO: 1 (Gruppenerste) oder 2 (Erste &amp; Zweite)</li>
+        <li><strong>Rundenanzahl</strong> — Nur bei Finalrunde <em>nur Gruppenphase</em>: begrenzt den Spielplan auf so viele Runden (leer/0 = vollständig, jeder gegen jeden). Teilnehmer, die in den begrenzten Runden ein Freilos hatten, erhalten in einer zusätzlichen <strong>Ausgleichsrunde</strong> ein weiteres Spiel gegen eine noch nicht gespielte Mannschaft, damit möglichst alle gleich viele Spiele haben (perfekt ausgleichbar bei gerader Teilnehmer- oder Rundenzahl)</li>
         <li><strong>Kreuzspiele – Paarungen je Rang</strong> — Bei Finalrunde Kreuzspiele: pro Rang-Paar (1+2, 3+4, …) festlegen, ob <em>über Kreuz</em> (1.A–2.B …) oder <em>getrennt</em> ausgespielt wird (siehe <a href="#kreuzspiele">Kreuzspiele</a>)</li>
         <li><strong>Spielrunden anzeigen</strong> — Zeigt im Gruppen-Spielplan die Runden (Durchgänge) und spielfreien Teilnehmer (bei ungeraden Gruppen) an. Voraussetzung für Zeitplan und Pausen</li>
         <li><strong>Spielfreie Runde garantieren</strong> — Garantiert jedem Teilnehmer mindestens eine spielfreie Runde (auch bei gerader Teilnehmerzahl; der Spielplan wird dann i.d.R. eine Runde länger). Wirkt erst bei der nächsten Auslosung</li>
+        <li><strong>Spielplan-Erstellung</strong> — <em>Zufällig</em> (Standard) oder <em>Nach Position</em>. Bei „Nach Position" folgt der Spielplan deterministisch der Teilnehmer-Reihenfolge in der Gruppe (Position 1 als Anker); siehe <a href="#gruppenphase">Gruppenphase</a></li>
         <li><strong>Platz-3-Spiel</strong> — Bei KO-Finalrunde: ob die Halbfinalverlierer um Platz 3 spielen</li>
-        <li><strong>Setzungsreihenfolge</strong> — <em>Höhere Stärke = stärker</em>, <em>Niedrigere Stärke = stärker</em> (Tennis-Modus) oder <em>Zufällig (keine Setzung)</em> (komplett zufällige Gruppen-/KO-Auslosung)</li>
+        <li><strong>Setzungsreihenfolge</strong> — <em>Höhere Spielstärke = stärker</em>, <em>Niedrigere Spielstärke = stärker</em> (Tennis-Modus) oder <em>Zufällig (keine Setzung)</em> (komplett zufällige Gruppen-/KO-Auslosung)</li>
         <li><strong>Tabellenreihung</strong> — Reihenfolge der Tiebreaker bei Punktegleichstand: <em>Punkte – Direktes Duell – Differenz</em> (Standard) oder <em>Punkte – Differenz – Direktes Duell</em></li>
         <li><strong>Punktevergabe</strong> — Wertung in der Gruppentabelle: <em>Sieg 2 / Unentschieden 1 / Niederlage 0</em> (Standard), <em>Sieg 3 / 1 / 0</em> oder <em>Sieg 3 / 2 / 1</em></li>
         <li><strong>Spielstärke anzeigen (Gruppe)</strong> — Zeigt die Spielstärke neben den Teilnehmern in der Gruppenansicht</li>
+        <li><strong>separate Seite für Match-Cards</strong> — Druckt jede Match-Card sowie jede Team- und Bahnplan-Übersicht auf einer eigenen Seite (statt mehrere pro Seite)</li>
         <li><strong>Setzungen anzeigen (KO)</strong> — Nur in KO-/Doppel-KO-Modi: blendet die Setzungslabels (z.B. „5-8") ein</li>
         <li><strong>Max. Teilnehmer</strong> — Obergrenze (0 = unbegrenzt)</li>
         <li><strong>Spielplätze</strong> — Anzahl paralleler Plätze (0 = aus); die Bezeichnung richtet sich nach der Sportart (Bahn, Tisch, Spielfeld, Tennisplatz …); siehe <a href="#spielplaetze">Spielplätze</a></li>
@@ -229,7 +233,7 @@ ob_start(); ?>
       <ul>
         <li><strong>Importieren</strong> (Tab Spieler) — eine Zeile je Spieler. Spalten: Name, Vorname, Verein, Geschlecht, Lizenznummer, E-Mail, Spielstärke, Spielstärke Tischtennis, Spielstärke Tennis, Spielstärke Fußball, RatingsCentral-ID. Dedup über Pass-Nr. oder Nachname+Vorname.</li>
         <li><strong>Doppel importieren</strong> (Tab Doppel) — eine Zeile je Doppel mit beiden Spielern (je Nachname, Vorname, Pass-Nr.). Noch nicht existierende Spieler werden automatisch angelegt.</li>
-        <li><strong>Teams importieren</strong> (Tab Teams) — Langformat: eine Zeile je Mitglied, gruppiert nach Teamname. Eine Zeile mit nur ausgefülltem Teamnamen legt ein Team ohne Mitglieder an.</li>
+        <li><strong>Teams importieren</strong> (Tab Teams) — Langformat: eine Zeile je Mitglied, gruppiert nach Teamname. Optionale Spalte <strong>Kapitän</strong> (genügt einmal je Team). Eine Zeile mit nur ausgefülltem Teamnamen legt ein Team ohne Mitglieder an.</li>
       </ul>
       <div class="alert alert-info small">
         <i class="bi bi-info-circle me-1"></i>
@@ -283,8 +287,9 @@ ob_start(); ?>
       <h5 class="mt-3">Team anlegen und verwalten</h5>
       <ol>
         <li>Im Spielerregister auf den Tab <strong>Teams</strong> wechseln</li>
-        <li>Über <strong>Neues Team erstellen</strong> einen Teamnamen vergeben und optional Spieler direkt hinzufügen</li>
-        <li>Das Bearbeiten-Modal zeigt zwei Tabs: <strong>Mitglieder</strong> (Spieler hinzufügen/entfernen) und <strong>Bewerbe</strong> (alle Bewerbs-Zuordnungen mit Turniername)</li>
+        <li>Über <strong>Neues Team erstellen</strong> einen Teamnamen vergeben, optional einen <strong>Kapitän</strong> (Freitext) eintragen und optional Spieler direkt hinzufügen</li>
+        <li>Das Bearbeiten-Modal zeigt zwei Tabs: <strong>Mitglieder</strong> (Spieler hinzufügen/entfernen) und <strong>Bewerbe</strong> (alle Bewerbs-Zuordnungen mit Turniername); der Kapitän ist ebenfalls editierbar</li>
+        <li>Die Teamübersicht zeigt eine eigene Spalte <strong>Kapitän</strong>; der Kapitän erscheint auch im Bewerbsaushang in Klammern hinter dem Teamnamen</li>
       </ol>
       <div class="alert alert-info small">
         <i class="bi bi-info-circle me-1"></i>
@@ -299,6 +304,15 @@ ob_start(); ?>
 
       <h5 class="mt-3">Teams einem Bewerb zuweisen</h5>
       <p>Auf der Bewerbsseite können im Setup-Modus Teams aus dem Register hinzugefügt werden.</p>
+
+      <h5 class="mt-3">Teilnehmer aus Ergebnis übernehmen</h5>
+      <p>Im Teilnehmerbereich eines Teambewerbs (Einrichtungsphase) können Teams automatisch aus dem Ergebnis eines anderen Bewerbs übernommen werden:</p>
+      <ol>
+        <li>Voraussetzung: ein <strong>beendeter</strong> Teambewerb mit Modus <em>nur Gruppenphase</em> im selben Turnier (Phase „Abgeschlossen")</li>
+        <li>Im Abschnitt <strong>Teilnehmer aus Ergebnis übernehmen</strong> den Quell-Bewerb auswählen</li>
+        <li>Die zu übernehmenden <strong>Gruppenplätze</strong> ankreuzen (z.B. Platz 1 und 2) — übernommen wird der jeweils so platzierte Teilnehmer <em>jeder</em> Gruppe</li>
+        <li>Die <strong>Spielstärke</strong> der übernommenen Teilnehmer wird automatisch auf den erreichten Gruppenplatz gesetzt (Platz 1 → Stärke 1 usw.). Bereits vorhandene Teams werden übersprungen, nicht vorhandene Plätze ignoriert</li>
+      </ol>
 
       <h5 class="mt-3">Ergebnisse bei Teambewerben</h5>
       <p>Wenn <em>Spiele pro Team</em> größer 0 ist, wird jedes Mannschaftsspiel in <strong>Einzel-Duelle</strong> aufgeteilt:</p>
@@ -339,11 +353,12 @@ ob_start(); ?>
       <h2 class="h4 border-bottom pb-2">Auslosung</h2>
 
       <h5 id="gruppenphase" class="mt-3">Gruppenphase</h5>
-      <p>Voraussetzung: Modus <em>Gruppenphase</em>, mindestens so viele Teilnehmer wie eine Gruppenanzahl × Gruppengröße (3–20 Spieler/Teams pro Gruppe).</p>
+      <p>Voraussetzung: Modus <em>Gruppenphase</em>, mindestens so viele Teilnehmer wie eine Gruppenanzahl × Gruppengröße (3–24 Spieler/Teams pro Gruppe).</p>
       <ol>
         <li>Klicke auf <strong>Gruppen auslosen</strong> — Teilnehmer werden nach Spielstärke gereiht und gleichmäßig auf die Gruppen verteilt</li>
-        <li>Die Gruppenreihenfolge kann per Drag &amp; Drop angepasst werden (<strong>Gruppen neu ordnen</strong>)</li>
-        <li>Alle Gruppenspiele werden automatisch als Round-Robin-Spielplan erzeugt (rundenbasiert, möglichst ohne zwei Partien direkt hintereinander)</li>
+        <li>Über <strong>Umstellen</strong> (solange keine Ergebnisse erfasst sind) lassen sich Teilnehmer per Drag &amp; Drop zwischen Gruppen verschieben und innerhalb einer Gruppe an die gewünschte <strong>Position</strong> ziehen</li>
+        <li>Alle Gruppenspiele werden automatisch als Round-Robin-Spielplan erzeugt. Die Option <strong>Spielplan-Erstellung</strong> bestimmt die Reihenfolge: <em>Zufällig</em> (rundenbasiert, möglichst ohne zwei Partien direkt hintereinander) oder <em>Nach Position</em> (deterministisch entlang der Gruppenposition)</li>
+        <li>Mit der Option <strong>Rundenanzahl</strong> (nur bei Finalrunde <em>nur Gruppenphase</em>) wird der Spielplan auf wenige Runden begrenzt; Freilose werden durch eine <strong>Ausgleichsrunde</strong> ausgeglichen</li>
         <li>Ergebnisse erfassen → Tabelle wird automatisch berechnet</li>
         <li>Wenn alle Gruppenspiele eingetragen sind, erscheint je nach Finalrunde <strong>KO-Runde auslosen</strong> bzw. <strong>Kreuzspiele auslosen</strong> (entfällt bei <em>nur Gruppenphase</em>)</li>
       </ol>
@@ -425,11 +440,11 @@ ob_start(); ?>
       </ul>
 
       <h5 class="mt-3">Pause je Gruppe</h5>
-      <p>Bei aktivem Zeitplan kann pro Gruppe optional eine <strong>Pause</strong> festgelegt werden (Abschnitt <em>Pause pro Gruppe</em> in den Einstellungen): Zeitpunkt + Dauer.</p>
+      <p>Pro Gruppe kann optional eine <strong>Pause</strong> festgelegt werden (Abschnitt <em>Pause pro Gruppe</em> in den Einstellungen). Die Eingabe richtet sich danach, ob der Zeitplan aktiv ist:</p>
       <ul>
-        <li>Die Pause wird zum angegebenen Zeitpunkt bzw. — falls dieser mitten in einer Runde liegt — <strong>nach Ende der laufenden Runde</strong> eingeplant.</li>
-        <li>Alle Runden nach der Pause verschieben sich um die Pausendauer nach hinten.</li>
-        <li>Die Pause erscheint als eigene Zeile im Spielplan, in den Teamplänen und Bahnplänen (z.B. <em>Pause · 11:30 – 12:00 Uhr</em>).</li>
+        <li><strong>Mit Zeitplan:</strong> Pause über <em>Zeitpunkt + Dauer (Min.)</em>. Sie wird zum angegebenen Zeitpunkt bzw. — falls dieser mitten in einer Runde liegt — <strong>nach Ende der laufenden Runde</strong> eingeplant; alle folgenden Runden verschieben sich um die Pausendauer. Anzeige z.B. <em>Pause · 11:30 – 12:00 Uhr</em>.</li>
+        <li><strong>Ohne Zeitplan:</strong> Pause über die <em>Spielrunde</em>, nach der sie liegen soll (keine Dauer/Uhrzeit). Anzeige z.B. <em>Pause nach Runde 3</em>.</li>
+        <li>Die Pause erscheint als eigene Zeile im Spielplan, in der Monitor-Übersicht sowie in Team- und Bahnplänen.</li>
         <li>Jede Gruppe kann eine eigene Pause haben; ohne Eintrag gibt es keine Pause.</li>
       </ul>
     </section>

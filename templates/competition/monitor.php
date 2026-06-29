@@ -265,14 +265,14 @@ $teilnehmer_kopf = $is_team ? 'Mannschaft' : ($is_doubles ? 'Doppel' : 'Spieler'
       <div class="mon-sched">
         <?php
           $sched_prev = null;
-          $grp_pause  = group_pause_window($c, $g);
+          $grp_pause  = group_pause_info($c, $g);
           foreach ($gi['matches'] as $m):
             if (empty($m['player1_id']) || empty($m['player2_id'])) continue;
             $cur_round = (int)($m['round_no'] ?? 0);
             if ($cur_round !== $sched_prev) {
                 // Pause zwischen den Runden (wie Webansicht)
                 if ($grp_pause && $sched_prev !== null && $sched_prev <= $grp_pause['after_round'] && $cur_round > $grp_pause['after_round']) {
-                    echo '<div class="mon-sched-pause">Pause &middot; ' . e($grp_pause['start']) . ' &ndash; ' . e($grp_pause['end']) . ' Uhr</div>';
+                    echo '<div class="mon-sched-pause">' . e($grp_pause['label']) . '</div>';
                 }
                 if ($cur_round > 0) {
                     $rt = group_round_time($c, $g, $cur_round);

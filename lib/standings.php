@@ -179,7 +179,8 @@ function group_standings(int $group_id, string $seeding_order = 'desc', string $
          FROM player p
          JOIN group_player gp ON gp.player_id = p.id AND gp.group_id = ?
          LEFT JOIN competition_player cp ON cp.player_id = p.id
-           AND cp.competition_id = (SELECT competition_id FROM grp WHERE id = ?)",
+           AND cp.competition_id = (SELECT competition_id FROM grp WHERE id = ?)
+         ORDER BY gp.position, p.id",
         [$group_id, $group_id]
     );
     $matches = db_fetchall(
@@ -250,7 +251,8 @@ function team_standings(int $group_id, string $seeding_order = 'desc', string $s
          FROM `team` t
          JOIN group_team gt ON gt.team_id = t.id AND gt.group_id = ?
          LEFT JOIN competition_team ct ON ct.team_id = t.id
-           AND ct.competition_id = (SELECT competition_id FROM grp WHERE id = ?)",
+           AND ct.competition_id = (SELECT competition_id FROM grp WHERE id = ?)
+         ORDER BY gt.position, t.id",
         [$group_id, $group_id]
     );
     $matches = db_fetchall(
@@ -351,7 +353,8 @@ function double_standings(int $group_id, string $seeding_order = 'desc', string 
          JOIN player p2 ON p2.id = d.player2_id
          JOIN group_double gd ON gd.double_id = d.id AND gd.group_id = ?
          LEFT JOIN competition_double cd ON cd.double_id = d.id
-           AND cd.competition_id = (SELECT competition_id FROM grp WHERE id = ?)",
+           AND cd.competition_id = (SELECT competition_id FROM grp WHERE id = ?)
+         ORDER BY gd.position, d.id",
         [$group_id, $group_id]
     );
     $matches = db_fetchall(

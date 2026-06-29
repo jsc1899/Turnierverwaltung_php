@@ -147,7 +147,7 @@ ob_start(); ?>
               </button>
               <?php if (can_edit()): ?>
               <form method="post" action="<?= url('player/'.$p['id'].'/toggle-active') ?>"
-                    class="d-inline ms-1"
+                    class="d-inline ms-1 js-ajax" data-refresh="#tab-spieler"
                     data-confirm="<?= $p['is_active'] ? 'Spieler '.e($p['firstname'].' '.$p['name']).' inaktiv setzen?' : 'Spieler '.e($p['firstname'].' '.$p['name']).' wieder aktivieren?' ?>">
                 <?= csrf_field() ?>
                 <button class="btn btn-outline-<?= $p['is_active'] ? 'warning' : 'success' ?> btn-sm"
@@ -158,7 +158,7 @@ ob_start(); ?>
               <?php endif; ?>
               <?php if (is_admin()): ?>
               <form method="post" action="<?= url('player/' . $p['id'] . '/delete') ?>"
-                    class="d-inline ms-1"
+                    class="d-inline ms-1 js-ajax" data-refresh="#tab-spieler"
                     data-confirm="Spieler <?= e($p['firstname'].' '.$p['name']) ?> wirklich löschen?">
                 <?= csrf_field() ?>
                 <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button>
@@ -242,7 +242,7 @@ ob_start(); ?>
               <i class="bi bi-pencil"></i>
             </button>
             <form method="post" action="<?= url('players/double/'.$d['id'].'/toggle-active') ?>"
-                  class="d-inline me-1"
+                  class="d-inline me-1 js-ajax" data-refresh="#tab-doppel"
                   data-confirm="<?= $d['is_active'] ? 'Doppel &bdquo;'.e($d['name']).'&ldquo; inaktiv setzen?' : 'Doppel &bdquo;'.e($d['name']).'&ldquo; wieder aktivieren?' ?>">
               <?= csrf_field() ?>
               <button class="btn btn-outline-<?= $d['is_active'] ? 'warning' : 'success' ?> btn-sm py-0 px-1"
@@ -252,7 +252,7 @@ ob_start(); ?>
             </form>
             <?php if (is_admin()): ?>
             <form method="post" action="<?= url('players/double/'.$d['id'].'/delete') ?>"
-                  class="d-inline"
+                  class="d-inline js-ajax" data-refresh="#tab-doppel"
                   data-confirm="Doppel &bdquo;<?= e($d['name']) ?>&ldquo; wirklich löschen?">
               <?= csrf_field() ?>
               <button class="btn btn-outline-danger btn-sm py-0 px-1" title="Löschen">
@@ -274,7 +274,7 @@ ob_start(); ?>
     <?php if (can_edit() && count($players) >= 2): ?>
     <div class="border-top pt-3">
       <h6 class="mb-3"><i class="bi bi-plus-circle me-1"></i>Neues Doppel bilden</h6>
-      <form method="post" action="<?= url('players/double/new') ?>" class="row g-2 align-items-end">
+      <form method="post" action="<?= url('players/double/new') ?>" class="row g-2 align-items-end js-ajax" data-refresh="#tab-doppel">
         <?= csrf_field() ?>
         <div class="col-sm-5">
           <label class="form-label small">Spieler 1</label>
@@ -346,7 +346,7 @@ ob_start(); ?>
       <table class="table table-sm table-hover align-middle mb-0" data-sortable id="tbl-teams">
         <thead class="table-light">
           <tr>
-            <th>Teamname</th><th>Mitglieder</th>
+            <th>Teamname</th><th>Kapitän</th><th>Mitglieder</th>
             <?php if (can_edit()): ?><th class="no-sort"></th><?php endif; ?>
           </tr>
         </thead>
@@ -354,6 +354,13 @@ ob_start(); ?>
         <?php foreach ($all_teams as $team): ?>
         <tr data-active="<?= $team['is_active'] ?>"<?= $team['is_active'] ? '' : ' class="opacity-50"' ?>>
           <td class="fw-semibold"><?= e($team['name']) ?></td>
+          <td class="small">
+            <?php if (!empty($team['captain'])): ?>
+              <i class="bi bi-person-badge me-1 text-muted"></i><?= e($team['captain']) ?>
+            <?php else: ?>
+              <span class="text-muted">—</span>
+            <?php endif; ?>
+          </td>
           <td class="small">
             <?php if ($team['members']): ?>
               <?= e(implode(', ', array_column($team['members'], 'fullname'))) ?>
@@ -369,7 +376,7 @@ ob_start(); ?>
               <i class="bi bi-pencil"></i>
             </button>
             <form method="post" action="<?= url('players/team/'.$team['id'].'/toggle-active') ?>"
-                  class="d-inline me-1"
+                  class="d-inline me-1 js-ajax" data-refresh="#tab-teams"
                   data-confirm="<?= $team['is_active'] ? 'Team &bdquo;'.e($team['name']).'&ldquo; inaktiv setzen?' : 'Team &bdquo;'.e($team['name']).'&ldquo; wieder aktivieren?' ?>">
               <?= csrf_field() ?>
               <button class="btn btn-outline-<?= $team['is_active'] ? 'warning' : 'success' ?> btn-sm py-0 px-1"
@@ -379,7 +386,7 @@ ob_start(); ?>
             </form>
             <?php if (is_admin()): ?>
             <form method="post" action="<?= url('players/team/'.$team['id'].'/delete') ?>"
-                  class="d-inline"
+                  class="d-inline js-ajax" data-refresh="#tab-teams"
                   data-confirm="Team &bdquo;<?= e($team['name']) ?>&ldquo; wirklich löschen?">
               <?= csrf_field() ?>
               <button class="btn btn-outline-danger btn-sm py-0 px-1" title="Löschen">
@@ -401,13 +408,17 @@ ob_start(); ?>
     <?php if (can_edit()): ?>
     <div class="border-top pt-3">
       <h6 class="mb-3"><i class="bi bi-plus-circle me-1"></i>Neues Team erstellen</h6>
-      <form method="post" action="<?= url('players/team/new') ?>" class="row g-2 align-items-end">
+      <form method="post" action="<?= url('players/team/new') ?>" class="row g-2 align-items-end js-ajax" data-refresh="#tab-teams">
         <?= csrf_field() ?>
-        <div class="col-sm-8">
+        <div class="col-sm-5">
           <label class="form-label small">Teamname <span class="text-danger">*</span></label>
           <input type="text" name="name" class="form-control form-control-sm" required placeholder="z.B. Team Alpha">
         </div>
         <div class="col-sm-4">
+          <label class="form-label small">Kapitän <span class="text-muted">(optional)</span></label>
+          <input type="text" name="captain" class="form-control form-control-sm" placeholder="z.B. Max Mustermann">
+        </div>
+        <div class="col-sm-3">
           <button class="btn btn-primary btn-sm w-100"><i class="bi bi-plus me-1"></i>Erstellen</button>
         </div>
         <?php if ($players): ?>
@@ -448,12 +459,16 @@ ob_start(); ?>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <form method="post" action="<?= url('players/team/'.$team['id'].'/edit') ?>" class="mb-3">
+        <form method="post" action="<?= url('players/team/'.$team['id'].'/edit') ?>" class="mb-3 js-ajax" data-refresh="#tab-teams">
           <?= csrf_field() ?>
           <div class="row g-2 align-items-end">
-            <div class="col-sm-9">
+            <div class="col-sm-5">
               <label class="form-label small">Teamname <span class="text-danger">*</span></label>
               <input type="text" name="name" class="form-control form-control-sm" value="<?= e($team['name']) ?>" required>
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label small">Kapitän <span class="text-muted">(optional)</span></label>
+              <input type="text" name="captain" class="form-control form-control-sm" value="<?= e($team['captain'] ?? '') ?>" placeholder="z.B. Max Mustermann">
             </div>
             <div class="col-sm-3">
               <button class="btn btn-primary btn-sm w-100"><i class="bi bi-check me-1"></i>Speichern</button>
@@ -485,7 +500,8 @@ ob_start(); ?>
                   <?php if ($member['club']): ?><span class="text-muted">(<?= e($member['club']) ?>)</span><?php endif; ?>
                 </span>
                 <form method="post" action="<?= url('players/team/'.$team['id'].'/player/'.$member['id'].'/remove') ?>"
-                      class="d-inline" data-confirm="Spieler aus dem Team entfernen?">
+                      class="d-inline js-ajax" data-refresh="#teamTabMember<?= $team['id'] ?>, #tab-teams"
+                      data-confirm="Spieler aus dem Team entfernen?">
                   <?= csrf_field() ?>
                   <button class="btn btn-outline-danger btn-sm py-0 px-1" title="Entfernen">
                     <i class="bi bi-x"></i>
@@ -497,7 +513,7 @@ ob_start(); ?>
             <?php else: ?>
             <p class="text-muted small mb-3">Noch keine Mitglieder.</p>
             <?php endif; ?>
-            <form method="post" action="<?= url('players/team/'.$team['id'].'/player/add') ?>" class="row g-2 align-items-end">
+            <form method="post" action="<?= url('players/team/'.$team['id'].'/player/add') ?>" class="row g-2 align-items-end js-ajax" data-refresh="#teamTabMember<?= $team['id'] ?>, #tab-teams">
               <?= csrf_field() ?>
               <?php $assigned_ids = array_column($team['members'], 'id'); ?>
               <div class="col-sm-9">
@@ -550,7 +566,7 @@ ob_start(); ?>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <form method="post" action="<?= url('player/new') ?>">
+        <form method="post" action="<?= url('player/new') ?>" class="js-ajax" data-refresh="#tab-spieler" data-modal-close>
           <?= csrf_field() ?>
           <div class="mb-2">
             <label class="form-label">Nachname <span class="text-danger">*</span></label>
@@ -614,7 +630,7 @@ ob_start(); ?>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <form method="post" action="<?= url('players/double/'.$d['id'].'/edit') ?>" class="mb-3" id="doubleEditForm<?= $d['id'] ?>">
+        <form method="post" action="<?= url('players/double/'.$d['id'].'/edit') ?>" class="mb-3 js-ajax" data-refresh="#tab-doppel" data-modal-close id="doubleEditForm<?= $d['id'] ?>">
           <?= csrf_field() ?>
           <div class="row g-2 align-items-end">
             <div class="col-sm-9">
@@ -710,7 +726,7 @@ ob_start(); ?>
           <div class="tab-content px-3 pt-3 pb-2">
             <!-- Tab: Stammdaten -->
             <div class="tab-pane fade show active" id="profileTabStamm" role="tabpanel">
-              <form method="post" id="profileEditForm" action="#">
+              <form method="post" id="profileEditForm" action="#" class="js-ajax" data-refresh="#tab-spieler">
                 <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
                 <div class="row g-3">
                   <div class="col-sm-6">
@@ -810,12 +826,12 @@ ob_start(); ?>
       <div class="modal-footer" id="profileFooter" style="display:none">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schließen</button>
         <?php if (can_edit()): ?>
-        <form id="profileToggleForm" method="post" action="" class="me-auto">
+        <form id="profileToggleForm" method="post" action="" class="me-auto js-ajax" data-refresh="#tab-spieler" data-modal-close>
           <?= csrf_field() ?>
           <button type="submit" id="profileToggleBtn" class="btn btn-outline-warning btn-sm"></button>
         </form>
         <?php if (is_admin()): ?>
-        <form id="profileDeleteForm" method="post" action="">
+        <form id="profileDeleteForm" method="post" action="" class="js-ajax" data-refresh="#tab-spieler" data-modal-close>
           <?= csrf_field() ?>
           <button type="submit" id="profileDeleteBtn" class="btn btn-outline-danger btn-sm">
             <i class="bi bi-trash me-1"></i>Löschen
@@ -1260,16 +1276,26 @@ document.addEventListener('click', function(e) {
 });
 
 // ── Inaktive Einträge ein-/ausblenden ─────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', function() {
-  document.querySelectorAll('.show-inactive-cb').forEach(function(cb) {
+// Zustand je Tabelle merken, damit er einen AJAX-Refresh des Tabs übersteht.
+var inactiveState = {};
+function initInactiveToggles(root) {
+  (root || document).querySelectorAll('.show-inactive-cb').forEach(function(cb) {
+    var table = cb.dataset.table;
     function applyFilter() {
-      var rows = document.querySelectorAll('#' + cb.dataset.table + ' tbody tr[data-active="0"]');
-      rows.forEach(function(r) { r.classList.toggle('d-none', !cb.checked); });
+      document.querySelectorAll('#' + table + ' tbody tr[data-active="0"]').forEach(function(r) {
+        r.classList.toggle('d-none', !cb.checked);
+      });
     }
-    cb.addEventListener('change', applyFilter);
-    applyFilter(); // beim Laden inaktive sofort verstecken
+    if (table in inactiveState) cb.checked = inactiveState[table];
+    if (!cb.dataset.inactiveBound) {
+      cb.dataset.inactiveBound = '1';
+      cb.addEventListener('change', function() { inactiveState[table] = cb.checked; applyFilter(); });
+    }
+    applyFilter(); // inaktive sofort verstecken (gemäß gemerktem Zustand)
   });
-});
+}
+document.addEventListener('DOMContentLoaded', function() { initInactiveToggles(document); });
+document.addEventListener('content:refreshed', function(e) { initInactiveToggles(e.detail.container); });
 </script>
 <?php
 $content = ob_get_clean();

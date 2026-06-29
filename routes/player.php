@@ -193,8 +193,9 @@ function create_team_global(array $p): void {
         redirect('players#tab-teams');
         return;
     }
-    $skill = (float)post('skill', 0);
-    $tid = (int)db_insert("INSERT INTO `team` (name, skill) VALUES (?,?)", [$name, $skill]);
+    $skill   = (float)post('skill', 0);
+    $captain = trim(post('captain'));
+    $tid = (int)db_insert("INSERT INTO `team` (name, skill, captain) VALUES (?,?,?)", [$name, $skill, $captain]);
     foreach ((array)($_POST['player_ids'] ?? []) as $pid_str) {
         $pid = (int)$pid_str;
         if ($pid) db_execute("INSERT IGNORE INTO `team_player` (team_id, player_id) VALUES (?,?)", [$tid, $pid]);
@@ -213,8 +214,8 @@ function edit_team_global(array $p): void {
         redirect('players#tab-teams');
         return;
     }
-    $skill = (float)post('skill', 0);
-    db_execute("UPDATE `team` SET name=?, skill=? WHERE id=?", [$name, $skill, $tid]);
+    $captain = trim(post('captain'));
+    db_execute("UPDATE `team` SET name=?, captain=? WHERE id=?", [$name, $captain, $tid]);
     flash('success', 'Team gespeichert.');
     redirect('players#tab-teams');
 }
@@ -649,11 +650,11 @@ function import_doubles(array $p): void {
 
 function import_teams_template(array $p): void {
     require_edit();
-    $headers = ['Teamname', 'Nachname', 'Vorname', 'Pass-Nr.'];
-    $example = ['Team Alpha', 'Mustermann', 'Max', 'TT123'];
+    $headers = ['Teamname', 'Kapitän', 'Nachname', 'Vorname', 'Pass-Nr.'];
+    $example = ['Team Alpha', 'Max Mustermann', 'Mustermann', 'Max', 'TT123'];
     $extra   = [
-        ['Team Alpha', 'Müller', 'Anna', ''],   // weiteres Mitglied desselben Teams
-        ['Team Beta', '', '', ''],              // Team ohne Spieler (nur Teamname)
+        ['Team Alpha', '', 'Müller', 'Anna', ''],         // weiteres Mitglied (Kapitän nur einmal nötig)
+        ['Team Beta', 'Erika Musterfrau', '', '', ''],    // Team ohne Spieler (nur Teamname + optional Kapitän)
     ];
     header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     header('Content-Disposition: attachment; filename="team_vorlage.xlsx"');
@@ -667,6 +668,7 @@ function import_teams(array $p): void {
     $info = 'Langformat: <strong>eine Zeile je Mitglied</strong>, gruppiert nach <strong>Teamname</strong> '
           . '(beliebige Teamgröße). Mitglieder werden über die <strong>Pass-Nr.</strong> (sonst '
           . '<strong>Nachname + Vorname</strong>) zugeordnet; unbekannte Spieler werden automatisch angelegt. '
+          . 'Die Spalte <strong>Kapitän</strong> ist optional (genügt einmal je Team). '
           . 'Ein <strong>Team ohne Mitglieder</strong> ist möglich — dann nur die Spalte <strong>Teamname</strong> '
           . 'ausfüllen. Ein Team wird übersprungen, wenn bereits ein Team mit gleichem Namen existiert.';
     $base = [
@@ -684,14 +686,16 @@ function import_teams(array $p): void {
     // Zeilen nach Teamname gruppieren (Reihenfolge erhalten)
     $teams = []; $order = [];
     foreach ($rows as $i => $row) {
-        $row = array_pad(array_values($row), 4, '');
+        $row = array_pad(array_values($row), 5, '');
         $tn  = trim($row[0]);
         if ($tn === '') continue;
         $key = mb_strtolower($tn);
-        if (!isset($teams[$key])) { $teams[$key] = ['name' => $tn, 'members' => []]; $order[] = $key; }
-        // Zeile nur mit Teamname (keine Mitgliedsdaten) → Team ohne Spieler, keine Mitgliedszeile
-        if (trim($row[1]) === '' && trim($row[2]) === '' && trim($row[3]) === '') continue;
-        $teams[$key]['members'][] = ['name' => $row[1], 'firstname' => $row[2], 'pass' => $row[3], 'line' => $i + 2];
+        if (!isset($teams[$key])) { $teams[$key] = ['name' => $tn, 'captain' => '', 'members' => []]; $order[] = $key; }
+        // Kapitän (optional) — erster nicht-leerer Wert je Team gilt
+        if (trim($row[1]) !== '' && $teams[$key]['captain'] === '') $teams[$key]['captain'] = trim($row[1]);
+        // Zeile ohne Mitgliedsdaten → Team ohne Spieler, keine Mitgliedszeile
+        if (trim($row[2]) === '' && trim($row[3]) === '' && trim($row[4]) === '') continue;
+        $teams[$key]['members'][] = ['name' => $row[2], 'firstname' => $row[3], 'pass' => $row[4], 'line' => $i + 2];
     }
 
     $imported = 0; $skipped = 0; $created = 0; $errors = [];
@@ -715,7 +719,7 @@ function import_teams(array $p): void {
             $sk = db_fetch("SELECT skill FROM player WHERE id=?", [$pid]);
             $teamSkill += (float)($sk['skill'] ?? 0);
         }
-        $tid = (int)db_insert("INSERT INTO `team` (name, skill) VALUES (?,?)", [$g['name'], round($teamSkill, 1)]);
+        $tid = (int)db_insert("INSERT INTO `team` (name, skill, captain) VALUES (?,?,?)", [$g['name'], round($teamSkill, 1), $g['captain']]);
         foreach (array_keys($ids) as $pid) {
             db_execute("INSERT IGNORE INTO `team_player` (team_id, player_id) VALUES (?,?)", [$tid, $pid]);
         }
