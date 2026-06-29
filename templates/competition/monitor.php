@@ -92,7 +92,7 @@ $schedRow = function(array $m) use ($winner): string {
 // Rendert einen Turnierbaum (Rundenüberschriften + Spalten + SVG-Overlay). Spalten sind
 // dynamisch breit (flex:1) und füllen die verfügbare Breite, damit der Baum möglichst komplett
 // sichtbar ist. $roundClass: 'ko-round' (KO/WB-Stil) oder 'lb-round' (Losers Bracket).
-$renderTree = function(array $rounds, string $bracketId, string $svgId, string $roundClass, bool $trophyLast, int &$num) use ($bracketBox): string {
+$renderTree = function(array $rounds, string $bracketId, string $svgId, string $roundClass, bool $trophyLast, int &$num, string $thirdHtml = '', bool $finalLabel = false) use ($bracketBox): string {
     $rounds = array_values($rounds);
     if (!$rounds) return '';
     $slot_h = 150;
@@ -108,9 +108,20 @@ $renderTree = function(array $rounds, string $bracketId, string $svgId, string $
     }
     $o .= '</div>';
     $o .= '<div id="' . $bracketId . '" style="display:flex;position:relative;height:' . $h . 'px;width:100%">';
-    foreach ($rounds as $rd) {
-        $o .= '<div class="' . $roundClass . '" style="display:flex;flex-direction:column;justify-content:space-around;flex:1 1 0;min-width:0;height:100%;padding:0 8px">';
-        foreach ($rd['matches'] as $m) { $num++; $o .= $bracketBox($m, 'Spiel ' . $num); }
+    foreach ($rounds as $ri => $rd) {
+        $isLast3rd = ($ri === $last && $thirdHtml !== '');
+        $isLastFin = ($finalLabel && $ri === $last);
+        $cs = 'display:flex;flex-direction:column;justify-content:space-around;flex:1 1 0;min-width:0;height:100%;padding:0 8px' . ($isLast3rd ? ';position:relative' : '');
+        $o .= '<div class="' . $roundClass . '" style="' . $cs . '">';
+        if ($isLastFin) {
+            $o .= '<div style="display:flex;flex-direction:column">';
+            $o .= '<div style="text-align:center;font-weight:700;font-size:1.05rem;color:#856404;padding-bottom:6px">🏆 ' . e($rd['name']) . '</div>';
+            foreach ($rd['matches'] as $m) { $num++; $o .= $bracketBox($m, 'Spiel ' . $num); }
+            $o .= '</div>';
+        } else {
+            foreach ($rd['matches'] as $m) { $num++; $o .= $bracketBox($m, 'Spiel ' . $num); }
+        }
+        if ($isLast3rd) $o .= '<div class="mon-third-place" style="position:absolute;left:8px;right:8px">' . $thirdHtml . '</div>';
         $o .= '</div>';
     }
     $o .= '<svg id="' . $svgId . '" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible"></svg>';
@@ -333,18 +344,20 @@ $teilnehmer_kopf = $is_team ? 'Mannschaft' : ($is_doubles ? 'Doppel' : 'Spieler'
 
   <?php else: // groups_ko / ko_only — Turnierbaum mit Kästchen + Verbindungslinien ?>
   <?php $ko_num = 0; ?>
+  <?php
+  // Spiel um Platz 3 vorab bauen → wird direkt unter dem (zentrierten) Finale platziert.
+  $monThirdHtml = '';
+  if (!empty($third_place_match)) {
+      $ko_total = 0;
+      foreach ($ko_rounds as $__r) { $ko_total += count($__r['matches']); }
+      ob_start(); ?>
+      <div style="text-align:center;font-weight:700;font-size:1.05rem;color:#856404;padding-bottom:6px;margin-top:6px">🥉 <?= e($third_place_match['name']) ?></div>
+      <?php foreach ($third_place_match['matches'] as $m) { echo $bracketBox($m, 'Spiel ' . ($ko_total + 1), '#ffc107'); }
+      $monThirdHtml = ob_get_clean();
+  }
+  ?>
   <div class="mon-block">
-  <?= $renderTree($ko_rounds, 'mon-ko-bracket', 'mon-ko-svg', 'ko-round', true, $ko_num) ?>
-  <?php if (!empty($third_place_match)): ?>
-  <!-- Spiel um Platz 3 (unter dem Finale ausgerichtet) -->
-  <div style="display:flex;width:100%;margin-top:8px">
-    <?php for ($i = 0; $i < count($ko_rounds) - 1; $i++): ?><div style="flex:1 1 0;min-width:0"></div><?php endfor; ?>
-    <div style="flex:1 1 0;min-width:0;padding:0 8px">
-      <div style="text-align:center;font-weight:700;font-size:1.05rem;color:#856404;padding-bottom:6px">🥉 <?= e($third_place_match['name']) ?></div>
-      <?php foreach ($third_place_match['matches'] as $m) { echo $bracketBox($m, '', '#ffc107'); } ?>
-    </div>
-  </div>
-  <?php endif; ?>
+  <?= $renderTree($ko_rounds, 'mon-ko-bracket', 'mon-ko-svg', 'ko-round', true, $ko_num, $monThirdHtml, true) ?>
   </div>
   <?php endif; ?>
   <?php endif; ?>
@@ -423,7 +436,21 @@ $teilnehmer_kopf = $is_team ? 'Mannschaft' : ($is_doubles ? 'Doppel' : 'Spieler'
       }
     }
   }
+  // Spiel um Platz 3 direkt unter dem (vertikal zentrierten) Finale platzieren.
+  function positionThird() {
+    var tp = document.querySelector('.mon-third-place'); if (!tp) return;
+    var col = tp.closest('.ko-round'); if (!col) return;
+    var fin = col.querySelector('.ko-match'); if (!fin) return;  // erstes .ko-match = Finale
+    tp.style.top = (fin.offsetTop + fin.offsetHeight + 12) + 'px';
+    var bracket = document.getElementById('mon-ko-bracket');
+    if (bracket) {
+      // Platz unterhalb reservieren (ohne Hoehe zu aendern → Finale bleibt zentriert)
+      var overflow = (tp.offsetTop + tp.offsetHeight) - bracket.offsetHeight;
+      bracket.style.marginBottom = (overflow > 0 ? overflow + 12 : 0) + 'px';
+    }
+  }
   function drawAll() {
+    positionThird();
     drawWB(document.getElementById('mon-ko-bracket'),     document.getElementById('mon-ko-svg'));
     drawWB(document.getElementById('mon-dko-wb-bracket'),  document.getElementById('mon-dko-wb-svg'));
     drawLB(document.getElementById('mon-dko-lb-bracket'),  document.getElementById('mon-dko-lb-svg'));
