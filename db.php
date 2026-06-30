@@ -223,6 +223,7 @@ function init_db(): void {
             method     VARCHAR(8)   NOT NULL DEFAULT '',
             path       VARCHAR(255) NOT NULL DEFAULT '',
             action     VARCHAR(64)  NOT NULL DEFAULT '',
+            target     VARCHAR(255) NOT NULL DEFAULT '',
             status     VARCHAR(8)   NOT NULL DEFAULT 'ok',
             ip         VARCHAR(45)  NOT NULL DEFAULT '',
             INDEX idx_audit_created (created_at),
@@ -394,6 +395,7 @@ function init_db(): void {
         "ALTER TABLE tournament ADD COLUMN monitor_scroll_mode VARCHAR(8) NOT NULL DEFAULT 'smooth'",
         "ALTER TABLE tournament ADD COLUMN monitor_block_pause INT NOT NULL DEFAULT 5",
         "ALTER TABLE tournament ADD COLUMN monitor_competitions TEXT",
+        "ALTER TABLE audit_log ADD COLUMN target VARCHAR(255) NOT NULL DEFAULT ''",
     ];
     foreach ($migrations as $sql) {
         try { $pdo->exec($sql); } catch (\PDOException $e) { /* Spalte/Typ bereits korrekt */ }

@@ -108,8 +108,17 @@ function save_design(array $p): void {
 function audit(array $p): void {
     require_admin();
     $status = in_array(get_param('status'), ['ok', 'denied'], true) ? get_param('status') : '';
-    $where  = $status ? "WHERE status=?" : "";
-    $args   = $status ? [$status] : [];
+    $q      = trim((string)get_param('q'));
+
+    $cond = [];
+    $args = [];
+    if ($status !== '') { $cond[] = "status=?"; $args[] = $status; }
+    if ($q !== '') {
+        $cond[] = "(username LIKE ? OR role LIKE ? OR action LIKE ? OR target LIKE ? OR path LIKE ? OR ip LIKE ?)";
+        $like = '%' . $q . '%';
+        array_push($args, $like, $like, $like, $like, $like, $like);
+    }
+    $where = $cond ? ('WHERE ' . implode(' AND ', $cond)) : '';
 
     $per   = 100;
     $total = (int)db_fetch("SELECT COUNT(*) n FROM audit_log $where", $args)['n'];
@@ -125,6 +134,7 @@ function audit(array $p): void {
         'page'       => $page,
         'pages'      => $pages,
         'status'     => $status,
+        'q'          => $q,
     ]);
 }
 

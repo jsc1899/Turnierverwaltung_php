@@ -4,11 +4,21 @@ ob_start(); ?>
 <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
   <h2 class="mb-0"><i class="bi bi-journal-text me-2"></i>Aktivitätsprotokoll</h2>
   <span class="badge bg-secondary"><?= (int)$total ?> Einträge</span>
-  <div class="ms-auto d-flex gap-2 align-items-center">
+  <div class="ms-auto d-flex gap-2 align-items-center flex-wrap">
+    <form method="get" action="<?= url('admin/audit') ?>" class="d-flex gap-1">
+      <?php if ($status !== ''): ?><input type="hidden" name="status" value="<?= e($status) ?>"><?php endif; ?>
+      <input type="search" name="q" value="<?= e($q) ?>" class="form-control form-control-sm"
+             style="min-width:200px" placeholder="Suche: Benutzer, Aktion, Objekt …">
+      <button class="btn btn-outline-secondary btn-sm" type="submit"><i class="bi bi-search"></i></button>
+      <?php if ($q !== ''): ?>
+      <a class="btn btn-outline-secondary btn-sm" href="<?= url('admin/audit') ?><?= $status !== '' ? '?status=' . urlencode($status) : '' ?>" title="Suche zurücksetzen"><i class="bi bi-x-lg"></i></a>
+      <?php endif; ?>
+    </form>
+    <?php $qs = $q !== '' ? '&q=' . urlencode($q) : ''; ?>
     <div class="btn-group btn-group-sm">
-      <a class="btn btn-outline-secondary<?= $status === ''       ? ' active' : '' ?>" href="<?= url('admin/audit') ?>">Alle</a>
-      <a class="btn btn-outline-secondary<?= $status === 'ok'     ? ' active' : '' ?>" href="<?= url('admin/audit') ?>?status=ok">Aktionen</a>
-      <a class="btn btn-outline-secondary<?= $status === 'denied' ? ' active' : '' ?>" href="<?= url('admin/audit') ?>?status=denied">Verweigert</a>
+      <a class="btn btn-outline-secondary<?= $status === ''       ? ' active' : '' ?>" href="<?= url('admin/audit') ?><?= $q !== '' ? '?q=' . urlencode($q) : '' ?>">Alle</a>
+      <a class="btn btn-outline-secondary<?= $status === 'ok'     ? ' active' : '' ?>" href="<?= url('admin/audit') ?>?status=ok<?= $qs ?>">Aktionen</a>
+      <a class="btn btn-outline-secondary<?= $status === 'denied' ? ' active' : '' ?>" href="<?= url('admin/audit') ?>?status=denied<?= $qs ?>">Verweigert</a>
     </div>
     <?php if ($total > 0): ?>
     <form method="post" action="<?= url('admin/audit/clear') ?>" data-confirm="Gesamtes Protokoll unwiderruflich löschen?">
@@ -32,7 +42,7 @@ ob_start(); ?>
     <thead class="table-light">
       <tr>
         <th>Zeitpunkt</th><th>Benutzer</th><th>Rolle</th>
-        <th>Bereich / Aktion</th><th>Pfad</th><th>Status</th><th>IP</th>
+        <th>Bereich / Aktion</th><th>Objekt</th><th>Pfad</th><th>Status</th><th>IP</th>
       </tr>
     </thead>
     <tbody>
@@ -47,6 +57,7 @@ ob_start(); ?>
         <td class="small"><?= e($role_labels[$r['role']] ?? $r['role']) ?></td>
         <td class="small"><span class="fw-semibold"><?= e($area) ?></span>
           <span class="text-muted">· <?= e($act) ?></span></td>
+        <td class="small"><?= $r['target'] !== '' ? e($r['target']) : '<span class="text-muted">–</span>' ?></td>
         <td class="small text-muted text-break"><code><?= e($r['method']) ?></code> <?= e($r['path']) ?></td>
         <td>
           <?php if ($r['status'] === 'denied'): ?>
@@ -66,10 +77,11 @@ ob_start(); ?>
 <nav>
   <ul class="pagination pagination-sm">
     <?php
-      $q = $status ? '&status=' . urlencode($status) : '';
+      $pq = ($status !== '' ? '&status=' . urlencode($status) : '')
+          . ($q !== ''      ? '&q='      . urlencode($q)      : '');
       for ($i = 1; $i <= $pages; $i++): ?>
     <li class="page-item<?= $i === $page ? ' active' : '' ?>">
-      <a class="page-link" href="<?= url('admin/audit') ?>?page=<?= $i ?><?= $q ?>"><?= $i ?></a>
+      <a class="page-link" href="<?= url('admin/audit') ?>?page=<?= $i ?><?= $pq ?>"><?= $i ?></a>
     </li>
     <?php endfor; ?>
   </ul>

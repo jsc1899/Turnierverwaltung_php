@@ -101,8 +101,8 @@ function audit_log(string $status): void {
     try {
         $u = current_user();
         db_execute(
-            "INSERT INTO audit_log (user_id, username, role, method, path, action, status, ip)
-             VALUES (?,?,?,?,?,?,?,?)",
+            "INSERT INTO audit_log (user_id, username, role, method, path, action, target, status, ip)
+             VALUES (?,?,?,?,?,?,?,?,?)",
             [
                 $u['id'] ?? null,
                 $u['username'] ?? 'Gast',
@@ -110,6 +110,7 @@ function audit_log(string $status): void {
                 substr($method, 0, 8),
                 substr((string)($_SERVER['REQUEST_URI'] ?? ''), 0, 255),
                 substr((string)($GLOBALS['__audit_route'] ?? ''), 0, 64),
+                audit_target(),
                 $status === 'denied' ? 'denied' : 'ok',
                 substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45),
             ]
@@ -117,6 +118,143 @@ function audit_log(string $status): void {
     } catch (\Throwable $e) {
         // Logging darf den eigentlichen Request nicht stören
     }
+}
+
+// Löst das betroffene Objekt einer privilegierten Aktion in einen lesbaren Namen auf
+// (z.B. Spielername bei Löschung, Editor-Name bei Zuordnung). Wird zur Gate-Zeit
+// aufgerufen – das Objekt existiert dann noch (auch bei Löschaktionen). Liefert '' wenn
+// kein sinnvolles Einzelobjekt bestimmbar ist. Fehler werden geschluckt.
+function audit_target(): string {
+    try {
+        $route  = (string)($GLOBALS['__audit_route'] ?? '');
+        $params = (array)($GLOBALS['__audit_params'] ?? []);
+        [$handler, $action] = array_pad(explode('.', $route, 2), 2, '');
+        $t = _audit_resolve_target($handler, $action, $params);
+        return $t !== '' ? mb_substr($t, 0, 255) : '';
+    } catch (\Throwable $e) {
+        return '';
+    }
+}
+
+// ── Namensauflösung für das Audit-Protokoll ────────────────────────────────────
+function _audit_tname(int $id): string { $r = db_fetch("SELECT name FROM tournament WHERE id=?", [$id]); return ($r && $r['name'] !== '') ? $r['name'] : "Turnier #$id"; }
+function _audit_cname(int $id): string { $r = db_fetch("SELECT name FROM competition WHERE id=?", [$id]); return ($r && $r['name'] !== '') ? $r['name'] : "Bewerb #$id"; }
+function _audit_uname(int $id): string { $r = db_fetch("SELECT username FROM user WHERE id=?", [$id]); return ($r && $r['username'] !== '') ? $r['username'] : "Benutzer #$id"; }
+function _audit_dname(int $id): string { $r = db_fetch("SELECT name FROM `double` WHERE id=?", [$id]); return ($r && $r['name'] !== '') ? $r['name'] : "Doppel #$id"; }
+function _audit_teamname(int $id): string { $r = db_fetch("SELECT name FROM `team` WHERE id=?", [$id]); return ($r && $r['name'] !== '') ? $r['name'] : "Team #$id"; }
+function _audit_pname(int $id): string {
+    $r = db_fetch("SELECT firstname, name FROM player WHERE id=?", [$id]);
+    if (!$r) return "Spieler #$id";
+    return trim(($r['firstname'] !== '' ? $r['firstname'] . ' ' : '') . $r['name']);
+}
+function _audit_regname(int $id): string {
+    $r = db_fetch("SELECT firstname, lastname FROM registration WHERE id=?", [$id]);
+    return $r ? trim($r['firstname'] . ' ' . $r['lastname']) : "Nennung #$id";
+}
+function _audit_rcrname(int $id): string {
+    $r = db_fetch("SELECT reg.firstname, reg.lastname FROM registration_change_request rcr
+                   JOIN registration reg ON reg.id = rcr.registration_id WHERE rcr.id=?", [$id]);
+    return $r ? trim($r['firstname'] . ' ' . $r['lastname']) : "Antrag #$id";
+}
+function _audit_matchdesc(int $mid): string {
+    $m = db_fetch("SELECT * FROM `match` WHERE id=?", [$mid]);
+    if (!$m) return "Spiel #$mid";
+    $cn = _audit_cname((int)$m['competition_id']);
+    if (!empty($m['team1_id']) || !empty($m['team2_id'])) {
+        $a = $m['team1_id'] ? _audit_teamname((int)$m['team1_id']) : 'frei';
+        $b = $m['team2_id'] ? _audit_teamname((int)$m['team2_id']) : 'frei';
+    } elseif (!empty($m['double1_id']) || !empty($m['double2_id'])) {
+        $a = $m['double1_id'] ? _audit_dname((int)$m['double1_id']) : 'frei';
+        $b = $m['double2_id'] ? _audit_dname((int)$m['double2_id']) : 'frei';
+    } else {
+        $a = $m['player1_id'] ? _audit_pname((int)$m['player1_id']) : 'frei';
+        $b = $m['player2_id'] ? _audit_pname((int)$m['player2_id']) : 'frei';
+    }
+    return "$cn: $a – $b";
+}
+// Liste von IDs zu Namen (cap Einträge, danach „+N")
+function _audit_names(array $ids, callable $fn, int $cap = 4): string {
+    $ids = array_values(array_filter(array_map('intval', (array)$ids)));
+    if (!$ids) return '';
+    $names = array_map($fn, array_slice($ids, 0, $cap));
+    $extra = count($ids) - count($names);
+    return implode(', ', $names) . ($extra > 0 ? " +$extra" : '');
+}
+
+function _audit_resolve_target(string $handler, string $action, array $params): string {
+    $id  = (int)($params['id']  ?? 0);
+    $tid = (int)($params['tid'] ?? 0);
+    $pid = (int)($params['pid'] ?? 0);
+    $did = (int)($params['did'] ?? 0);
+    $uid = (int)($params['uid'] ?? 0);
+    $gid = (int)($params['gid'] ?? 0);
+
+    switch ($handler) {
+        case 'tournament':
+            return match ($action) {
+                'new_tournament'       => trim((string)post('name')) ?: 'neues Turnier',
+                'reorder'              => 'Turnier-Reihenfolge',
+                'reorder_competitions' => _audit_tname($tid),
+                'add_editor'           => _audit_uname((int)post('user_id')) . ' → ' . _audit_tname($id),
+                'remove_editor'        => _audit_uname($uid) . ' → ' . _audit_tname($id),
+                default                => _audit_tname($id),
+            };
+
+        case 'competition':
+            return match ($action) {
+                'new_competition'      => (trim((string)post('name')) ?: 'neuer Bewerb') . ' (' . _audit_tname($tid) . ')',
+                'add_player'           => _audit_names($_POST['player_ids'] ?? [], '_audit_pname') . ' → ' . _audit_cname($id),
+                'add_double'           => _audit_names($_POST['double_ids'] ?? [], '_audit_dname') . ' → ' . _audit_cname($id),
+                'add_team'             => _audit_names($_POST['team_ids'] ?? [], '_audit_teamname') . ' → ' . _audit_cname($id),
+                'remove_player', 'update_player_skill' => _audit_pname($pid) . ' (' . _audit_cname($id) . ')',
+                'remove_double', 'update_double_skill' => _audit_dname($did) . ' (' . _audit_cname($id) . ')',
+                'remove_team',   'update_team_skill'   => _audit_teamname($tid) . ' (' . _audit_cname($id) . ')',
+                'save_group_tiebreak'  => _audit_cname((int)(db_fetch("SELECT competition_id FROM grp WHERE id=?", [$gid])['competition_id'] ?? 0)),
+                default                => _audit_cname($id),
+            };
+
+        case 'match_result':
+            if (in_array($action, ['save_bulk', 'save_duels_bulk', 'clear_phase_results'], true)) {
+                return _audit_cname($id);
+            }
+            return _audit_matchdesc($id);
+
+        case 'registration':
+            if (str_starts_with($action, 'change_')) return _audit_rcrname($id);
+            return _audit_regname($id);
+
+        case 'player':
+            return match ($action) {
+                'new_player'           => trim(((string)post('firstname') !== '' ? post('firstname') . ' ' : '') . (string)post('name')) ?: 'neuer Spieler',
+                'edit', 'delete', 'toggle_active_player' => _audit_pname($id),
+                'edit_double_global', 'delete_double_global', 'toggle_active_double' => _audit_dname($did),
+                'create_double_global' => 'neues Doppel',
+                'edit_team_global', 'delete_team_global', 'toggle_active_team' => _audit_teamname($tid),
+                'create_team_global'   => trim((string)post('name')) ?: 'neues Team',
+                'add_team_player'      => _audit_pname((int)post('player_id')) . ' → ' . _audit_teamname($tid),
+                'remove_team_player'   => _audit_pname($pid) . ' (' . _audit_teamname($tid) . ')',
+                'import_players'       => 'Spieler-Import',
+                'import_doubles'       => 'Doppel-Import',
+                'import_teams'         => 'Team-Import',
+                default                => '',
+            };
+
+        case 'admin':
+            return match ($action) {
+                'set_role'       => _audit_uname($id) . ' → Rolle ' . (string)post('role'),
+                'toggle_active', 'resend_confirm', 'delete_user' => _audit_uname($id),
+                'save_design'    => 'Design: ' . (string)post('theme'),
+                'save_impressum' => 'Impressum',
+                'clear_audit'    => 'Protokoll',
+                default          => '',
+            };
+
+        case 'pdf':
+            return in_array($action, ['aushang', 'players_pdf', 'players_csv', 'registrations_pdf', 'registrations_csv'], true)
+                ? _audit_tname($id)
+                : _audit_cname($id);
+    }
+    return '';
 }
 
 // Deutsche Bereichsbezeichnung zum Handler-Namen (für die Protokollanzeige)

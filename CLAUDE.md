@@ -122,9 +122,16 @@ geschrieben; `$status='denied'` (verweigerter Zugriff via `_audit_deny()`) wird 
 GET/Gast — sicherheitsrelevant). Reine Ansichten/Exporte (privilegierte GET-Handler) werden bewusst nicht
 protokolliert. Einmal pro Request (statischer Guard); Schreibfehler brechen den Request nie (try/catch).
 Der Route-Kontext kommt aus `$GLOBALS['__audit_route']` (in `index.php` als `handler.action` gesetzt).
+Pro Eintrag wird zusätzlich das **betroffene Objekt** lesbar aufgelöst (Spalte `target`): z.B.
+Editor-/Benutzername bei Zuordnung/Rollenänderung, Spieler-/Team-/Doppelname bei Teilnehmer-Aktionen,
+Begegnung (Teilnehmer) bei Ergebnissen, Nennungs-Person, Turnier-/Bewerbsname sonst. Auflösung über
+`audit_target()` → `_audit_resolve_target($handler, $action, $params)` (nutzt `$GLOBALS['__audit_params']`,
+also die Route-Parameter, sowie `$_POST`); da das Logging zur **Gate-Zeit** (vor der Aktion) läuft, sind
+auch Namen zu löschenden Objekten noch verfügbar.
 Nur Admins: Ansicht unter **`GET /admin/audit`** (Menü → Protokoll), Filter Alle/Aktionen/Verweigert,
-Paginierung (100/Seite); **`POST /admin/audit/clear`** leert das Protokoll (unbegrenzte Aufbewahrung,
-manuelles Leeren). `audit_area_label($handler)` liefert die deutsche Bereichsbezeichnung für die Anzeige.
+**Volltextsuche** (`?q=` über Benutzer/Rolle/Aktion/Objekt/Pfad/IP) und Paginierung (100/Seite);
+**`POST /admin/audit/clear`** leert das Protokoll (unbegrenzte Aufbewahrung, manuelles Leeren).
+`audit_area_label($handler)` liefert die deutsche Bereichsbezeichnung für die Anzeige.
 
 `ADMIN_EMAIL` in `config.php` ist fest als Admin-Konto hinterlegt. `current_user()` verwendet einen statischen Cache (maximal eine DB-Abfrage pro Request).
 
@@ -314,4 +321,4 @@ angelegt (`created=true`). Dedup: Doppel über Paar (beide Reihenfolgen), Team �
 | `registration_change_competition` | Bewerbs-spezifische Änderungen in einem Änderungsantrag |
 | `user` | App-Benutzer mit gehashten Passwörtern und Rolle |
 | `tournament_editor` | Zuordnung Editor↔Turnier (PK: tournament_id + user_id, FK CASCADE) — Editoren mit Bearbeitungsrecht für genau dieses Turnier und seine Bewerbe |
-| `audit_log` | Aktivitätsprotokoll privilegierter Aktionen: `user_id`/`username`/`role` (Snapshot, kein FK — überlebt Benutzerlöschung), `method`, `path`, `action` (handler.action), `status` ('ok'/'denied'), `ip`, `created_at` |
+| `audit_log` | Aktivitätsprotokoll privilegierter Aktionen: `user_id`/`username`/`role` (Snapshot, kein FK — überlebt Benutzerlöschung), `method`, `path`, `action` (handler.action), `target` (lesbares betroffenes Objekt), `status` ('ok'/'denied'), `ip`, `created_at` |

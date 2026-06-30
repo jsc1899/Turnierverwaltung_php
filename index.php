@@ -260,7 +260,8 @@ foreach ($routes as [$route_methods, $pattern, $handler, $action]) {
             if (is_string($k)) $params[$k] = $v;
         }
         $matched = true;
-        $GLOBALS['__audit_route'] = $handler . '.' . $action;   // für audit_log() (helpers.php)
+        $GLOBALS['__audit_route']  = $handler . '.' . $action;   // für audit_log() (helpers.php)
+        $GLOBALS['__audit_params'] = $params;                    // Objektauflösung im Protokoll
         require_once __DIR__ . '/routes/' . $handler . '.php';
         $action($params);
         break;
