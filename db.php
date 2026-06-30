@@ -197,12 +197,36 @@ function init_db(): void {
             created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+        CREATE TABLE IF NOT EXISTS tournament_editor (
+            tournament_id INT NOT NULL,
+            user_id       INT NOT NULL,
+            created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (tournament_id, user_id),
+            FOREIGN KEY (tournament_id) REFERENCES tournament(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id)       REFERENCES user(id)        ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
         CREATE TABLE IF NOT EXISTS rate_limit (
             ip         VARCHAR(45) NOT NULL,
             action     VARCHAR(50) NOT NULL,
             attempts   INT DEFAULT 1,
             window_start DATETIME DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (ip, action)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id         INT AUTO_INCREMENT PRIMARY KEY,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            user_id    INT NULL DEFAULT NULL,
+            username   VARCHAR(255) NOT NULL DEFAULT '',
+            role       VARCHAR(20)  NOT NULL DEFAULT '',
+            method     VARCHAR(8)   NOT NULL DEFAULT '',
+            path       VARCHAR(255) NOT NULL DEFAULT '',
+            action     VARCHAR(64)  NOT NULL DEFAULT '',
+            status     VARCHAR(8)   NOT NULL DEFAULT 'ok',
+            ip         VARCHAR(45)  NOT NULL DEFAULT '',
+            INDEX idx_audit_created (created_at),
+            INDEX idx_audit_status (status)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
         CREATE TABLE IF NOT EXISTS `double` (

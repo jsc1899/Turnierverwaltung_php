@@ -104,6 +104,38 @@ function save_design(array $p): void {
     redirect('admin/design');
 }
 
+// Aktivitätsprotokoll: privilegierte Aktionen (ändernde POSTs) und verweigerte Zugriffe.
+function audit(array $p): void {
+    require_admin();
+    $status = in_array(get_param('status'), ['ok', 'denied'], true) ? get_param('status') : '';
+    $where  = $status ? "WHERE status=?" : "";
+    $args   = $status ? [$status] : [];
+
+    $per   = 100;
+    $total = (int)db_fetch("SELECT COUNT(*) n FROM audit_log $where", $args)['n'];
+    $pages = max(1, (int)ceil($total / $per));
+    $page  = min(max(1, (int)get_param('page', 1)), $pages);
+    $off   = ($page - 1) * $per;
+
+    $rows = db_fetchall("SELECT * FROM audit_log $where ORDER BY id DESC LIMIT $per OFFSET $off", $args);
+    render('admin/audit', [
+        'page_title' => 'Aktivitätsprotokoll',
+        'rows'       => $rows,
+        'total'      => $total,
+        'page'       => $page,
+        'pages'      => $pages,
+        'status'     => $status,
+    ]);
+}
+
+function clear_audit(array $p): void {
+    require_admin();
+    csrf_verify();
+    db_execute("DELETE FROM audit_log");
+    flash('info', 'Protokoll geleert.');
+    redirect('admin/audit');
+}
+
 function impressum(array $p): void {
     require_admin();
     render('admin/impressum', ['page_title' => 'Impressum', 'impressum' => get_setting('impressum', '')]);

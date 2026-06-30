@@ -1,8 +1,17 @@
 <?php
 
 function index(array $p): void {
-    if (can_edit()) {
+    $u = current_user();
+    if ($u && $u['role'] === 'admin') {
         $tournaments = db_fetchall("SELECT * FROM tournament ORDER BY sort_order ASC, event_date DESC, id DESC");
+    } elseif ($u && $u['role'] === 'editor') {
+        // Editor sieht zugeordnete Turniere (bearbeitbar) plus öffentliche (nur Ansicht)
+        $tournaments = db_fetchall(
+            "SELECT * FROM tournament
+             WHERE is_public=1 OR id IN (SELECT tournament_id FROM tournament_editor WHERE user_id=?)
+             ORDER BY sort_order ASC, event_date DESC, id DESC",
+            [$u['id']]
+        );
     } else {
         $tournaments = db_fetchall("SELECT * FROM tournament WHERE is_public=1 ORDER BY sort_order ASC, event_date DESC, id DESC");
     }
@@ -33,6 +42,11 @@ function new_tournament(array $p): void {
         "INSERT INTO tournament (name, organizer, sport, event_date, max_competitions, registrations_open, is_public, is_done, info_url, show_skill) VALUES (?,?,?,?,?,?,?,?,?,?)",
         [$name, $organizer, $sport, $event_date, $max_competitions, $registrations_open, $is_public, $is_done, $info_url, $show_skill]
     );
+    // Ersteller automatisch dem Turnier zuordnen (erhält Bearbeitungsrechte)
+    $u = current_user();
+    if ($u) {
+        db_execute("INSERT IGNORE INTO tournament_editor (tournament_id, user_id) VALUES (?,?)", [(int)$tid, (int)$u['id']]);
+    }
     _save_tournament_files((int)$tid);
     redirect('tournament/' . $tid);
 }
@@ -40,7 +54,8 @@ function new_tournament(array $p): void {
 function show(array $p): void {
     $t = db_fetch("SELECT * FROM tournament WHERE id = ?", [$p['id']]);
     if (!$t) { redirect(''); return; }
-    if (!$t['is_public'] && !can_edit()) {
+    $can_edit = can_edit_tournament((int)$p['id']);
+    if (!$t['is_public'] && !$can_edit) {
         flash('warning', 'Dieses Turnier ist nicht öffentlich sichtbar.');
         redirect('');
         return;
@@ -62,7 +77,7 @@ function show(array $p): void {
     $change_requests = [];
     $history         = [];
 
-    if (can_edit()) {
+    if ($can_edit) {
         $regs = db_fetchall(
             "SELECT * FROM registration WHERE tournament_id=? ORDER BY (status='pending') DESC, created_at DESC",
             [$p['id']]
@@ -124,22 +139,43 @@ function show(array $p): void {
         usort($history, fn($a, $b) => strcmp($b['date'], $a['date']));
     }
 
-    $pending_registrations = can_edit()
+    $pending_registrations = $can_edit
         ? array_values(array_filter($registrations, fn($i) => $i['has_pending']))
         : [];
 
+    // Editor-Verwaltung: zugeordnete Editoren + noch verfügbare Editor-Benutzer
+    $editors = $available_editors = [];
+    if ($can_edit) {
+        $editors = db_fetchall(
+            "SELECT u.id, u.username, u.email FROM tournament_editor te
+             JOIN user u ON u.id = te.user_id
+             WHERE te.tournament_id = ? ORDER BY u.username",
+            [(int)$p['id']]
+        );
+        $available_editors = db_fetchall(
+            "SELECT id, username, email FROM user
+             WHERE role='editor'
+               AND id NOT IN (SELECT user_id FROM tournament_editor WHERE tournament_id=?)
+             ORDER BY username",
+            [(int)$p['id']]
+        );
+    }
+
     render('tournament/show', [
-        'page_title'      => $t['name'],
-        't'               => $t,
-        'comp_info'       => $comp_info,
-        'registrations'   => $pending_registrations,
-        'change_requests' => $change_requests,
-        'history'         => $history,
+        'page_title'        => $t['name'],
+        't'                 => $t,
+        'comp_info'         => $comp_info,
+        'registrations'     => $pending_registrations,
+        'change_requests'   => $change_requests,
+        'history'           => $history,
+        'can_edit'          => $can_edit,
+        'editors'           => $editors,
+        'available_editors' => $available_editors,
     ]);
 }
 
 function settings(array $p): void {
-    require_edit();
+    require_tournament_edit((int)$p['id']);
     csrf_verify();
     $t = db_fetch("SELECT * FROM tournament WHERE id = ?", [$p['id']]);
     if (!$t) { redirect(''); return; }
@@ -193,7 +229,7 @@ function settings(array $p): void {
 }
 
 function delete(array $p): void {
-    require_edit();
+    require_tournament_edit((int)$p['id']);
     csrf_verify();
     db_execute("DELETE FROM tournament WHERE id = ?", [$p['id']]);
     flash('info', 'Turnier gelöscht.');
@@ -205,7 +241,7 @@ function delete(array $p): void {
 function monitor(array $p): void {
     $t = db_fetch("SELECT * FROM tournament WHERE id = ?", [$p['id']]);
     if (!$t) { redirect(''); return; }
-    if (!$t['is_public'] && !can_edit()) {
+    if (!$t['is_public'] && !can_edit_tournament((int)$p['id'])) {
         flash('warning', 'Dieses Turnier ist nicht öffentlich sichtbar.');
         redirect('');
         return;
@@ -229,7 +265,7 @@ function monitor(array $p): void {
 
 // Einstellungen des Turnier-Monitors speichern (Register „Monitor" auf Turnierebene).
 function monitor_settings(array $p): void {
-    require_edit();
+    require_tournament_edit((int)$p['id']);
     csrf_verify();
     $tid = (int)$p['id'];
     $show_schedule = post('monitor_show_schedule') ? 1 : 0;
@@ -255,7 +291,7 @@ function ausschreibung(array $p): void {
         redirect('tournament/' . $p['id']);
         return;
     }
-    if (!$t['is_public'] && !can_edit()) {
+    if (!$t['is_public'] && !can_edit_tournament((int)$p['id'])) {
         flash('warning', 'Dieses Turnier ist nicht öffentlich sichtbar.');
         redirect('');
         return;
@@ -285,7 +321,7 @@ function reorder(array $p): void {
 }
 
 function reorder_competitions(array $p): void {
-    require_edit();
+    require_tournament_edit((int)$p['tid']);
     csrf_verify();
     $tid = (int)$p['tid'];
     $ids = array_map('intval', $_POST['ids'] ?? []);
@@ -295,6 +331,44 @@ function reorder_competitions(array $p): void {
     header('Content-Type: application/json');
     echo '{"ok":true}';
     exit;
+}
+
+// ── Editor-Zuordnung (Turniereinstellungen) ───────────────────────────────────
+
+// Editor einem Turnier zuordnen. Erlaubt für Admins und bereits zugeordnete Editoren.
+function add_editor(array $p): void {
+    require_tournament_edit((int)$p['id']);
+    csrf_verify();
+    $tid = (int)$p['id'];
+    $uid = (int)post('user_id');
+    // Nur Benutzer mit Rolle 'editor' zuordnen
+    $u = db_fetch("SELECT id FROM user WHERE id=? AND role='editor'", [$uid]);
+    if (!$u) {
+        flash('danger', 'Benutzer nicht gefunden oder kein Editor.');
+    } else {
+        db_execute("INSERT IGNORE INTO tournament_editor (tournament_id, user_id) VALUES (?,?)", [$tid, $uid]);
+        flash('success', 'Editor zugeordnet.');
+    }
+    redirect('tournament/' . $tid . '#tab-settings');
+}
+
+// Editor-Zuordnung entfernen. Erlaubt für Admins und bereits zugeordnete Editoren.
+// Editoren können sich jedoch nicht selbst entfernen (Schutz vor Selbst-Aussperrung);
+// das übernimmt ein Admin.
+function remove_editor(array $p): void {
+    require_tournament_edit((int)$p['id']);
+    csrf_verify();
+    $tid = (int)$p['id'];
+    $uid = (int)$p['uid'];
+    $u   = current_user();
+    if (!is_admin() && (int)$u['id'] === $uid) {
+        flash('danger', 'Sie können sich nicht selbst aus dem Turnier entfernen. Bitte einen Admin darum bitten.');
+        redirect('tournament/' . $tid . '#tab-settings');
+        return;
+    }
+    db_execute("DELETE FROM tournament_editor WHERE tournament_id=? AND user_id=?", [$tid, $uid]);
+    flash('info', 'Editor-Zuordnung entfernt.');
+    redirect('tournament/' . $tid . '#tab-settings');
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

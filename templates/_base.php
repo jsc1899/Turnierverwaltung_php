@@ -69,6 +69,7 @@
             <li><a class="dropdown-item" href="<?= url('admin/users') ?>"><i class="bi bi-shield-lock me-1"></i>Benutzer</a></li>
             <li><a class="dropdown-item" href="<?= url('admin/design') ?>"><i class="bi bi-palette me-1"></i>Design</a></li>
             <li><a class="dropdown-item" href="<?= url('admin/impressum') ?>"><i class="bi bi-file-text me-1"></i>Impressum</a></li>
+            <li><a class="dropdown-item" href="<?= url('admin/audit') ?>"><i class="bi bi-journal-text me-1"></i>Protokoll</a></li>
             <?php $ver = get_git_version(); if ($ver !== ''): ?>
             <li><hr class="dropdown-divider"></li>
             <li><span class="dropdown-item-text text-muted small text-nowrap"><i class="bi bi-clock me-1"></i>Version: <?= e($ver) ?></span></li>

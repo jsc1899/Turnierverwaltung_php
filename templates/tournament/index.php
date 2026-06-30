@@ -128,7 +128,7 @@ ob_start(); ?>
               <a href="<?= url('tournament/' . $t['id']) ?>" class="btn btn-primary btn-sm flex-grow-1">
                 <i class="bi bi-arrow-right-circle me-1"></i>Öffnen
               </a>
-              <?php if (can_edit()): ?>
+              <?php if (can_edit_tournament((int)$t['id'])): ?>
               <form method="post" action="<?= url('tournament/' . $t['id'] . '/delete') ?>"
                     data-confirm="Turnier wirklich löschen?">
                 <?= csrf_field() ?>

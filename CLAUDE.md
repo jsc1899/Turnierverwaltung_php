@@ -90,9 +90,41 @@ Alternativ können Route-Handler `render('pfad/template', ['var' => $val])` aufr
 ### Auth & Rollen
 
 Drei Rollen: `admin`, `editor`, `viewer`. Nicht angemeldete Benutzer können öffentliche Turniere ansehen.
-- `can_edit()` → admin oder editor
+- `can_edit()` → admin oder editor (rollenbasiert, **nicht** turnier-gebunden)
 - `is_admin()` → nur admin
 - `require_edit()` / `require_admin()` → Weiterleitung zum Login oder 403
+
+**Turnier-gebundene Bearbeitungsrechte** (`auth.php`): Editoren dürfen **nur** Turniere bearbeiten,
+denen sie zugeordnet sind (Tabelle `tournament_editor`); Admins dürfen alles. Maßgeblich ist:
+- `can_edit_tournament(?int $tid)` → Admin immer true; Editor nur bei Zuordnung; Viewer/Gast nie.
+- `require_tournament_edit(int $tid)` / `require_competition_edit(int $cid)` /
+  `require_match_edit(int $mid)` → Login + Scope-Prüfung, sonst 403. `competition_tid($cid)` löst
+  die Turnier-ID eines Bewerbs auf. **Alle** turnier-/bewerbs-gebundenen Handler (tournament,
+  competition, match_result, registration, nicht-öffentliche pdf-Exporte) nutzen diese statt
+  `require_edit()`. Öffentliche PDFs prüfen `is_public || can_edit_tournament(...)`.
+- Rollenbasiert (global) bleiben: Turnier **anlegen** (`new_tournament`), Liste umsortieren
+  (`reorder`), globales **Spielerregister**/Importe (`player.php`), Doppel-Stubs (`double.php`),
+  Register-PDFs. Der Turnier-Ersteller wird automatisch in `tournament_editor` eingetragen.
+- **Editor-Verwaltung** in den Turniereinstellungen (Settings-Tab von `tournament/show.php`):
+  zugeordnete Editoren hinzufügen (Dropdown der `role='editor'`-Benutzer) / entfernen — erlaubt für
+  Admins und bereits zugeordnete Editoren. Routen `POST /tournament/{id}/editors/add` und
+  `…/editors/{uid}/remove` → `add_editor()`/`remove_editor()`. Templates (`tournament/show.php`,
+  `competition/show.php`) nutzen das vom Handler übergebene `$can_edit` (= `can_edit_tournament`)
+  statt `can_edit()`, damit Editor-Buttons nur bei tatsächlichem Bearbeitungsrecht erscheinen.
+  Die Turnierliste (`index()`) zeigt Editoren zugeordnete **plus** öffentliche Turniere.
+- Bestehende Turniere ohne Zuordnung sind nur für Admins bearbeitbar (keine Auto-Migration).
+
+**Aktivitätsprotokoll / Audit-Log** (`helpers.php` `audit_log()`, Tabelle `audit_log`): protokolliert
+privilegierte Aktionen (Funktionen, die Gästen nicht offenstehen). Zentrale Funktion `audit_log($status)`
+wird ausschließlich aus den Auth-Gates (`auth.php`) aufgerufen — daher deckt sie automatisch **jede**
+gate-geschützte Funktion ab. `$status='ok'` (erfolgreiche Aktion) wird **nur bei ändernden POST-Requests**
+geschrieben; `$status='denied'` (verweigerter Zugriff via `_audit_deny()`) wird **immer** geschrieben (auch
+GET/Gast — sicherheitsrelevant). Reine Ansichten/Exporte (privilegierte GET-Handler) werden bewusst nicht
+protokolliert. Einmal pro Request (statischer Guard); Schreibfehler brechen den Request nie (try/catch).
+Der Route-Kontext kommt aus `$GLOBALS['__audit_route']` (in `index.php` als `handler.action` gesetzt).
+Nur Admins: Ansicht unter **`GET /admin/audit`** (Menü → Protokoll), Filter Alle/Aktionen/Verweigert,
+Paginierung (100/Seite); **`POST /admin/audit/clear`** leert das Protokoll (unbegrenzte Aufbewahrung,
+manuelles Leeren). `audit_area_label($handler)` liefert die deutsche Bereichsbezeichnung für die Anzeige.
 
 `ADMIN_EMAIL` in `config.php` ist fest als Admin-Konto hinterlegt. `current_user()` verwendet einen statischen Cache (maximal eine DB-Abfrage pro Request).
 
@@ -281,3 +313,5 @@ angelegt (`created=true`). Dedup: Doppel über Paar (beide Reihenfolgen), Team �
 | `registration_change_request` | Abmelde- oder Änderungsantrag des Spielers |
 | `registration_change_competition` | Bewerbs-spezifische Änderungen in einem Änderungsantrag |
 | `user` | App-Benutzer mit gehashten Passwörtern und Rolle |
+| `tournament_editor` | Zuordnung Editor↔Turnier (PK: tournament_id + user_id, FK CASCADE) — Editoren mit Bearbeitungsrecht für genau dieses Turnier und seine Bewerbe |
+| `audit_log` | Aktivitätsprotokoll privilegierter Aktionen: `user_id`/`username`/`role` (Snapshot, kein FK — überlebt Benutzerlöschung), `method`, `path`, `action` (handler.action), `status` ('ok'/'denied'), `ip`, `created_at` |

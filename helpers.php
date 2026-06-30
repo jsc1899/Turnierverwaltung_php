@@ -86,6 +86,53 @@ function is_post(): bool {
     return $_SERVER['REQUEST_METHOD'] === 'POST';
 }
 
+// ── Audit-Protokoll ────────────────────────────────────────────────────────────
+// Protokolliert privilegierte Aktionen (Funktionen, die Gästen nicht offenstehen).
+// Aufgerufen aus den Auth-Gates (auth.php). $status: 'ok' = erfolgreiche Aktion (nur
+// bei ändernden POST-Requests protokolliert), 'denied' = verweigerter Zugriff (immer
+// protokolliert, auch GET/Gast — sicherheitsrelevant). Einmal pro Request; Fehler beim
+// Schreiben dürfen den Request nie unterbrechen.
+function audit_log(string $status): void {
+    static $logged = false;
+    $method = $_SERVER['REQUEST_METHOD'] ?? '';
+    if ($status === 'ok' && $method !== 'POST') return;
+    if ($logged) return;
+    $logged = true;
+    try {
+        $u = current_user();
+        db_execute(
+            "INSERT INTO audit_log (user_id, username, role, method, path, action, status, ip)
+             VALUES (?,?,?,?,?,?,?,?)",
+            [
+                $u['id'] ?? null,
+                $u['username'] ?? 'Gast',
+                $u['role'] ?? '',
+                substr($method, 0, 8),
+                substr((string)($_SERVER['REQUEST_URI'] ?? ''), 0, 255),
+                substr((string)($GLOBALS['__audit_route'] ?? ''), 0, 64),
+                $status === 'denied' ? 'denied' : 'ok',
+                substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45),
+            ]
+        );
+    } catch (\Throwable $e) {
+        // Logging darf den eigentlichen Request nicht stören
+    }
+}
+
+// Deutsche Bereichsbezeichnung zum Handler-Namen (für die Protokollanzeige)
+function audit_area_label(string $handler): string {
+    return [
+        'tournament'   => 'Turnier',
+        'competition'  => 'Bewerb',
+        'match_result' => 'Ergebnis',
+        'registration' => 'Nennung',
+        'admin'        => 'Admin',
+        'player'       => 'Spielerregister',
+        'double'       => 'Doppel',
+        'pdf'          => 'Export',
+    ][$handler] ?? $handler;
+}
+
 // ── Rate-Limiting ──────────────────────────────────────────────────────────────
 
 function rate_limit_check(string $action, int $max_attempts = 10, int $window_seconds = 60): bool {

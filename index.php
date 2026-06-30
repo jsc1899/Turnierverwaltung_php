@@ -105,6 +105,8 @@ $routes = [
     ['GET',      '/tournament/{id}/ausschreibung', 'tournament', 'ausschreibung'],
     ['GET',      '/tournament/{id}/monitor',           'tournament', 'monitor'],
     ['POST',     '/tournament/{id}/monitor-settings',  'tournament', 'monitor_settings'],
+    ['POST',     '/tournament/{id}/editors/add',           'tournament', 'add_editor'],
+    ['POST',     '/tournament/{id}/editors/{uid}/remove',  'tournament', 'remove_editor'],
 
     // Registrations (public + admin)
     ['GET|POST', '/tournament/{id}/register',                        'registration', 'register_form'],
@@ -239,6 +241,8 @@ $routes = [
     ['POST', '/admin/design',             'admin', 'save_design'],
     ['GET',  '/admin/impressum',          'admin', 'impressum'],
     ['POST', '/admin/impressum',          'admin', 'save_impressum'],
+    ['GET',  '/admin/audit',              'admin', 'audit'],
+    ['POST', '/admin/audit/clear',        'admin', 'clear_audit'],
 ];
 
 // ── Routing ───────────────────────────────────────────────────────────────────
@@ -256,6 +260,7 @@ foreach ($routes as [$route_methods, $pattern, $handler, $action]) {
             if (is_string($k)) $params[$k] = $v;
         }
         $matched = true;
+        $GLOBALS['__audit_route'] = $handler . '.' . $action;   // für audit_log() (helpers.php)
         require_once __DIR__ . '/routes/' . $handler . '.php';
         $action($params);
         break;

@@ -8,7 +8,7 @@ function register_form(array $p): void {
     $tid = (int)$p['id'];
     $t   = db_fetch("SELECT * FROM tournament WHERE id=?", [$tid]);
     if (!$t) { redirect(''); return; }
-    if (!$t['is_public'] && !can_edit()) {
+    if (!$t['is_public'] && !can_edit_tournament($tid)) {
         flash('warning', 'Dieses Turnier ist nicht öffentlich sichtbar.');
         redirect('');
         return;
@@ -125,11 +125,11 @@ function register_form(array $p): void {
 // ── Admin: confirm/reject registrations ───────────────────────────────────────
 
 function confirm_all(array $p): void {
-    require_edit();
     csrf_verify();
     $rid = (int)$p['id'];
     $r   = db_fetch("SELECT * FROM registration WHERE id=?", [$rid]);
     if (!$r) { redirect(''); return; }
+    require_tournament_edit((int)$r['tournament_id']);
 
     $t     = db_fetch("SELECT sport FROM tournament WHERE id=?", [$r['tournament_id']]);
     $sport = $t ? ($t['sport'] ?? '') : '';
@@ -163,11 +163,11 @@ function confirm_all(array $p): void {
 }
 
 function reject_all(array $p): void {
-    require_edit();
     csrf_verify();
     $rid = (int)$p['id'];
     $r   = db_fetch("SELECT * FROM registration WHERE id=?", [$rid]);
     if (!$r) { redirect(''); return; }
+    require_tournament_edit((int)$r['tournament_id']);
     db_execute("UPDATE registration_competition SET status='rejected' WHERE registration_id=? AND status='pending'", [$rid]);
     db_execute("UPDATE registration SET status='rejected' WHERE id=?", [$rid]);
     _notify_reg_status($r);
@@ -176,12 +176,12 @@ function reject_all(array $p): void {
 }
 
 function confirm_comp(array $p): void {
-    require_edit();
     csrf_verify();
     $rid = (int)$p['id']; $cid = (int)$p['cid'];
     $r   = db_fetch("SELECT * FROM registration WHERE id=?", [$rid]);
     $rc  = db_fetch("SELECT * FROM registration_competition WHERE registration_id=? AND competition_id=?", [$rid, $cid]);
     if (!$r || !$rc) { redirect(''); return; }
+    require_tournament_edit((int)$r['tournament_id']);
 
     $t     = db_fetch("SELECT sport FROM tournament WHERE id=?", [$r['tournament_id']]);
     $sport = $t ? ($t['sport'] ?? '') : '';
@@ -204,11 +204,11 @@ function confirm_comp(array $p): void {
 }
 
 function reject_comp(array $p): void {
-    require_edit();
     csrf_verify();
     $rid = (int)$p['id']; $cid = (int)$p['cid'];
     $r   = db_fetch("SELECT * FROM registration WHERE id=?", [$rid]);
     if (!$r) { redirect(''); return; }
+    require_tournament_edit((int)$r['tournament_id']);
     db_execute("UPDATE registration_competition SET status='rejected' WHERE registration_id=? AND competition_id=?", [$rid, $cid]);
     _update_registration_status($rid);
     $still_pending = db_fetch(
@@ -516,11 +516,11 @@ function manage_change(array $p): void {
 // ── Change request admin actions ───────────────────────────────────────────────
 
 function change_confirm_all(array $p): void {
-    require_edit();
     csrf_verify();
     $rcr_id = (int)$p['id'];
     $rcr    = db_fetch("SELECT rcr.*, r.tournament_id FROM registration_change_request rcr JOIN registration r ON r.id=rcr.registration_id WHERE rcr.id=?", [$rcr_id]);
     if (!$rcr) { redirect(''); return; }
+    require_tournament_edit((int)$rcr['tournament_id']);
 
     if ($rcr['request_type'] === 'withdraw') {
         _process_withdraw($rcr['registration_id'], $rcr['tournament_id']);
@@ -538,11 +538,11 @@ function change_confirm_all(array $p): void {
 }
 
 function change_reject_all(array $p): void {
-    require_edit();
     csrf_verify();
     $rcr_id = (int)$p['id'];
     $rcr    = db_fetch("SELECT rcr.*, r.tournament_id FROM registration_change_request rcr JOIN registration r ON r.id=rcr.registration_id WHERE rcr.id=?", [$rcr_id]);
     if (!$rcr) { redirect(''); return; }
+    require_tournament_edit((int)$rcr['tournament_id']);
     db_execute("UPDATE registration_change_competition SET status='rejected' WHERE change_request_id=? AND status='pending'", [$rcr_id]);
     db_execute("UPDATE registration_change_request SET status='rejected' WHERE id=?", [$rcr_id]);
     _notify_change_request_status($rcr_id);
@@ -551,11 +551,11 @@ function change_reject_all(array $p): void {
 }
 
 function change_confirm_comp(array $p): void {
-    require_edit();
     csrf_verify();
     $rcr_id = (int)$p['id']; $cid = (int)$p['cid'];
     $rcr    = db_fetch("SELECT rcr.*, r.tournament_id, r.id as rid FROM registration_change_request rcr JOIN registration r ON r.id=rcr.registration_id WHERE rcr.id=?", [$rcr_id]);
     if (!$rcr) { redirect(''); return; }
+    require_tournament_edit((int)$rcr['tournament_id']);
 
     $comp_entry = db_fetch("SELECT * FROM registration_change_competition WHERE change_request_id=? AND competition_id=?", [$rcr_id, $cid]);
     if ($comp_entry) {
@@ -589,11 +589,11 @@ function change_confirm_comp(array $p): void {
 }
 
 function change_reject_comp(array $p): void {
-    require_edit();
     csrf_verify();
     $rcr_id = (int)$p['id']; $cid = (int)$p['cid'];
     $rcr    = db_fetch("SELECT rcr.*, r.tournament_id FROM registration_change_request rcr JOIN registration r ON r.id=rcr.registration_id WHERE rcr.id=?", [$rcr_id]);
     if (!$rcr) { redirect(''); return; }
+    require_tournament_edit((int)$rcr['tournament_id']);
     db_execute("UPDATE registration_change_competition SET status='rejected' WHERE change_request_id=? AND competition_id=?", [$rcr_id, $cid]);
     _maybe_close_change_request($rcr_id);
     $closed_status = db_fetch("SELECT status FROM registration_change_request WHERE id=?", [$rcr_id])['status'] ?? 'pending';

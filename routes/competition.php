@@ -36,7 +36,7 @@ function _get_player_skill(int $pid, string $sport): float {
 }
 
 function new_competition(array $p): void {
-    require_edit();
+    require_tournament_edit((int)$p['tid']);
     csrf_verify();
     require_tournament_open((int)$p['tid']);
     $name          = trim(post('name'));
@@ -535,6 +535,7 @@ function show(array $p): void {
     $c   = db_fetch("SELECT * FROM competition WHERE id = ?", [$cid]);
     if (!$c) { redirect(''); return; }
     $t = db_fetch("SELECT * FROM tournament WHERE id = ?", [$c['tournament_id']]);
+    $can_edit   = can_edit_tournament((int)$c['tournament_id']);
     $is_doubles = !empty($c['is_doubles']);
     $is_team    = !empty($c['is_team']);
 
@@ -724,6 +725,7 @@ function show(array $p): void {
     render('competition/show', [
         'page_title' => $c['name'],
         'c' => $c, 't' => $t,
+        'can_edit' => $can_edit,
         'import_sources' => $import_sources,
         'is_doubles' => $is_doubles, 'is_team' => $is_team,
         'assigned' => $assigned, 'unassigned' => $unassigned,
@@ -774,7 +776,7 @@ function monitor(array $p): void {
 
 // Einstellungen der Monitoransicht speichern (eigenes Register „Monitor").
 function monitor_settings(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     $cid = (int)$p['id'];
     $show_schedule = post('monitor_show_schedule') ? 1 : 0;
@@ -791,7 +793,7 @@ function monitor_settings(array $p): void {
 }
 
 function settings(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     $cid = (int)$p['id'];
     if (!post('reopen')) {
@@ -936,7 +938,7 @@ function settings(array $p): void {
 
 // Manuelle Platzzuordnung pro Gruppe speichern (Formularfeld courts[<group_id>] = "1,2").
 function save_courts(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     $cid = (int)$p['id'];
     $c = db_fetch("SELECT num_courts, court_start FROM competition WHERE id=?", [$cid]);
@@ -956,7 +958,7 @@ function save_courts(array $p): void {
 }
 
 function save_pauses(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     $cid = (int)$p['id'];
     $c = db_fetch("SELECT schedule_enabled, show_byes FROM competition WHERE id=?", [$cid]);
@@ -978,7 +980,7 @@ function save_pauses(array $p): void {
 
 // Rundenbasierte Pause je Gruppe (ohne aktiven Zeitplan): Pause NACH der angegebenen Spielrunde.
 function save_round_pauses(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     $cid = (int)$p['id'];
     $c = db_fetch("SELECT schedule_enabled FROM competition WHERE id=?", [$cid]);
@@ -999,7 +1001,7 @@ function save_round_pauses(array $p): void {
 }
 
 function delete(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     require_competition_open((int)$p['id']);
     $c = db_fetch("SELECT tournament_id FROM competition WHERE id=?", [(int)$p['id']]);
@@ -1009,7 +1011,7 @@ function delete(array $p): void {
 }
 
 function add_player(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     $cid  = (int)$p['id'];
     require_competition_open($cid);
@@ -1042,7 +1044,7 @@ function add_player(array $p): void {
 }
 
 function remove_player(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     require_competition_open((int)$p['id']);
     db_execute("DELETE FROM competition_player WHERE competition_id=? AND player_id=?",
@@ -1051,7 +1053,7 @@ function remove_player(array $p): void {
 }
 
 function remove_all_players(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     $cid = (int)$p['id'];
     require_competition_open($cid);
@@ -1063,7 +1065,7 @@ function remove_all_players(array $p): void {
 }
 
 function add_double(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     $cid  = (int)$p['id'];
     require_competition_open($cid);
@@ -1110,7 +1112,7 @@ function add_double(array $p): void {
 }
 
 function pair_double_from_reg(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     $cid = (int)$p['id'];
     require_competition_open($cid);
@@ -1168,7 +1170,7 @@ function pair_double_from_reg(array $p): void {
 }
 
 function remove_double(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     require_competition_open((int)$p['id']);
     db_execute("DELETE FROM competition_double WHERE competition_id=? AND double_id=?",
@@ -1177,7 +1179,7 @@ function remove_double(array $p): void {
 }
 
 function remove_all_doubles(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     $cid = (int)$p['id'];
     require_competition_open($cid);
@@ -1189,7 +1191,7 @@ function remove_all_doubles(array $p): void {
 }
 
 function update_player_skill(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     $cid   = (int)$p['id'];
     require_competition_open($cid);
@@ -1203,7 +1205,7 @@ function update_player_skill(array $p): void {
 }
 
 function update_double_skill(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     $cid   = (int)$p['id'];
     require_competition_open($cid);
@@ -1217,7 +1219,7 @@ function update_double_skill(array $p): void {
 }
 
 function draw_groups(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     $cid = (int)$p['id'];
     require_competition_open($cid);
@@ -1372,7 +1374,7 @@ function draw_groups(array $p): void {
 
 // Modus groups_cross: nach der Gruppenphase vollständige Platzierungs-Brackets auslosen.
 function draw_cross(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     $cid = (int)$p['id'];
     require_competition_open($cid);
@@ -1407,7 +1409,7 @@ function draw_cross(array $p): void {
 }
 
 function draw_ko(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     $cid = (int)$p['id'];
     require_competition_open($cid);
@@ -1513,7 +1515,7 @@ function draw_ko(array $p): void {
 }
 
 function draw_ko_direct(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     $cid = (int)$p['id'];
     require_competition_open($cid);
@@ -1595,7 +1597,7 @@ function draw_ko_direct(array $p): void {
 }
 
 function reset_groups(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     $cid = (int)$p['id'];
     require_competition_open($cid);
@@ -1607,7 +1609,7 @@ function reset_groups(array $p): void {
 }
 
 function reset_ko(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     $cid = (int)$p['id'];
     require_competition_open($cid);
@@ -1621,7 +1623,7 @@ function reset_ko(array $p): void {
 }
 
 function groups_reorder(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     $cid = (int)$p['id'];
     require_competition_open($cid);
@@ -1734,7 +1736,7 @@ function groups_reorder(array $p): void {
 }
 
 function ko_reorder(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     $cid = (int)$p['id'];
     require_competition_open($cid);
@@ -1785,7 +1787,7 @@ function ko_reorder(array $p): void {
 }
 
 function seedings_save(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     $cid   = (int)$p['id'];
     require_competition_open($cid);
@@ -1885,7 +1887,7 @@ function save_group_tiebreak(array $p): void {
 // ── Internal helpers ───────────────────────────────────────────────────────────
 
 function add_team(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     $cid  = (int)$p['id'];
     require_competition_open($cid);
@@ -1913,7 +1915,7 @@ function add_team(array $p): void {
 }
 
 function remove_team(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     require_competition_open((int)$p['id']);
     db_execute("DELETE FROM competition_team WHERE competition_id=? AND team_id=?",
@@ -1925,7 +1927,7 @@ function remove_team(array $p): void {
 // Teambewerbs desselben Turniers übernehmen. Für jeden ausgewählten Gruppenplatz wird das
 // entsprechend platzierte Team JEDER Gruppe hinzugefügt; die Spielstärke = erreichter Platz.
 function import_teams_from_result(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     $cid = (int)$p['id'];
     require_competition_open($cid);
@@ -1987,7 +1989,7 @@ function import_teams_from_result(array $p): void {
 }
 
 function remove_all_teams(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     $cid = (int)$p['id'];
     require_competition_open($cid);
@@ -1999,7 +2001,7 @@ function remove_all_teams(array $p): void {
 }
 
 function update_team_skill(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     $cid   = (int)$p['id'];
     require_competition_open($cid);

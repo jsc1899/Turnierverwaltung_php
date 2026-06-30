@@ -44,7 +44,7 @@ function _propagate_result(int $cid, array $m): void {
 }
 
 function save(array $p): void {
-    require_edit();
+    require_match_edit((int)$p['id']);
     csrf_verify();
     $mid    = (int)$p['id'];
     $score1 = isset($_POST['score1']) ? (int)$_POST['score1'] : null;
@@ -82,7 +82,7 @@ function save_ko(array $p): void {
 }
 
 function save_bulk(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     csrf_verify();
     $cid     = (int)$p['id'];
     require_competition_open($cid);
@@ -120,7 +120,7 @@ function save_bulk(array $p): void {
 }
 
 function clear_result(array $p): void {
-    require_edit();
+    require_match_edit((int)$p['id']);
     csrf_verify();
     $mid = (int)$p['id'];
     $m   = db_fetch("SELECT * FROM `match` WHERE id=?", [$mid]);
@@ -150,7 +150,7 @@ function clear_result(array $p): void {
 }
 
 function force_advance_ko(array $p): void {
-    require_edit();
+    require_match_edit((int)$p['id']);
     csrf_verify();
     $mid  = (int)$p['id'];
     $slot = (int)$p['slot'];
@@ -235,7 +235,7 @@ function _apply_duels(array $m, array $duels, string $tot1_raw, string $tot2_raw
 }
 
 function save_duels(array $p): void {
-    require_edit();
+    require_match_edit((int)$p['id']);
     csrf_verify();
     $mid = (int)$p['id'];
     $m   = db_fetch(
@@ -261,7 +261,7 @@ function save_duels(array $p): void {
 // PHP-Grenze max_input_vars (Default 1000) überschreiten und stillschweigend verworfen würden.
 // Format: { csrf_token, dm: { matchId: { duels: { i: {score1,score2,player1_id,player2_id} }, total_score1, total_score2 } } }
 function save_duels_bulk(array $p): void {
-    require_edit();
+    require_competition_edit((int)$p['id']);
     $data = json_decode(file_get_contents('php://input'), true);
     if (!is_array($data)) { http_response_code(400); exit; }
     $_POST['csrf_token'] = (string)($data['csrf_token'] ?? '');  // csrf_verify liest aus $_POST
@@ -294,7 +294,7 @@ function save_duels_bulk(array $p): void {
 }
 
 function save_sets(array $p): void {
-    require_edit();
+    require_match_edit((int)$p['id']);
     csrf_verify();
     $mid = (int)$p['id'];
     $m   = db_fetch(

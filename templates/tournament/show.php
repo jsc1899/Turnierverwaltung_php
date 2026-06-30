@@ -42,7 +42,7 @@ ob_start(); ?>
         <i class="bi bi-flag-fill"></i> beendet
       </span>
       <?php endif; ?>
-      <?php if (can_edit() && !$t['is_public']): ?>
+      <?php if ($can_edit && !$t['is_public']): ?>
       <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">
         <i class="bi bi-eye-slash"></i> privat
       </span>
@@ -80,7 +80,7 @@ $nennung_badge = $pending_count + $change_count;
       <?php endif; ?>
     </button>
   </li>
-  <?php if (can_edit()): ?>
+  <?php if ($can_edit): ?>
   <li class="nav-item" role="presentation">
     <button class="nav-link" id="tab-registrations-btn"
             data-bs-toggle="tab" data-bs-target="#tab-registrations" type="button" role="tab">
@@ -91,7 +91,7 @@ $nennung_badge = $pending_count + $change_count;
     </button>
   </li>
   <?php endif; ?>
-  <?php if (can_edit()): ?>
+  <?php if ($can_edit): ?>
   <li class="nav-item" role="presentation">
     <button class="nav-link" id="tab-settings-btn"
             data-bs-toggle="tab" data-bs-target="#tab-settings" type="button" role="tab">
@@ -112,12 +112,12 @@ $nennung_badge = $pending_count + $change_count;
   <!-- ── Tab: Bewerbe ──────────────────────────────────────────────────────── -->
   <div class="tab-pane fade show active p-3" id="tab-competitions" role="tabpanel">
     <div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
-      <?php if (can_edit() && !$locked): ?>
+      <?php if ($can_edit && !$locked): ?>
       <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newCompetitionModal">
         <i class="bi bi-plus-circle me-1"></i>Neuer Bewerb
       </button>
       <?php endif; ?>
-      <?php if (can_edit() && $comp_info): ?>
+      <?php if ($can_edit && $comp_info): ?>
       <div class="btn-group btn-group-sm ms-auto">
         <span class="btn btn-sm btn-outline-secondary disabled pe-none" style="cursor:default">Spielerliste</span>
         <a href="<?= url('tournament/' . $t['id'] . '/players/pdf') ?>" class="btn btn-outline-danger" target="_blank" title="PDF">
@@ -130,7 +130,7 @@ $nennung_badge = $pending_count + $change_count;
       <?php endif; ?>
     </div>
     <?php if ($comp_info): ?>
-    <?php if (can_edit() && !$locked): ?>
+    <?php if ($can_edit && !$locked): ?>
     <div class="d-flex align-items-center gap-2 mb-2">
       <button id="comp-sort-toggle" class="btn btn-outline-secondary btn-sm">
         <i class="bi bi-arrows-move me-1"></i>Reihenfolge ändern
@@ -142,7 +142,7 @@ $nennung_badge = $pending_count + $change_count;
       <?php foreach ($comp_info as $ci): $c = $ci['comp']; ?>
       <div class="col-md-6" data-id="<?= $c['id'] ?>">
         <div class="card shadow-sm h-100">
-          <?php if (can_edit() && !$locked): ?>
+          <?php if ($can_edit && !$locked): ?>
           <div class="drag-handle d-flex justify-content-center align-items-center py-1 bg-light border-bottom"
                style="cursor:grab;border-radius:calc(var(--bs-card-border-radius) - 1px) calc(var(--bs-card-border-radius) - 1px) 0 0;user-select:none">
             <i class="bi bi-grip-horizontal text-muted"></i>
@@ -193,7 +193,7 @@ $nennung_badge = $pending_count + $change_count;
                  class="btn btn-outline-secondary btn-sm" title="Aushang (PDF mit QR-Code)">
                 <i class="bi bi-printer"></i>
               </a>
-              <?php if (can_edit() && !$locked): ?>
+              <?php if ($can_edit && !$locked): ?>
               <form method="post" action="<?= url('competition/' . $c['id'] . '/delete') ?>"
                     data-confirm="Bewerb wirklich löschen?">
                 <?= csrf_field() ?>
@@ -211,7 +211,7 @@ $nennung_badge = $pending_count + $change_count;
     <?php endif; ?>
   </div><!-- /tab-competitions -->
 
-  <?php if (can_edit()): ?>
+  <?php if ($can_edit): ?>
   <!-- ── Tab: Nennungen ────────────────────────────────────────────────────── -->
   <div class="tab-pane fade p-3" id="tab-registrations" role="tabpanel">
     <?php if ($registrations || $change_requests || $history): ?>
@@ -222,7 +222,7 @@ $nennung_badge = $pending_count + $change_count;
   </div><!-- /tab-registrations -->
   <?php endif; ?>
 
-  <?php if (can_edit()): ?>
+  <?php if ($can_edit): ?>
   <!-- ── Tab: Einstellungen ─────────────────────────────────────────────────── -->
   <div class="tab-pane fade p-3" id="tab-settings" role="tabpanel">
     <form method="post" action="<?= url('tournament/' . $t['id'] . '/settings') ?>"
@@ -312,6 +312,53 @@ $nennung_badge = $pending_count + $change_count;
     <hr class="my-4">
 
     <div>
+      <h6 class="mb-2"><i class="bi bi-people me-1"></i>Editoren dieses Turniers</h6>
+      <p class="text-muted small mb-2">Zugeordnete Editoren dürfen dieses Turnier und seine Bewerbe bearbeiten. Admins haben immer Zugriff.</p>
+      <?php if ($editors): ?>
+      <ul class="list-group mb-3" style="max-width:520px">
+        <?php foreach ($editors as $ed): ?>
+        <?php $is_self = !is_admin() && current_user() && (int)current_user()['id'] === (int)$ed['id']; ?>
+        <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+          <span><i class="bi bi-person me-1"></i><?= e($ed['username']) ?>
+            <span class="text-muted small">(<?= e($ed['email']) ?>)</span>
+            <?php if ($is_self): ?><span class="badge bg-secondary-subtle text-secondary ms-1">Sie</span><?php endif; ?></span>
+          <?php if (!$is_self): ?>
+          <form method="post" action="<?= url('tournament/' . $t['id'] . '/editors/' . $ed['id'] . '/remove') ?>"
+                data-confirm="Editor-Zuordnung wirklich entfernen?">
+            <?= csrf_field() ?>
+            <button class="btn btn-outline-danger btn-sm" title="Entfernen"><i class="bi bi-x-lg"></i></button>
+          </form>
+          <?php endif; ?>
+        </li>
+        <?php endforeach; ?>
+      </ul>
+      <?php else: ?>
+      <p class="text-muted small mb-3">Noch keine Editoren zugeordnet.</p>
+      <?php endif; ?>
+
+      <?php if ($available_editors): ?>
+      <form method="post" action="<?= url('tournament/' . $t['id'] . '/editors/add') ?>"
+            class="d-flex gap-2 align-items-end" style="max-width:520px">
+        <?= csrf_field() ?>
+        <div class="flex-grow-1">
+          <label class="form-label small mb-1">Editor hinzufügen</label>
+          <select name="user_id" class="form-select form-select-sm" required>
+            <option value="">– Editor auswählen –</option>
+            <?php foreach ($available_editors as $av): ?>
+            <option value="<?= (int)$av['id'] ?>"><?= e($av['username']) ?> (<?= e($av['email']) ?>)</option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <button class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Hinzufügen</button>
+      </form>
+      <?php else: ?>
+      <p class="text-muted small mb-0">Keine weiteren Editor-Benutzer verfügbar.</p>
+      <?php endif; ?>
+    </div>
+
+    <hr class="my-4">
+
+    <div>
       <h6 class="text-danger mb-2"><i class="bi bi-exclamation-triangle me-1"></i>Turnier löschen</h6>
       <p class="text-muted small mb-2">Das Turnier und alle zugehörigen Bewerbe, Spieler und Ergebnisse werden unwiderruflich gelöscht.</p>
       <form method="post" action="<?= url('tournament/' . $t['id'] . '/delete') ?>"
@@ -325,7 +372,7 @@ $nennung_badge = $pending_count + $change_count;
   </div><!-- /tab-settings -->
   <?php endif; ?>
 
-  <?php if (can_edit()): ?>
+  <?php if ($can_edit): ?>
   <!-- ── Tab: Monitor ───────────────────────────────────────────────────────── -->
   <div class="tab-pane fade p-3" id="tab-monitor" role="tabpanel">
     <?php $mon_sel = array_filter(array_map('intval', explode(',', (string)($t['monitor_competitions'] ?? '')))); ?>
@@ -400,7 +447,7 @@ $nennung_badge = $pending_count + $change_count;
 
 </div><!-- /tab-content -->
 
-<?php if (can_edit()): ?>
+<?php if ($can_edit): ?>
 <!-- Neuer Bewerb Modal -->
 <div class="modal fade" id="newCompetitionModal" tabindex="-1">
   <div class="modal-dialog modal-lg">
