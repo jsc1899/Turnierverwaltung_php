@@ -19,6 +19,7 @@ $ov_sched = $ov_sched ?? null;
 $ov_speed = $ov_speed ?? null;
 $ov_mode  = $ov_mode  ?? null;
 $ov_pause = $ov_pause ?? null;
+$ov_zoom  = $ov_zoom  ?? null;
 
 // Monitor-Einstellungen (Register „Monitor") – Overrides (Query) haben Vorrang vor den Bewerbswerten.
 $mon_show_schedule = $ov_sched !== null ? (bool)$ov_sched : !empty($c['monitor_show_schedule']);
@@ -27,6 +28,8 @@ $mon_scroll_speed  = ($ov_speed !== null && in_array($ov_speed, ['slow','medium'
 $mon_scroll_mode   = $ov_mode !== null ? ($ov_mode === 'block' ? 'block' : 'smooth')
                      : (($c['monitor_scroll_mode'] ?? 'smooth') === 'block' ? 'block' : 'smooth');
 $mon_block_pause   = $ov_pause !== null ? max(1, min(120, (int)$ov_pause)) : max(1, (int)($c['monitor_block_pause'] ?? 5));
+// Größe (Zoom) der gesamten Anzeige, 50–200 % in 10er-Schritten (Default 100).
+$mon_zoom          = monitor_zoom_clamp($ov_zoom !== null ? (int)$ov_zoom : (int)($c['monitor_zoom'] ?? 100));
 // Im Embed-Modus immer einspaltig (Gruppen + Spielplan untereinander), sonst die Bewerbseinstellung.
 $mon_max_cols      = $embed ? 1 : max(0, min(8, (int)($c['monitor_max_cols'] ?? 0))); // 0 = automatisch
 $grp_count         = is_array($groups ?? null) ? count($groups) : 0;
@@ -189,6 +192,9 @@ $teilnehmer_kopf = $is_team ? 'Mannschaft' : ($is_doubles ? 'Doppel' : 'Spieler'
   <style>
     html { font-size: 18px; }
     body { background: var(--bs-secondary-bg); color: var(--bs-body-color); }
+    <?php if ($mon_zoom !== 100): ?>
+    body { zoom: <?= (int)$mon_zoom ?>%; }
+    <?php endif; ?>
     .monitor-wrap { width: 100%; margin: 0 auto; padding: 0 1.6rem; }
     .mon-head { position:sticky; top:0; z-index:10; background:var(--bs-secondary-bg); display:flex; align-items:center; flex-wrap:wrap; gap:1rem; border-bottom:3px solid var(--bs-border-color); padding:1rem 0; margin-bottom:0; box-shadow:0 6px 10px -8px rgba(0,0,0,.35); }
     .mon-head h1 { font-size:2.1rem; font-weight:800; margin:0; display:flex; align-items:center; flex-wrap:wrap; gap:.6rem; }
@@ -559,8 +565,8 @@ $teilnehmer_kopf = $is_team ? 'Mannschaft' : ($is_doubles ? 'Doppel' : 'Spieler'
     var cols = document.querySelectorAll('.grp-sticky');
     for (var i = 0; i < cols.length; i++) {
       var el = cols[i];
-      // Zum Messen ggf. kurz die Off-Markierung ignorieren (offsetHeight ist davon unabhängig).
-      var tooTall = el.offsetHeight > (avail - 48);
+      // getBoundingClientRect liefert visuelle Pixel (zoom-sicher, konsistent zu innerHeight).
+      var tooTall = el.getBoundingClientRect().height > (avail - 48);
       el.classList.toggle('grp-sticky-off', tooTall);
     }
   }
@@ -602,7 +608,11 @@ $teilnehmer_kopf = $is_team ? 'Mannschaft' : ($is_doubles ? 'Doppel' : 'Spieler'
   if (cfg.mode === 'block' && blocks.length) {
     var DWELL = Math.max(1, cfg.pause) * 1000;
     var idx = 0, phase = 'to', pos = window.scrollY || 0, last = performance.now(), dwellStart = 0;
-    function targetFor(i) { return Math.min(maxScroll(), Math.max(0, blocks[i].offsetTop - 14)); }
+    function targetFor(i) {
+      // Dokumentposition in visuellen Pixeln (zoom-sicher; offsetTop wäre bei zoom≠100% falsch).
+      var top = blocks[i].getBoundingClientRect().top + window.scrollY;
+      return Math.min(maxScroll(), Math.max(0, top - 14));
+    }
     var target = targetFor(0);
     function step(now) {
       var dt = now - last; last = now;
