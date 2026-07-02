@@ -390,6 +390,7 @@ function init_db(): void {
         "ALTER TABLE competition ADD COLUMN monitor_block_pause INT NOT NULL DEFAULT 5",
         "ALTER TABLE competition ADD COLUMN monitor_max_cols INT NOT NULL DEFAULT 0",
         "ALTER TABLE competition ADD COLUMN monitor_zoom INT NOT NULL DEFAULT 100",
+        "ALTER TABLE competition ADD COLUMN monitor_reload INT NOT NULL DEFAULT 60",
         // Turnier-Monitor (mehrere Bewerbe nebeneinander)
         "ALTER TABLE tournament ADD COLUMN monitor_show_schedule TINYINT(1) NOT NULL DEFAULT 0",
         "ALTER TABLE tournament ADD COLUMN monitor_scroll_speed VARCHAR(8) NOT NULL DEFAULT 'medium'",
@@ -397,6 +398,7 @@ function init_db(): void {
         "ALTER TABLE tournament ADD COLUMN monitor_block_pause INT NOT NULL DEFAULT 5",
         "ALTER TABLE tournament ADD COLUMN monitor_competitions TEXT",
         "ALTER TABLE tournament ADD COLUMN monitor_zoom INT NOT NULL DEFAULT 100",
+        "ALTER TABLE tournament ADD COLUMN monitor_reload INT NOT NULL DEFAULT 60",
         "ALTER TABLE audit_log ADD COLUMN target VARCHAR(255) NOT NULL DEFAULT ''",
     ];
     foreach ($migrations as $sql) {
