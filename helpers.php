@@ -525,3 +525,11 @@ function render(string $template, array $vars = []): void {
 function monitor_zoom_clamp(int $v): int {
     return max(50, min(200, (int)round($v / 10) * 10));
 }
+
+/**
+ * Monitor-Aktualisierungsintervall normalisieren: auf 10-Sekunden-Schritt runden
+ * und auf 10–300 s klemmen.
+ */
+function monitor_reload_clamp(int $v): int {
+    return max(10, min(300, (int)round($v / 10) * 10));
+}
