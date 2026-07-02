@@ -20,6 +20,7 @@ $ov_speed = $ov_speed ?? null;
 $ov_mode  = $ov_mode  ?? null;
 $ov_pause = $ov_pause ?? null;
 $ov_zoom  = $ov_zoom  ?? null;
+$ov_reload = $ov_reload ?? null;
 
 // Monitor-Einstellungen (Register „Monitor") – Overrides (Query) haben Vorrang vor den Bewerbswerten.
 $mon_show_schedule = $ov_sched !== null ? (bool)$ov_sched : !empty($c['monitor_show_schedule']);
@@ -30,6 +31,8 @@ $mon_scroll_mode   = $ov_mode !== null ? ($ov_mode === 'block' ? 'block' : 'smoo
 $mon_block_pause   = $ov_pause !== null ? max(1, min(120, (int)$ov_pause)) : max(1, (int)($c['monitor_block_pause'] ?? 5));
 // Größe (Zoom) der gesamten Anzeige, 50–200 % in 10er-Schritten (Default 100).
 $mon_zoom          = monitor_zoom_clamp($ov_zoom !== null ? (int)$ov_zoom : (int)($c['monitor_zoom'] ?? 100));
+// Aktualisierungsintervall (Auto-Reload) in Sekunden, 10–300 in 10er-Schritten (Default 60).
+$mon_reload        = monitor_reload_clamp($ov_reload !== null ? (int)$ov_reload : (int)($c['monitor_reload'] ?? 60));
 // Im Embed-Modus immer einspaltig (Gruppen + Spielplan untereinander), sonst die Bewerbseinstellung.
 $mon_max_cols      = $embed ? 1 : max(0, min(8, (int)($c['monitor_max_cols'] ?? 0))); // 0 = automatisch
 $grp_count         = is_array($groups ?? null) ? count($groups) : 0;
@@ -598,7 +601,7 @@ $teilnehmer_kopf = $is_team ? 'Mannschaft' : ($is_doubles ? 'Doppel' : 'Spieler'
   };
   var SPEED_MAP = { slow: 14, medium: 28, fast: 52 }; // px/s
   var SPEED  = SPEED_MAP[cfg.speed] || 28;
-  var PERIOD = 60000;     // ms: frühestens nach so langer Zeit neu laden (am Zyklusende)
+  var PERIOD = <?= (int)$mon_reload * 1000 ?>; // ms: frühestens nach so langer Zeit neu laden (am Zyklusende)
   var EDGE_PAUSE = 2500;  // ms Pause an den Rändern (gleichmäßiger Modus)
   var loaded = Date.now();
   function maxScroll() { return Math.max(0, document.documentElement.scrollHeight - window.innerHeight); }
