@@ -771,6 +771,7 @@ function monitor(array $p): void {
         'ov_speed' => array_key_exists('speed', $_GET) ? (string)get_param('speed') : null,
         'ov_mode'  => array_key_exists('mode',  $_GET) ? (string)get_param('mode')  : null,
         'ov_pause' => array_key_exists('pause', $_GET) ? (int)get_param('pause')     : null,
+        'ov_zoom'  => array_key_exists('zoom',  $_GET) ? (int)get_param('zoom')      : null,
     ] + $data);
 }
 
@@ -784,9 +785,10 @@ function monitor_settings(array $p): void {
     $mode  = post('monitor_scroll_mode') === 'block' ? 'block' : 'smooth';
     $pause = max(1, min(120, (int)post('monitor_block_pause', 5)));
     $max_cols = max(0, min(8, (int)post('monitor_max_cols', 0)));
+    $zoom = monitor_zoom_clamp((int)post('monitor_zoom', 100));
     db_execute(
-        "UPDATE competition SET monitor_show_schedule=?, monitor_scroll_speed=?, monitor_scroll_mode=?, monitor_block_pause=?, monitor_max_cols=? WHERE id=?",
-        [$show_schedule, $speed, $mode, $pause, $max_cols, $cid]
+        "UPDATE competition SET monitor_show_schedule=?, monitor_scroll_speed=?, monitor_scroll_mode=?, monitor_block_pause=?, monitor_max_cols=?, monitor_zoom=? WHERE id=?",
+        [$show_schedule, $speed, $mode, $pause, $max_cols, $zoom, $cid]
     );
     flash('success', 'Monitor-Einstellungen gespeichert.');
     redirect('competition/' . $cid . '#tab-monitor');
