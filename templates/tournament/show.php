@@ -105,6 +105,13 @@ $nennung_badge = $pending_count + $change_count;
     </button>
   </li>
   <?php endif; ?>
+  <?php if (!$can_edit): ?>
+  <li class="nav-item" role="presentation">
+    <a class="nav-link" href="<?= url('tournament/' . $t['id'] . '/monitor') ?>" target="_blank">
+      <i class="bi bi-display me-1"></i>Monitor
+    </a>
+  </li>
+  <?php endif; ?>
 </ul>
 
 <div class="tab-content border border-top-0 rounded-bottom mb-4">

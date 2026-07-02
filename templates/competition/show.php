@@ -52,12 +52,12 @@ ob_start(); ?>
   <?php endif; ?>
   <?php endif; ?>
 
-  <?php if ($can_edit): ?>
   <div class="ms-auto d-flex gap-2 flex-wrap">
     <a href="<?= url('competition/'.$c['id'].'/monitor') ?>" target="_blank"
        class="btn btn-outline-secondary btn-sm" title="Monitoransicht (Vollbild für Anzeige/Beamer)">
       <i class="bi bi-display"></i>
     </a>
+    <?php if ($can_edit): ?>
     <?php if (!$locked && in_array($c['phase'], ['group','ko'], true)): ?>
     <form method="post" action="<?= url('competition/'.$c['id'].'/settings') ?>?action=done">
       <?= csrf_field() ?><input type="hidden" name="mark_done" value="1">
@@ -104,8 +104,8 @@ ob_start(); ?>
       <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash me-1"></i>Löschen</button>
     </form>
     <?php endif; ?>
+    <?php endif; ?>
   </div>
-  <?php endif; ?>
 </div>
 
 <?php if ($places && !empty($comp_complete)): ?>
