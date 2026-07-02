@@ -419,6 +419,11 @@ $nennung_badge = $pending_count + $change_count;
           <?php endfor; ?>
         </select>
       </div>
+      <div class="col-auto">
+        <label class="form-label">Aktualisierung (Sek.)</label>
+        <input type="number" name="monitor_reload" class="form-control form-control-sm" style="width:120px"
+               min="10" max="300" step="10" value="<?= (int)($t['monitor_reload'] ?? 60) ?>">
+      </div>
       <div class="col-12">
         <label class="form-label d-block mb-1">Anzuzeigende Bewerbe</label>
         <?php if (empty($comp_info)): ?>
@@ -442,6 +447,7 @@ $nennung_badge = $pending_count + $change_count;
       Jeder ausgewählte Bewerb wird in einer eigenen Spalte als eingebettete Monitoransicht dargestellt;
       Gruppentabellen und Spielplan stehen untereinander und scrollen je Spalte automatisch durch.
       <br><strong>Größe</strong>: skaliert den Inhalt aller Bewerbs-Spalten — 100 % = Normalgröße (Kopfzeile bleibt unverändert).
+      <br><strong>Aktualisierung</strong>: Reload-Intervall der Bewerbs-Spalten — frühestens nach Ablauf, jeweils am Ende des Scroll-Durchlaufs.
     </div>
     <script>
     (function() {

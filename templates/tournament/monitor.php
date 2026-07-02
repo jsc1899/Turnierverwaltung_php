@@ -4,7 +4,7 @@
  * Jede Spalte ist ein eingebettetes <iframe> der Bewerbs-Monitoransicht (embed-Modus),
  * das Gruppen + Spielplan untereinander darstellt und eigenständig scrollt/aktualisiert.
  *
- * Erwartete Variablen: $t, $comps, $mon_show_schedule, $mon_scroll_speed, $mon_scroll_mode, $mon_block_pause, $mon_zoom.
+ * Erwartete Variablen: $t, $comps, $mon_show_schedule, $mon_scroll_speed, $mon_scroll_mode, $mon_block_pause, $mon_zoom, $mon_reload.
  */
 $sport_icons  = ['tischtennis'=>'🏓','tennis'=>'🎾','fussball'=>'⚽','cornhole'=>'🫘'];
 $sport_labels = ['tischtennis'=>'Tischtennis','tennis'=>'Tennis','fussball'=>'Fußball','cornhole'=>'Cornhole'];
@@ -18,6 +18,7 @@ $embed_params = http_build_query([
     'mode'  => $mon_scroll_mode,
     'pause' => $mon_block_pause,
     'zoom'  => $mon_zoom,
+    'reload' => $mon_reload,
 ]);
 ?><!doctype html>
 <html lang="de"<?= $active_theme === 'dunkel' ? ' data-bs-theme="dark"' : '' ?>>
