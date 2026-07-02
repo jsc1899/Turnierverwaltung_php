@@ -516,3 +516,12 @@ function render(string $template, array $vars = []): void {
     $flashes = get_flashes();
     require __DIR__ . '/templates/' . $template . '.php';
 }
+
+// ── Monitor-Zoom ───────────────────────────────────────────────────────────────
+
+/**
+ * Monitor-Zoom normalisieren: auf 10%-Schritt runden und auf 50–200 klemmen.
+ */
+function monitor_zoom_clamp(int $v): int {
+    return max(50, min(200, (int)round($v / 10) * 10));
+}
