@@ -23,9 +23,12 @@ function mpdf(array $opts = []): \Mpdf\Mpdf {
     $tempDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'mpdf_tmp';
     if (!is_dir($tempDir)) mkdir($tempDir, 0777, true);
     return new \Mpdf\Mpdf(array_merge([
-        'mode'    => 'utf-8',
-        'format'  => 'A4',
-        'tempDir' => $tempDir,
+        'mode'       => 'utf-8',
+        'format'     => 'A4',
+        // Standard: 7 cm freier Rand oben auf jeder Seite (gilt für alle Exporte;
+        // die Aushang-Poster überschreiben dies bewusst mit einem kleinen Wert).
+        'margin_top' => 70,
+        'tempDir'    => $tempDir,
     ], $opts));
 }
 
@@ -593,7 +596,7 @@ function generate_groups_pdf(int $cid, ?int $gid = null): void {
         }
     }
 
-    $pdf = mpdf();
+    $pdf = mpdf(['margin_top' => 16]);  // kein 7-cm-Oberrand (hier nicht nötig)
     $pdf->WriteHTML($html);
     $fname = $single_grp ? 'Gruppenstand_' . _pdf_slug($single_grp) . '.pdf' : 'Gruppenstand.pdf';
     $pdf->Output($fname, \Mpdf\Output\Destination::INLINE);
@@ -670,6 +673,13 @@ function generate_team_strips_pdf(int $cid, ?int $gid = null): void {
         foreach (db_fetchall("SELECT t.id, t.name FROM `team` t JOIN group_team gt ON gt.team_id=t.id WHERE gt.group_id=?", [$g['id']]) as $r) {
             $names[(int)$r['id']] = $r['name'];
         }
+        // Breite der Mannschafts-Spalte an den längsten Gegner-Namen anpassen (Hochformat:
+        // schafft Platz für die Score-Spalten). Gegner-Label-Format: „T<nr> &ndash; <name>".
+        $oppW = mb_strlen('Mannschaft');
+        foreach ($numbers as $oid => $onr) {
+            $oppW = max($oppW, mb_strlen('T' . $onr . ' – ' . ($names[$oid] ?? '')));
+        }
+        $oppW = min(60, max(22, (int)ceil($oppW * 1.85) + 5));  // Zeichen → mm (9.5pt, fett)
         // Alle Team-Begegnungen der Gruppe.
         $matches = db_fetchall(
             "SELECT id, team1_id, team2_id, round_no, court_no, kickoff_team_id
@@ -706,7 +716,7 @@ function generate_team_strips_pdf(int $cid, ?int $gid = null): void {
                    . '<th style="width:9mm">Ge</th>'
                    . '<th style="width:9mm">An</th>'
                    . $score_head
-                   . '<th>Mannschaft</th>'
+                   . '<th style="width:' . $oppW . 'mm">Mannschaft</th>'
                    . $score_head
                    . '</tr></thead><tbody>';
 
@@ -838,13 +848,19 @@ function generate_team_strips_pdf(int $cid, ?int $gid = null): void {
             if (!$sms) continue;
             if (!$first) $html .= '<pagebreak />';
             $first = false;
+            // Mannschafts-Spalten an den längsten Namen der Sektion anpassen (Hochformat).
+            $koW = mb_strlen('Mannschaft 1');
+            foreach ($sms as $m) {
+                $koW = max($koW, mb_strlen((string)($m['p1name'] ?? '')), mb_strlen((string)($m['p2name'] ?? '')));
+            }
+            $koW = min(50, max(24, (int)ceil($koW * 1.85) + 5));  // Zeichen → mm
             $html .= '<p class="ksec-hd">' . e($c['name']) . ' &ndash; ' . $secname . '</p>';
             $html .= '<table class="kstbl"><thead><tr>'
                    . '<th class="klbl" style="width:24mm">Spiel</th>'
                    . '<th style="width:8mm">' . $court_ab . '</th>'
-                   . '<th style="width:21%">Mannschaft 1</th>'
+                   . '<th style="width:' . $koW . 'mm">Mannschaft 1</th>'
                    . $score_head
-                   . '<th class="mid" style="width:21%">Mannschaft 2</th>'
+                   . '<th class="mid" style="width:' . $koW . 'mm">Mannschaft 2</th>'
                    . $sc_head_r
                    . '</tr></thead><tbody>';
             foreach ($sms as $i => $m) {
@@ -872,7 +888,7 @@ function generate_team_strips_pdf(int $cid, ?int $gid = null): void {
         $html .= '<h2>Teampläne</h2><p>Keine ausgelosten Begegnungen vorhanden.</p>';
     }
 
-    $pdf = mpdf(['format' => 'A4-L', 'margin_top' => 8, 'margin_bottom' => 8, 'margin_left' => 10, 'margin_right' => 10]);
+    $pdf = mpdf(['margin_bottom' => 8, 'margin_left' => 10, 'margin_right' => 10]);  // Hochformat (A4), 7 cm Oberrand aus Factory
     $pdf->SetTitle('Teampläne: ' . $c['name']);
     $pdf->WriteHTML($html);
     $pdf->Output('Teamplaene.pdf', \Mpdf\Output\Destination::INLINE);
@@ -1105,7 +1121,7 @@ function generate_court_plans_pdf(int $cid, ?int $gid = null): void {
         $html .= '<h2>' . e($court_pl) . '-Pläne</h2><p>Keine Begegnungen mit ' . e($court_sg) . '-Zuweisung vorhanden.</p>';
     }
 
-    $pdf = mpdf(['margin_top' => 10, 'margin_bottom' => 10, 'margin_left' => 12, 'margin_right' => 12]);
+    $pdf = mpdf(['margin_bottom' => 10, 'margin_left' => 12, 'margin_right' => 12]);  // 7 cm Oberrand aus Factory
     $pdf->SetTitle($court_pl . '-Pläne: ' . $c['name'] . ($gid_name ? ' (' . $gid_name . ')' : ''));
     $pdf->WriteHTML($html);
     $fname = _pdf_slug($court_pl) . '_plaene' . ($gid_name ? '_' . _pdf_slug($gid_name) : '') . '.pdf';
@@ -1212,7 +1228,7 @@ function generate_ko_pdf(int $cid): void {
         $html .= '</table>';
     }
 
-    $pdf = mpdf();
+    $pdf = mpdf(['margin_top' => 16]);  // kein 7-cm-Oberrand (hier nicht nötig)
     $pdf->WriteHTML($html);
     $pdf->Output('KO-Runde.pdf', \Mpdf\Output\Destination::INLINE);
     exit;
@@ -1344,7 +1360,7 @@ function _generate_dko_bracket_pdf(array $c, ?array $t): void {
         $html .= $tbl_close;
     }
 
-    $pdf = mpdf();
+    $pdf = mpdf(['margin_top' => 16]);  // kein 7-cm-Oberrand (hier nicht nötig)
     $pdf->WriteHTML($html);
     $pdf->Output('Doppel-KO.pdf', \Mpdf\Output\Destination::INLINE);
     exit;
@@ -1455,7 +1471,7 @@ function generate_cross_pdf(int $cid): void {
 function _match_card_styles(string $card_min_h): string {
     return '<style>
         .card { border: 0.8pt solid #d1d5db; border-radius: 2mm; padding: 3mm 5mm;
-                margin-bottom: 2mm; page-break-inside: avoid; min-height: ' . $card_min_h . '; }
+                margin-bottom: 70mm; page-break-inside: avoid; min-height: ' . $card_min_h . '; }
         .card-hdr { background: #eff6ff; padding: 1mm 4mm; margin: -3mm -5mm 2mm;
                     border-radius: 2mm 2mm 0 0; font-weight: bold; font-size: 9pt; color: #1e40af; }
         .players { width: 100%; border-collapse: collapse; margin-bottom: 2mm; }
@@ -1481,7 +1497,7 @@ function _match_card_styles(string $card_min_h): string {
         .wl  { display:block; border-bottom:0.6pt solid #374151; min-height:5.5mm; }
         .dlbl { font-size:7.5pt; color:#6b7280; }
         /* Compact-Team-Card (Match-Cards ohne Spielerfelder) */
-        .mc2card { margin-bottom:6mm; min-height:42mm; }
+        .mc2card { margin-bottom:70mm; min-height:42mm; }
         .mc2outer { width:100%; border-collapse:collapse; margin-bottom:1.5mm; table-layout:fixed; }
         .mc2half  { width:50%; vertical-align:top; padding-left:2mm; }
         .mc2half-l { padding-left:0; padding-right:2mm; }
@@ -1821,7 +1837,7 @@ function generate_match_cards_pdf(int $cid, ?int $gid = null): void {
         if ($separate && $i < $n_matches - 1) $html .= '<pagebreak />';
     }
 
-    $pdf = mpdf(['margin_top' => 5, 'margin_bottom' => 5, 'margin_left' => 12, 'margin_right' => 12]);
+    $pdf = mpdf(['margin_bottom' => 5, 'margin_left' => 12, 'margin_right' => 12]);  // 7 cm Oberrand aus Factory
     $pdf->WriteHTML($html);
     $pdf->Output($card_grp_name ? 'Match-Cards_' . _pdf_slug($card_grp_name) . '.pdf' : 'Match-Cards.pdf', \Mpdf\Output\Destination::INLINE);
     exit;

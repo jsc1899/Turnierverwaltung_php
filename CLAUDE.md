@@ -206,10 +206,11 @@ den Modus, die Standings-Funktionen reichen ihn an `_apply_h2h_tiebreaker(..., $
 
 ### Round-Robin-Spielplan (`lib/round_robin.php`)
 
-Gruppengröße: 3–24 Teilnehmer. Rundenbasierte Auslosung (Kreismethode): Der Plan wird in Runden gegliedert, in denen jeder Teilnehmer genau einmal spielt → gleichmäßige Verteilung über den gesamten Spielplan (kein „Front-Loading"). Zur Vermeidung von Back-to-Back (zwei Partien direkt hintereinander, v.a. an Rundenübergängen) werden mehrere zufällige Kandidaten erzeugt und der mit den wenigsten Back-to-Back-Übergängen gewählt (`rr_count_back_to_back`-frei ab 5 Teilnehmern immer möglich; bei 3/4 sind einzelne unvermeidbar). Zufall (wechselnde Spielpläne) durch Mischen von Teilnehmern, Runden, Spielreihenfolge und Seitenwahl.
+Gruppengröße: 3–24 Teilnehmer. Rundenbasierte Auslosung (Kreismethode): Der Plan wird in Runden gegliedert, in denen jeder Teilnehmer genau einmal spielt → gleichmäßige Verteilung über den gesamten Spielplan (kein „Front-Loading"). Zur Vermeidung von Back-to-Back (zwei Partien direkt hintereinander, v.a. an Rundenübergängen) werden mehrere Kandidaten erzeugt und der mit den wenigsten Back-to-Back-Übergängen gewählt (back-to-back-frei ab 5 Teilnehmern immer möglich; bei 3/4 sind einzelne unvermeidbar). Zwei Modi (`competition.schedule_mode`, s.u.): **zufällig** (jedes Mal ein anderer Plan durch Mischen von Teilnehmern, Runden, Spielreihenfolge und Seitenwahl) oder **nach Position** (deterministisch/reproduzierbar, aber trotzdem gleichmäßig verteilt).
 
 - `round_robin_schedule(player_ids)` → flache Paarliste `[[p1,p2], …]` (rückwärtskompatibel).
-- `round_robin_schedule_rounds(player_ids, force_bye=false)` → `['matches' => [['p1','p2','round'], …], 'byes' => [rundenNr => spielfreie_ID|null]]`. `draw_groups()` speichert `round_no` je `match`; die Spielfreien werden bei der Anzeige aus `round_no` + Gruppenmitglieder berechnet (nicht als Match-Zeile gespeichert). Der `byes`-Rückgabewert ist bei mehreren Spielfreien je Runde unvollständig und wird daher nicht genutzt.
+- `round_robin_schedule_rounds(player_ids, force_bye=false, mode='random', round_limit=0)` → `['matches' => [['p1','p2','round'], …], 'byes' => [rundenNr => spielfreie_ID|null]]`. `draw_groups()` speichert `round_no` je `match`; die Spielfreien werden bei der Anzeige aus `round_no` + Gruppenmitglieder berechnet (nicht als Match-Zeile gespeichert). Der `byes`-Rückgabewert ist bei mehreren Spielfreien je Runde unvollständig und wird daher nicht genutzt.
+- Bewerbsoption `competition.schedule_mode` (UI „Spielplan-Erstellung"): `'random'` (Default) mischt Teilnehmer/Runden/Spielreihenfolge/Seiten → jedes Mal ein anderer Plan. `'position'` erzeugt einen **deterministischen** Plan (immer dasselbe Schema für dieselbe Gruppenposition, kein Zufall), dessen **Paarungsstruktur** der Teilnehmerreihenfolge (Kreismethode, `rr_build_position`) folgt. Die Anordnung wird dabei bewusst verteilt, damit **nicht immer dieselbe Mannschaft** (z.B. Position 1) das erste Spiel der Runde hat oder zuerst genannt wird: `rr_seq_start` (Phase 1 wählt das „erste Spiel" je Runde ausgeglichen, Phase 2 das „letzte Spiel" back-to-back-frei zur Folgerunde) liefert eine Startlösung, die `rr_local_improve` (lokale Optimierung, Zielgröße lexikografisch `[Back-to-Back, Quadratsumme der Erst-Zähler]` via `rr_score_seq`) verfeinert; `rr_sequence_position` probiert dazu einige deterministische Startpunkte (Runden-Rotationen) und nimmt den besten. `rr_balance_sides` gleicht abschließend p1/p2 (Nennungsseite) je Team auf ~50/50 aus. Ergebnis: Back-to-Back=0 (außer bei 3 Teilnehmern unvermeidbar), gleichmäßig verteiltes erstes Spiel, ausgeglichene Seiten — reproduzierbar. Laufzeit auch bei 24 Teilnehmern < 1 s.
 - Bewerbsoption `competition.show_byes`: zeigt spielfreie Teilnehmer (ungerade Gruppen) als Inline-Zeile je Runde im Spielplan an — in der Web-Ansicht (`templates/competition/show.php`) und im Gruppen-PDF (`generate_groups_pdf`).
 - Bewerbsoption `competition.force_byes` (alle Gruppen-Bewerbe): garantiert jedem Teilnehmer ≥1 spielfreie Runde. Bei gerader Anzahl fügt `rr_build_once` zwei Phantom-/Bye-Slots ein (Slot-Zahl bleibt gerade) → jedes Team i.d.R. 2 Pausen, Spielplan +1 Runde; bei ungerader Anzahl ohne Effekt (bereits 1 Pause). Wirkt nur bei `draw_groups()`/`groups_reorder()`. Web- und Gruppen-PDF-Anzeige unterstützen **mehrere** Spielfreie je Runde und werden bei `show_byes` **oder** `force_byes` angezeigt.
 
@@ -249,6 +250,10 @@ max. Serie 2 (bei ungerader Spielzahl das Minimum).
 ### PDF- & CSV-Exporte (`lib/pdf.php`)
 
 `mpdf()` Factory setzt immer `tempDir = sys_get_temp_dir() . '/mpdf_tmp'` — unter Windows erforderlich.
+Standard-Oberrand: **`margin_top => 70`** (7 cm freier Rand oben auf jeder Seite, gilt für alle
+Exporte). Ausnahme: die beiden **Aushang-Poster** (`generate_aushang_pdf`,
+`generate_competition_aushang_pdf`) übergeben bewusst `margin_top => 5`. Beim Ergänzen neuer PDF-
+Exporte den kleinen Oberrand nur setzen, wenn der 7-cm-Rand dort nicht gewünscht ist.
 
 **QR-Codes** verwenden `chillerlan/php-qrcode` v5. `outputBase64 => false` für rohes SVG, in Temp-Datei schreiben, per Pfad in `<img src="...">` referenzieren. Der v5-Optionsname ist `outputBase64` (nicht `imageBase64`). ECC-Level: `\chillerlan\QRCode\Common\EccLevel::M`.
 
@@ -261,7 +266,7 @@ Export-Funktionen:
   Gesamtanzahl); Logo (Turnier-Banner) rechts oben, QR-Code → Bewerbsseite unterhalb der Gruppen.
   Route `…/competition/{id}/aushang`, in der Bewerbskachel verlinkt.
 - `generate_groups_pdf(cid)` / `generate_ko_pdf(cid)` / `generate_match_cards_pdf(cid)`
-- `generate_team_strips_pdf(cid, ?gid)` — Teampläne (Querformat): Gruppenphase pro Team ein
+- `generate_team_strips_pdf(cid, ?gid)` — Teampläne (Hochformat, A4): Gruppenphase pro Team ein
   Spielplan-Streifen zum Ausfüllen (Spalten Dg/B/Ge/An/1..team_size/Su/Pu/Mannschaft + gespiegelter
   Block); zusätzlich KO-Phase und Kreuzspiele als kompakte Tabelle mit einer Zeile je Begegnung
   (Label/Platz/Mannschaft 1 + Ausfüllspalten + Mannschaft 2, möglichst viele je Seite).

@@ -41,10 +41,15 @@ function round_robin_schedule_rounds(array $player_ids, bool $force_bye = false,
                 'byes' => [1 => null]], $round_limit);
     }
 
-    // "Nach Position": deterministischer Spielplan (Kreismethode ohne Zufall), der der
-    // Teilnehmerreihenfolge (= Gruppenposition) folgt. Keine Back-to-Back-Optimierung.
+    // "Nach Position": deterministischer Spielplan (immer nach dem gleichen Schema, kein Zufall),
+    // dessen Paarungsstruktur der Teilnehmerreihenfolge (= Gruppenposition) folgt. Über zwei
+    // deterministische Nachläufe wird bewusst verteilt: rr_sequence_position ordnet die Spiele so,
+    // dass keine Mannschaft immer das erste Spiel der Runde hat und Back-to-Back vermieden wird;
+    // rr_balance_sides gleicht aus, wie oft jede Mannschaft zuerst genannt wird (p1/p2).
     if ($mode === 'position') {
-        return rr_apply_limit(rr_flatten_plain(rr_build_position($player_ids, $force_bye)), $round_limit);
+        $seq = rr_sequence_position(rr_build_position($player_ids, $force_bye));
+        $seq['matches'] = rr_balance_sides($seq['matches']);
+        return rr_apply_limit($seq, $round_limit);
     }
 
     // Ohne Rundenbegrenzung: nur nach Back-to-Back optimieren (bisheriges Verhalten).
@@ -232,10 +237,11 @@ function rr_flatten(array $rounds): array {
 
 /**
  * Deterministischer, positionsbasierter Spielplan-Kandidat (Kreismethode OHNE Zufall).
- * Die Teilnehmerreihenfolge $player_ids entspricht der Gruppenposition (1, 2, 3, …).
- * Position 1 ist der feste Drehpunkt; gerundet wird wie in rr_build_once (BYE/Phantom-Slots).
- * Seitenwahl: niedrigere Position spielt als p1 (Heim). Reihenfolge innerhalb einer Runde:
- * nach niedrigster beteiligter Position. Rundenreihenfolge: natürliche Kreismethoden-Folge.
+ * Die Teilnehmerreihenfolge $player_ids entspricht der Gruppenposition (1, 2, 3, …). Liefert die
+ * reine Paarungsstruktur je Runde (immer dasselbe Schema für dieselben Positionen). Die
+ * Verteilung von Spielreihenfolge und Seitenwahl übernehmen rr_sequence_position/rr_balance_sides.
+ * Basis-Seitenwahl: niedrigere Position = p1 (wird später ausgeglichen). Rundenreihenfolge:
+ * natürliche Kreismethoden-Folge.
  */
 function rr_build_position(array $player_ids, bool $force_bye = false): array {
     $pos     = array_flip(array_values($player_ids));   // id => 0-basierte Position
@@ -249,7 +255,7 @@ function rr_build_position(array $player_ids, bool $force_bye = false): array {
     $m    = count($players);
     $half = intdiv($m, 2);
 
-    $fixed    = array_shift($players);                  // Position 1 bleibt fix
+    $fixed    = array_shift($players);                  // Drehpunkt (Kreismethode)
     $rotating = $players;                               // $m-1 Elemente
     $rounds   = [];
     for ($r = 0; $r < $m - 1; $r++) {
@@ -262,11 +268,9 @@ function rr_build_position(array $player_ids, bool $force_bye = false): array {
         foreach ($pairs as [$p1, $p2]) {
             if ($p1 === null)      { $bye = $p2; continue; }
             elseif ($p2 === null)  { $bye = $p1; continue; }
-            if ($pos[$p1] > $pos[$p2]) [$p1, $p2] = [$p2, $p1]; // niedrigere Position = Heim
+            if ($pos[$p1] > $pos[$p2]) [$p1, $p2] = [$p2, $p1]; // Basis: niedrigere Position = p1
             $matches[] = [$p1, $p2];
         }
-        // Reihenfolge innerhalb der Runde: nach niedrigster beteiligter Position
-        usort($matches, fn($a, $b) => $pos[$a[0]] <=> $pos[$b[0]]);
         $rounds[] = ['matches' => $matches, 'bye' => $bye];
         array_unshift($rotating, array_pop($rotating)); // Rotation
     }
@@ -274,19 +278,164 @@ function rr_build_position(array $player_ids, bool $force_bye = false): array {
 }
 
 /**
- * Reiht Runden in natürlicher Reihenfolge aneinander (ohne Back-to-Back-Optimierung).
- * Für den positionsbasierten Spielplan, damit die Reihenfolge exakt der Position folgt.
+ * Deterministische Sequenzierung des positionsbasierten Spielplans (kein Zufall).
+ * Erzeugt aus einigen deterministischen Startpunkten (Runden-Rotationen) je eine gut verteilte
+ * Startlösung (rr_seq_start), optimiert sie lokal (rr_local_improve) und behält die beste: zuerst
+ * möglichst wenig Back-to-Back, dann möglichst gleichmäßig verteiltes „erstes Spiel der Runde" —
+ * damit nicht immer dieselbe Mannschaft (z.B. Position 1) das erste Spiel hat. Reproduzierbar für
+ * dieselben Positionen. Liefert ['matches' => [...], 'byes' => [...]].
  */
-function rr_flatten_plain(array $rounds): array {
-    $matches = [];
-    $byes    = [];
-    $ri      = 0;
-    foreach ($rounds as $round) {
-        $ri++;
-        foreach ($round['matches'] as [$a, $b]) {
-            $matches[] = ['p1' => $a, 'p2' => $b, 'round' => $ri];
-        }
-        $byes[$ri] = $round['bye'];
+function rr_sequence_position(array $rounds): array {
+    $R = count($rounds);
+    // Wenige Startpunkte genügen und halten auch große Gruppen schnell (Rundenreihenfolge unter den
+    // Kreismethoden-Runden ist beliebig, daher ist das Rotieren als Startvariante zulässig).
+    $starts = min(max(1, $R), 8);
+    $best = null; $bestScore = null;
+    for ($rot = 0; $rot < $starts; $rot++) {
+        $rot_rounds = [];
+        for ($k = 0; $k < $R; $k++) $rot_rounds[] = $rounds[($rot + $k) % $R];
+        $sol = rr_local_improve(rr_seq_start($rot_rounds));
+        $sc  = rr_score_seq($sol);
+        if ($bestScore === null || $sc < $bestScore) { $bestScore = $sc; $best = $sol; }
+    }
+
+    $matches = []; $byes = []; $rno = 0;
+    foreach ($best as $o) {
+        $rno++;
+        foreach ($o['matches'] as [$a, $b]) $matches[] = ['p1' => $a, 'p2' => $b, 'round' => $rno];
+        $byes[$rno] = $o['bye'];
     }
     return ['matches' => $matches, 'byes' => $byes];
+}
+
+/**
+ * Erzeugt eine gut verteilte Start-Sequenz (Liste von ['matches' => geordnet, 'bye' => …]) in zwei
+ * schnellen, deterministischen Phasen:
+ *  - Phase 1: je Runde das „erste Spiel" ausgeglichen wählen — die Paarung, deren beide Mannschaften
+ *    bisher am seltensten das erste Spiel einer Runde hatten.
+ *  - Phase 2: je Runde das „letzte Spiel" so wählen, dass es keine Mannschaft des bereits gewählten
+ *    ersten Spiels der nächsten Runde enthält → kein Back-to-Back am Rundenübergang. Die mittleren
+ *    Spiele sind für Back-to-Back irrelevant und bleiben in natürlicher Reihenfolge.
+ */
+function rr_seq_start(array $rounds): array {
+    $R    = count($rounds);
+    $conf = fn($x, $y) => $x[0] === $y[0] || $x[0] === $y[1] || $x[1] === $y[0] || $x[1] === $y[1];
+
+    $firstIdx = []; $firstCnt = [];
+    foreach ($rounds as $ri => $round) {
+        $ms = $round['matches'];
+        if (!$ms) { $firstIdx[$ri] = -1; continue; }
+        $bi = 0; $bk = null;
+        foreach ($ms as $i => [$a, $b]) {
+            $k = [($firstCnt[$a] ?? 0) + ($firstCnt[$b] ?? 0), max($firstCnt[$a] ?? 0, $firstCnt[$b] ?? 0), $i];
+            if ($bk === null || $k < $bk) { $bk = $k; $bi = $i; }
+        }
+        $firstIdx[$ri] = $bi;
+        $firstCnt[$ms[$bi][0]] = ($firstCnt[$ms[$bi][0]] ?? 0) + 1;
+        $firstCnt[$ms[$bi][1]] = ($firstCnt[$ms[$bi][1]] ?? 0) + 1;
+    }
+
+    $sol = [];
+    foreach ($rounds as $ri => $round) {
+        $ms = array_values($round['matches']);
+        if (count($ms) > 1) {
+            $fi    = $firstIdx[$ri];
+            $first = $ms[$fi];
+            array_splice($ms, $fi, 1);                       // $ms = restliche Spiele
+            $nextFirst = null;
+            if ($ri + 1 < $R && ($firstIdx[$ri + 1] ?? -1) >= 0) {
+                $nm = $rounds[$ri + 1]['matches'];
+                $nextFirst = $nm[$firstIdx[$ri + 1]];
+            }
+            $bj = 0; $bk = null;
+            foreach ($ms as $j => $m) {
+                $k = [($nextFirst && $conf($m, $nextFirst)) ? 1 : 0, $j];
+                if ($bk === null || $k < $bk) { $bk = $k; $bj = $j; }
+            }
+            $last = $ms[$bj];
+            array_splice($ms, $bj, 1);
+            $ms = array_merge([$first], $ms, [$last]);
+        }
+        $sol[] = ['matches' => $ms, 'bye' => $round['bye']];
+    }
+    return $sol;
+}
+
+/**
+ * Bewertet eine Sequenz (Liste von ['matches' => geordnete Paarliste, 'bye' => …]) lexikografisch:
+ * [Anzahl Back-to-Back, Ausgeglichenheit „erstes Spiel der Runde"]. Kleiner = besser.
+ * Für die Ausgeglichenheit wird die Summe der Quadrate der Erst-Zähler verwendet (nicht max−min):
+ * sie liefert der lokalen Suche einen glatten Gradienten und drängt so aktiv zu einer gleichmäßigen
+ * Verteilung, während max−min oft flach ist und keine Verbesserung anzeigt.
+ */
+function rr_score_seq(array $sol): array {
+    $flat = [];
+    foreach ($sol as $o) foreach ($o['matches'] as $m) $flat[] = $m;
+    $b2b = 0;
+    for ($i = 1, $n = count($flat); $i < $n; $i++) {
+        $a = $flat[$i - 1]; $c = $flat[$i];
+        if ($a[0] === $c[0] || $a[0] === $c[1] || $a[1] === $c[0] || $a[1] === $c[1]) $b2b++;
+    }
+    $fc = [];
+    foreach ($sol as $o) {
+        if (!$o['matches']) continue;
+        $m = $o['matches'][0];
+        $fc[$m[0]] = ($fc[$m[0]] ?? 0) + 1;
+        $fc[$m[1]] = ($fc[$m[1]] ?? 0) + 1;
+    }
+    $sumSq = 0;
+    foreach ($fc as $c) $sumSq += $c * $c;
+    return [$b2b, $sumSq];
+}
+
+/**
+ * Deterministische lokale Optimierung: probiert je Runde alle Zuordnungen von „erstem" und
+ * „letztem" Spiel durch (die Reihenfolge der mittleren Spiele ist für Back-to-Back irrelevant) und
+ * übernimmt jeweils den besten verbessernden Zug (nach rr_score_seq), bis keine Verbesserung mehr
+ * möglich ist. Kein Zufall, feste Durchlaufreihenfolge → dasselbe Ergebnis für dieselbe Eingabe.
+ */
+function rr_local_improve(array $sol): array {
+    $cur = rr_score_seq($sol);
+    for ($guard = 0; $guard < 2000; $guard++) {
+        $bestScore = $cur; $bestRi = -1; $bestLine = null;
+        foreach ($sol as $ri => $round) {
+            $ms = $round['matches']; $n = count($ms);
+            if ($n < 2) continue;
+            for ($f = 0; $f < $n; $f++) {
+                for ($l = 0; $l < $n; $l++) {
+                    if ($f === $l) continue;
+                    $rest = [];
+                    for ($k = 0; $k < $n; $k++) if ($k !== $f && $k !== $l) $rest[] = $ms[$k];
+                    $line = array_merge([$ms[$f]], $rest, [$ms[$l]]);
+                    if ($line === $ms) continue;                     // keine Änderung
+                    $trial = $sol; $trial[$ri]['matches'] = $line;
+                    $sc = rr_score_seq($trial);
+                    if ($sc < $bestScore) { $bestScore = $sc; $bestRi = $ri; $bestLine = $line; }
+                }
+            }
+        }
+        if ($bestRi < 0) break;                                     // kein verbessernder Zug mehr
+        $sol[$bestRi]['matches'] = $bestLine; $cur = $bestScore;
+    }
+    return $sol;
+}
+
+/**
+ * Gleicht deterministisch aus, wie oft jede Mannschaft zuerst genannt wird (p1 vs p2): geht die
+ * Spiele in Reihenfolge durch und stellt jeweils die Mannschaft nach vorne, die bisher seltener
+ * p1 war (bzw. öfter p2). Bei Gleichstand bleibt die bestehende Reihenfolge (niedrigere Position
+ * zuerst). Ändert nur die Nennungsseite, nicht die Paarungen oder die Spielreihenfolge.
+ */
+function rr_balance_sides(array $matches): array {
+    $net = [];   // Team => (#p1 − #p2) bisher; hoher Wert = war öfter zuerst
+    foreach ($matches as &$m) {
+        $a = $m['p1']; $b = $m['p2'];
+        // Team mit niedrigerem net-Wert (seltener zuerst) soll p1 werden.
+        if (($net[$b] ?? 0) < ($net[$a] ?? 0)) { [$a, $b] = [$b, $a]; }
+        $m['p1'] = $a; $m['p2'] = $b;
+        $net[$a] = ($net[$a] ?? 0) + 1;
+        $net[$b] = ($net[$b] ?? 0) - 1;
+    }
+    unset($m);
+    return $matches;
 }
