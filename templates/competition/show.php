@@ -242,6 +242,14 @@ ob_start(); ?>
         </select>
       </div>
       <div class="col-auto">
+        <label class="form-label">Größe</label>
+        <select name="monitor_zoom" class="form-select form-select-sm">
+          <?php for ($z = 50; $z <= 200; $z += 10): ?>
+          <option value="<?= $z ?>"<?= (int)($c['monitor_zoom'] ?? 100) === $z ? ' selected' : '' ?>><?= $z ?> %</option>
+          <?php endfor; ?>
+        </select>
+      </div>
+      <div class="col-auto">
         <button class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>Speichern</button>
       </div>
     </form>
@@ -250,6 +258,7 @@ ob_start(); ?>
       Gruppen, KO-/Finalrunden-Bereiche) gescrollt und dort die eingestellte Zeit verweilt.
       <br><strong>Gruppentabellen nebeneinander</strong>: begrenzt die Anzahl der Tabellen pro Reihe;
       bei weniger Gruppen werden die Tabellen nicht breiter dargestellt. „Automatisch" füllt die volle Breite.
+      <br><strong>Größe</strong>: skaliert die gesamte Monitoranzeige (Schrift, Tabellen, Turnierbaum) — 100 % = Normalgröße.
     </div>
     <script>
     (function() {
