@@ -1,13 +1,16 @@
-# Design: Monitoransicht – Aktualisierungsintervall einstellbar (10–300 s)
+# Design: Monitoransicht – Aktualisierungsintervall (10–300 s) & Monitor-Link für Gäste
 
 **Datum:** 2026-07-02
 **Status:** Vom Benutzer genehmigt
 
 ## Ziel
 
-Das Auto-Reload-Intervall der Monitoransicht (Bewerbs- und Turnier-Monitor) soll
-einstellbar sein: 10 bis 300 Sekunden in 10-Sekunden-Schritten, Standard 60 s.
-Bisher ist es als Konstante `PERIOD = 60000` ms im Monitor-JS fest verdrahtet.
+Zwei Ergänzungen der Monitoransicht:
+1. Das Auto-Reload-Intervall (Bewerbs- und Turnier-Monitor) soll einstellbar
+   sein: 10 bis 300 Sekunden in 10-Sekunden-Schritten, Standard 60 s. Bisher ist
+   es als Konstante `PERIOD = 60000` ms im Monitor-JS fest verdrahtet.
+2. Der Link zur Monitoransicht soll auch für Gäste sichtbar sein — die
+   Monitor-**Einstellungen** bleiben Editoren vorbehalten.
 
 ## Ansatz
 
@@ -66,10 +69,30 @@ Analog zu `monitor_zoom_clamp()` direkt daneben platziert.
   `mon_reload` (geklemmt); `templates/tournament/monitor.php` reicht den Wert
   als Query-Parameter `reload` in `$embed_params` an die iframes weiter.
 
+### 5. Monitor-Link für Gäste (nur Templates)
+
+Die Monitor-Routen sind bereits öffentlich (Bewerbs-Monitor generell, Turnier-
+Monitor bei `is_public`; Gäste sehen ohnehin nur öffentliche Turniere). Es
+fehlen nur sichtbare Links:
+
+- **Bewerbsseite** (`templates/competition/show.php`): Das Monitor-Icon
+  (`bi-display`) in der Kopfzeilen-Aktionsleiste wird aus dem
+  `$can_edit`-Block herausgelöst und immer angezeigt. Die übrigen
+  Aktions-Buttons daneben und das Register „Monitor" (Einstellungen) bleiben
+  Editoren vorbehalten.
+- **Turnierseite** (`templates/tournament/show.php`): Für Gäste
+  (`!$can_edit`) erscheint in der Tab-Leiste ein Eintrag „Monitor" (gleiches
+  Icon) als **direkter Link** auf `tournament/{id}/monitor` (`target="_blank"`,
+  `<a class="nav-link">` statt Tab-Button) — kein Register, keine
+  Einstellungen. Editoren behalten ihr bisheriges Register unverändert.
+- Keine Routen-/Rechteänderung.
+
 ## Rechte & Audit
 
 Keine Sonderbehandlung — die bestehenden Gates der beiden
 `monitor_settings()`-Handler decken das neue POST-Feld automatisch ab.
+Die Monitor-Ansichten sind reine öffentliche GET-Ansichten (werden bewusst
+nicht protokolliert, wie alle Ansichten).
 
 ## Testen
 
@@ -81,3 +104,7 @@ Keine Sonderbehandlung — die bestehenden Gates der beiden
 - Turnier-Monitor: iframe-URLs enthalten `reload=<wert>`.
 - Verhalten: Reload weiterhin nur am Zyklusende (gleichmäßig: oben angekommen;
   blockweise: nach letztem Block; ohne Scrollbedarf: einfacher Timeout).
+- Gäste-Link: Ohne Anmeldung zeigt die Bewerbsseite das Monitor-Icon in der
+  Kopfzeile und die Turnierseite den „Monitor"-Link in der Tab-Leiste; das
+  Register „Monitor" (Einstellungen) erscheint in beiden Fällen nicht.
+  Angemeldete Editoren sehen alles wie bisher.
