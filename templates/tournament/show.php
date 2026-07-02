@@ -411,6 +411,14 @@ $nennung_badge = $pending_count + $change_count;
         <input type="number" name="monitor_block_pause" class="form-control form-control-sm" style="width:120px"
                min="1" max="120" value="<?= (int)($t['monitor_block_pause'] ?? 5) ?>">
       </div>
+      <div class="col-auto">
+        <label class="form-label">Größe</label>
+        <select name="monitor_zoom" class="form-select form-select-sm">
+          <?php for ($z = 50; $z <= 200; $z += 10): ?>
+          <option value="<?= $z ?>"<?= (int)($t['monitor_zoom'] ?? 100) === $z ? ' selected' : '' ?>><?= $z ?> %</option>
+          <?php endfor; ?>
+        </select>
+      </div>
       <div class="col-12">
         <label class="form-label d-block mb-1">Anzuzeigende Bewerbe</label>
         <?php if (empty($comp_info)): ?>
@@ -433,6 +441,7 @@ $nennung_badge = $pending_count + $change_count;
     <div class="form-text mt-2">
       Jeder ausgewählte Bewerb wird in einer eigenen Spalte als eingebettete Monitoransicht dargestellt;
       Gruppentabellen und Spielplan stehen untereinander und scrollen je Spalte automatisch durch.
+      <br><strong>Größe</strong>: skaliert den Inhalt aller Bewerbs-Spalten — 100 % = Normalgröße (Kopfzeile bleibt unverändert).
     </div>
     <script>
     (function() {

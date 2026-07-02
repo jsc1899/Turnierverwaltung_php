@@ -260,6 +260,7 @@ function monitor(array $p): void {
         'mon_scroll_speed'  => in_array($t['monitor_scroll_speed'] ?? 'medium', ['slow','medium','fast'], true) ? $t['monitor_scroll_speed'] : 'medium',
         'mon_scroll_mode'   => ($t['monitor_scroll_mode'] ?? 'smooth') === 'block' ? 'block' : 'smooth',
         'mon_block_pause'   => max(1, (int)($t['monitor_block_pause'] ?? 5)),
+        'mon_zoom'          => monitor_zoom_clamp((int)($t['monitor_zoom'] ?? 100)),
     ]);
 }
 
@@ -272,13 +273,14 @@ function monitor_settings(array $p): void {
     $speed = in_array(post('monitor_scroll_speed'), ['slow', 'medium', 'fast'], true) ? post('monitor_scroll_speed') : 'medium';
     $mode  = post('monitor_scroll_mode') === 'block' ? 'block' : 'smooth';
     $pause = max(1, min(120, (int)post('monitor_block_pause', 5)));
+    $zoom = monitor_zoom_clamp((int)post('monitor_zoom', 100));
     // Ausgewählte Bewerbe (nur tatsächlich zu diesem Turnier gehörende IDs übernehmen)
     $valid = array_map(fn($c) => (int)$c['id'], db_fetchall("SELECT id FROM competition WHERE tournament_id=?", [$tid]));
     $picked = array_values(array_intersect(array_map('intval', (array)post('monitor_competitions', [])), $valid));
     $comp_csv = implode(',', $picked);
     db_execute(
-        "UPDATE tournament SET monitor_show_schedule=?, monitor_scroll_speed=?, monitor_scroll_mode=?, monitor_block_pause=?, monitor_competitions=? WHERE id=?",
-        [$show_schedule, $speed, $mode, $pause, $comp_csv, $tid]
+        "UPDATE tournament SET monitor_show_schedule=?, monitor_scroll_speed=?, monitor_scroll_mode=?, monitor_block_pause=?, monitor_zoom=?, monitor_competitions=? WHERE id=?",
+        [$show_schedule, $speed, $mode, $pause, $zoom, $comp_csv, $tid]
     );
     flash('success', 'Monitor-Einstellungen gespeichert.');
     redirect('tournament/' . $tid . '#tab-monitor');
