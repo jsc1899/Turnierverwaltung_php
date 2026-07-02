@@ -65,6 +65,9 @@ auf zoom-sichere Messungen (`getBoundingClientRect` + `scrollY`) umzustellen:
   `offsetHeight` mit `innerHeight` vergleichen.
 - Blockweises Scrollen (`targetFor`): Blockziel via
   `getBoundingClientRect().top + window.scrollY` statt `offsetTop`.
+- `drawWB()`/`drawLB()`: SVG-Verbindungslinien des Turnierbaums — gBCR-Koordinaten
+  durch den effektiven Zoom (`bRect.width / bracket.offsetWidth`) teilen, da das
+  Overlay-SVG in lokalen Einheiten rendert.
 
 Unkritisch (bleibt): `positionThird()` und `setHeadOffset()` arbeiten vollständig
 innerhalb des gezoomten Teilbaums bzw. konsistent im lokalen Koordinatensystem.

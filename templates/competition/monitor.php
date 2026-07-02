@@ -479,6 +479,9 @@ $teilnehmer_kopf = $is_team ? 'Mannschaft' : ($is_doubles ? 'Doppel' : 'Spieler'
     if (!bracket || !svg) return;
     svg.innerHTML = '';
     var bRect = bracket.getBoundingClientRect();
+    // gBCR liefert visuelle (gezoomte) Pixel, das Overlay-SVG ohne viewBox rendert aber in
+    // lokalen Einheiten des gezoomten Teilbaums → durch effektiven Zoom zurückrechnen.
+    var z = bracket.offsetWidth ? (bRect.width / bracket.offsetWidth) : 1;
     var rounds = bracket.querySelectorAll('.ko-round');
     for (var ri = 0; ri < rounds.length - 1; ri++) {
       var thisM = rounds[ri].querySelectorAll('.ko-match');
@@ -487,9 +490,9 @@ $teilnehmer_kopf = $is_team ? 'Mannschaft' : ($is_doubles ? 'Doppel' : 'Spieler'
         var m1 = thisM[ni * 2], m2 = thisM[ni * 2 + 1], mn = nextM[ni];
         if (!m1 || !m2 || !mn) continue;
         var r1 = m1.getBoundingClientRect(), r2 = m2.getBoundingClientRect(), rn = mn.getBoundingClientRect();
-        var x1 = r1.right - bRect.left, y1 = (r1.top + r1.bottom) / 2 - bRect.top;
-        var x2 = r2.right - bRect.left, y2 = (r2.top + r2.bottom) / 2 - bRect.top;
-        var xn = rn.left - bRect.left,  yn = (rn.top + rn.bottom) / 2 - bRect.top;
+        var x1 = (r1.right - bRect.left) / z, y1 = ((r1.top + r1.bottom) / 2 - bRect.top) / z;
+        var x2 = (r2.right - bRect.left) / z, y2 = ((r2.top + r2.bottom) / 2 - bRect.top) / z;
+        var xn = (rn.left - bRect.left) / z,  yn = ((rn.top + rn.bottom) / 2 - bRect.top) / z;
         var xm = (x1 + xn) / 2;
         bLine(svg, x1, y1, xm, y1);
         bLine(svg, x2, y2, xm, y2);
@@ -503,6 +506,9 @@ $teilnehmer_kopf = $is_team ? 'Mannschaft' : ($is_doubles ? 'Doppel' : 'Spieler'
     if (!bracket || !svg) return;
     svg.innerHTML = '';
     var bRect = bracket.getBoundingClientRect();
+    // gBCR liefert visuelle (gezoomte) Pixel, das Overlay-SVG ohne viewBox rendert aber in
+    // lokalen Einheiten des gezoomten Teilbaums → durch effektiven Zoom zurückrechnen.
+    var z = bracket.offsetWidth ? (bRect.width / bracket.offsetWidth) : 1;
     var rounds = bracket.querySelectorAll('.lb-round');
     for (var ri = 0; ri < rounds.length - 1; ri++) {
       var cur = rounds[ri].querySelectorAll('.ko-match');
@@ -512,8 +518,8 @@ $teilnehmer_kopf = $is_team ? 'Mannschaft' : ($is_doubles ? 'Doppel' : 'Spieler'
           var ms = cur[i], mn = nxt[i];
           if (!ms || !mn) continue;
           var rs = ms.getBoundingClientRect(), rn = mn.getBoundingClientRect();
-          var x1 = rs.right - bRect.left, y1 = (rs.top + rs.bottom) / 2 - bRect.top;
-          var x2 = rn.left  - bRect.left, y2 = (rn.top + rn.bottom) / 2 - bRect.top;
+          var x1 = (rs.right - bRect.left) / z, y1 = ((rs.top + rs.bottom) / 2 - bRect.top) / z;
+          var x2 = (rn.left  - bRect.left) / z, y2 = ((rn.top + rn.bottom) / 2 - bRect.top) / z;
           var xm = (x1 + x2) / 2;
           bLine(svg, x1, y1, xm, y1);
           bLine(svg, xm, y1, xm, y2);
@@ -524,9 +530,9 @@ $teilnehmer_kopf = $is_team ? 'Mannschaft' : ($is_doubles ? 'Doppel' : 'Spieler'
           var m1 = cur[ni * 2], m2 = cur[ni * 2 + 1], mn = nxt[ni];
           if (!m1 || !m2 || !mn) continue;
           var r1 = m1.getBoundingClientRect(), r2 = m2.getBoundingClientRect(), rn = mn.getBoundingClientRect();
-          var x1 = r1.right - bRect.left, y1 = (r1.top + r1.bottom) / 2 - bRect.top;
-          var x2 = r2.right - bRect.left, y2 = (r2.top + r2.bottom) / 2 - bRect.top;
-          var xn = rn.left  - bRect.left, yn = (rn.top + rn.bottom) / 2 - bRect.top;
+          var x1 = (r1.right - bRect.left) / z, y1 = ((r1.top + r1.bottom) / 2 - bRect.top) / z;
+          var x2 = (r2.right - bRect.left) / z, y2 = ((r2.top + r2.bottom) / 2 - bRect.top) / z;
+          var xn = (rn.left  - bRect.left) / z, yn = ((rn.top + rn.bottom) / 2 - bRect.top) / z;
           var xm = (x1 + xn) / 2;
           bLine(svg, x1, y1, xm, y1);
           bLine(svg, x2, y2, xm, y2);
