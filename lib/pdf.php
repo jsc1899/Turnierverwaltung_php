@@ -906,6 +906,7 @@ function generate_court_plans_pdf(int $cid, ?int $gid = null): void {
     $court_sg   = court_label($t['sport'] ?? '');          // z.B. „Bahn"
     $court_pl   = court_label($t['sport'] ?? '', true);     // z.B. „Bahnen"
     $num_courts = (int)($c['num_courts'] ?? 0);
+    $court_start= max(1, (int)($c['court_start'] ?? 1));   // Start-Platznummer (mehrere Bewerbe = disjunkte Bereiche)
     $datum      = (!empty($t['event_date'])) ? date('d.m.Y', strtotime($t['event_date'])) : '';
 
     $is_team    = !empty($c['is_team']);
@@ -1049,7 +1050,7 @@ function generate_court_plans_pdf(int $cid, ?int $gid = null): void {
     $pname = fn($n) => ($n !== null && $n !== '') ? e($n) : '<span class="bp-none">&mdash;</span>';
 
     $first = true;
-    for ($court = 1; $court <= $num_courts; $court++) {
+    for ($court = $court_start; $court <= $court_start + $num_courts - 1; $court++) {
         $cms = $byCourt[$court] ?? [];
         if (!$cms) continue;
         if (!$first) $html .= '<pagebreak />';
@@ -1629,20 +1630,31 @@ function _match_card_team_compact_html(array $m, array $c, int $team_size,
         . '<td class="mc2half">' . $inner($name2, $nr2) . '</td>'
         . '</tr></table>';
 
-    // Unterschriften gekreuzt (links Mannschaft 2, rechts Mannschaft 1) wie im Muster.
+    // Unterschriften an den Team-Blöcken ausgerichtet (links Mannschaft 1, rechts Mannschaft 2).
     $h .= '<table class="sig-table"><tr>'
-        . '<td style="width:50%;padding-right:6mm"><div class="sig-write"></div><div class="sig-label">Unterschrift ' . e($name2 ?: 'Mannschaft 2') . '</div></td>'
-        . '<td style="width:50%;padding-left:6mm"><div class="sig-write"></div><div class="sig-label">Unterschrift ' . e($name1 ?: 'Mannschaft 1') . '</div></td>'
+        . '<td style="width:50%;padding-right:6mm"><div class="sig-write"></div><div class="sig-label">Unterschrift ' . e($name1 ?: 'Mannschaft 1') . '</div></td>'
+        . '<td style="width:50%;padding-left:6mm"><div class="sig-write"></div><div class="sig-label">Unterschrift ' . e($name2 ?: 'Mannschaft 2') . '</div></td>'
         . '</tr></table>';
 
     // Info-Zeile: Bahn / Anspiel / Runde (nur vorhandene Werte).
     $cells = [];
     if (!empty($m['court_no'])) $cells[] = [$court_label, (int)$m['court_no']];
     if (!empty($c['kickoff_enabled']) && !empty($m['kickoff_team_id'])) {
-        $ks = $starts[(int)$m['kickoff_team_id']] ?? '';
-        if ($ks !== '') $cells[] = ['Anspiel', (int)$ks];
+        $kt = (int)$m['kickoff_team_id'];
+        $ks = $starts[$kt] ?? '';
+        if ($ks !== '') {
+            $cells[] = ['Anspiel', (int)$ks];                       // Gruppenphase: Start-Nr.
+        } else {                                                     // KO/Kreuz: keine Gruppen-Start-Nr. → Anwurf-Team per Name
+            $kn = ($kt === (int)($m['team1_id'] ?? 0)) ? $name1
+                : (($kt === (int)($m['team2_id'] ?? 0)) ? $name2 : '');
+            if ($kn !== '') $cells[] = ['Anspiel', e($kn)];
+        }
     }
-    if (!empty($m['round_no'])) $cells[] = ['Runde', (int)$m['round_no']];
+    if (!empty($m['round_no'])) {
+        $cells[] = ['Runde', (int)$m['round_no']];                  // Gruppenphase: Durchgang
+    } elseif (empty($m['group_id']) && $label !== '') {
+        $cells[] = ['Runde', $label];                               // KO/Kreuz: Rundenbezeichnung (bereits e()-escaped)
+    }
     $time = match_schedule_time($c, $m);
     if ($time !== '') $cells[] = ['Zeit', $time . ' Uhr'];
     if ($cells) {
