@@ -444,6 +444,33 @@ function competition_view_data(array $c, bool $is_team, bool $is_doubles): array
                 }
             }
         }
+        // Nicht-Aufsteiger (Modus groups_ko): hinter den KO-Platzierungen die in der
+        // Gruppenphase ausgeschiedenen Teilnehmer nach Gruppenposition anfügen. Alle
+        // Teilnehmer derselben Gruppenposition teilen sich einen Rang (Standard-Wertung
+        // mit Lücken): z.B. 2 Gruppen mit je 2 Aufsteigern → Gruppendritte = Platz 5,
+        // Gruppenvierte = Platz 7 usw. ($ko_count = Anzahl bereits über die KO platzierter
+        // Aufsteiger; der nächste freie Rang ist ko_count+1.)
+        if ($c['mode'] === 'groups_ko' && (int)$c['advance_count'] > 0 && $places && $groups) {
+            $adv = (int)$c['advance_count'];
+            $ko_count = 0; $maxpos = 0;
+            foreach ($groups as $gi) {
+                $n = count($gi['standings']);
+                $ko_count += min($adv, $n);
+                if ($n > $maxpos) $maxpos = $n;
+            }
+            $rank = $ko_count + 1;
+            for ($pos = $adv + 1; $pos <= $maxpos; $pos++) {
+                $block = [];
+                foreach ($groups as $gi) {
+                    if (isset($gi['standings'][$pos - 1])) $block[] = $gi['standings'][$pos - 1];
+                }
+                if (!$block) continue;
+                foreach ($block as $row) {
+                    $places[] = ['rank' => $rank, 'name' => $row['name'], 'club' => $row['club'] ?? ''];
+                }
+                $rank += count($block);
+            }
+        }
     }
 
     // Finalrunde „nur Gruppenphase": bewusst KEINE Endplatzierung anzeigen

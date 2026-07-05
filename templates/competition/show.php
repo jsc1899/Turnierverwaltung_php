@@ -114,7 +114,7 @@ ob_start(); ?>
   <div class="card-body">
     <h5 class="card-title mb-3"><i class="bi bi-trophy-fill text-warning me-2"></i>Endplatzierung</h5>
     <div class="d-flex flex-wrap gap-3">
-      <?php foreach ($places as $pl): if ($pl['rank'] > 4) continue; ?>
+      <?php foreach ($places as $pl): if ($pl['rank'] > 3) continue; ?>
       <div class="text-center p-3 border rounded bg-white">
         <div class="fs-2"><?= match($pl['rank']) { 1=>'🥇', 2=>'🥈', 3=>'🥉', default=>$pl['rank'].'.' } ?></div>
         <div class="fw-bold"><?= e($pl['name']) ?></div>
@@ -122,7 +122,7 @@ ob_start(); ?>
       </div>
       <?php endforeach; ?>
     </div>
-    <?php $rest_places = array_filter($places, fn($p) => $p['rank'] > 4); ?>
+    <?php $rest_places = array_filter($places, fn($p) => $p['rank'] > 3); ?>
     <?php if ($rest_places): ?>
     <style>
       .more-places-btn .lbl-hide { display:none; }
