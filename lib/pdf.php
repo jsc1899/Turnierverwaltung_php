@@ -1466,6 +1466,44 @@ function generate_cross_pdf(int $cid): void {
     exit;
 }
 
+// ── Endplatzierung (alle Finalrunden-Modi: groups_ko, ko_only, double_ko, groups_cross) ──
+// $places = [['rank'=>int,'name'=>string,'club'=>string], …] aus competition_view_data().
+
+function generate_final_places_pdf(int $cid, array $places, bool $complete = true): void {
+    $c = db_fetch("SELECT * FROM competition WHERE id=?", [$cid]);
+    if (!$c) { http_response_code(404); exit; }
+    $t = db_fetch("SELECT name, event_date FROM tournament WHERE id=?", [$c['tournament_id']]);
+
+    $html  = pdf_css();
+    $html .= '<style>
+        .fp-tbl td.rank { text-align:center; font-weight:bold; }
+        .fp-club { color:#6b7280; }
+    </style>';
+    $html .= '<h2 style="margin-top:0">' . e($c['name']) . ' — Endplatzierung</h2>';
+    if ($t) {
+        $datum = !empty($t['event_date']) ? date('d.m.Y', strtotime($t['event_date'])) : '';
+        $html .= '<div class="meta">' . e($t['name']) . ($datum ? ' &middot; ' . $datum : '') . '</div>';
+    }
+
+    if (!$complete || !$places) {
+        $html .= '<p>Es liegt noch keine Endplatzierung vor.</p>';
+    } else {
+        $html .= '<table class="fp-tbl"><tr><th style="width:16mm">Platz</th><th>Teilnehmer</th></tr>';
+        foreach ($places as $pl) {
+            $name = '<span class="winner">' . e($pl['name']) . '</span>';
+            if (!empty($pl['club'])) $name .= ' <span class="fp-club">(' . e($pl['club']) . ')</span>';
+            $html .= '<tr><td class="rank">' . (int)$pl['rank'] . '.</td><td>' . $name . '</td></tr>';
+        }
+        $html .= '</table>';
+    }
+
+    $pdf = mpdf(['margin_top' => 15]);   // kein 7-cm-Oberrand (normaler Dokumentenrand)
+    $pdf->SetTitle('Endplatzierung: ' . $c['name']);
+    $pdf->WriteHTML($html);
+    $pdf->Output('Endplatzierung_' . _pdf_slug($c['name']) . '.pdf', \Mpdf\Output\Destination::INLINE);
+    exit;
+}
+
 // ── Match-Cards (zum Ausdrucken) ──────────────────────────────────────────────
 
 // CSS-Block für Match-Cards (dynamische Mindesthöhe je Bewerbstyp/Satzmodus).

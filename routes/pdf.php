@@ -39,6 +39,20 @@ function cross_pdf(array $p): void {
     generate_cross_pdf((int)$p['id']);
 }
 
+function final_places(array $p): void {
+    $cid = (int)$p['id'];
+    $c = db_fetch("SELECT c.*, t.is_public FROM competition c JOIN tournament t ON t.id=c.tournament_id WHERE c.id=?", [$cid]);
+    if (!$c) { http_response_code(404); exit; }
+    if (!$c['is_public'] && !can_edit_tournament(competition_tid($cid))) { http_response_code(403); exit; }
+    // Platzierungen über die geteilte View-Data-Funktion (deckt alle Modi ab).
+    require_once __DIR__ . '/competition.php';
+    require_once __DIR__ . '/../lib/standings.php';
+    $is_team    = !empty($c['is_team']);
+    $is_doubles = !$is_team && !empty($c['is_doubles']);
+    $data = competition_view_data($c, $is_team, $is_doubles);
+    generate_final_places_pdf($cid, $data['places'] ?? [], !empty($data['comp_complete']));
+}
+
 function match_cards(array $p): void {
     $c = db_fetch("SELECT t.is_public FROM competition c JOIN tournament t ON t.id=c.tournament_id WHERE c.id=?", [(int)$p['id']]);
     if (!$c) { http_response_code(404); exit; }

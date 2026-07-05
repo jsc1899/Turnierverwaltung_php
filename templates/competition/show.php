@@ -112,7 +112,13 @@ ob_start(); ?>
 <!-- Endplatzierung (erst wenn kein offenes Spiel mehr im gesamten Bewerb) -->
 <div class="card border-0 shadow-sm mb-4" style="background:linear-gradient(135deg,#fff9db,#fff);">
   <div class="card-body">
-    <h5 class="card-title mb-3"><i class="bi bi-trophy-fill text-warning me-2"></i>Endplatzierung</h5>
+    <div class="d-flex justify-content-between align-items-start mb-3">
+      <h5 class="card-title mb-0"><i class="bi bi-trophy-fill text-warning me-2"></i>Endplatzierung</h5>
+      <a href="<?= url('competition/'.$c['id'].'/pdf/final-places') ?>" class="btn btn-sm btn-outline-danger"
+         target="_blank" title="Endplatzierung als PDF">
+        <i class="bi bi-file-earmark-pdf"></i>
+      </a>
+    </div>
     <div class="d-flex flex-wrap gap-3">
       <?php foreach ($places as $pl): if ($pl['rank'] > 3) continue; ?>
       <div class="text-center p-3 border rounded bg-white">
