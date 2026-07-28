@@ -114,6 +114,9 @@ $routes = [
     ['POST',     '/registration/{id}/reject',                        'registration', 'reject_all'],
     ['POST',     '/registration/{id}/comp/{cid}/confirm',            'registration', 'confirm_comp'],
     ['POST',     '/registration/{id}/comp/{cid}/reject',             'registration', 'reject_comp'],
+    // Admin: Nennungseinträge löschen
+    ['POST',     '/registration/{id}/delete',                        'registration', 'delete'],
+    ['POST',     '/tournament/{id}/registrations/delete-all',        'registration', 'delete_all'],
     // Magic-Link: Verwaltungsseite anfordern + nutzen
     ['GET|POST', '/nennung/link',                                    'registration', 'request_link'],
     ['GET',      '/nennung/verwalten/{token}',                       'registration', 'manage_view'],

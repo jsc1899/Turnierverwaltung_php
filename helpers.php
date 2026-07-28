@@ -221,6 +221,7 @@ function _audit_resolve_target(string $handler, string $action, array $params): 
 
         case 'registration':
             if (str_starts_with($action, 'change_')) return _audit_rcrname($id);
+            if ($action === 'delete_all') return _audit_tname($id);
             return _audit_regname($id);
 
         case 'player':

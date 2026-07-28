@@ -116,6 +116,7 @@ function show(array $p): void {
                 $history[] = [
                     'date'           => $rcr['created_at'] ?? '',
                     'kind'           => 'change',
+                    'rid'            => $rcr['rid'],
                     'lastname'       => $rcr['lastname'],
                     'firstname'      => $rcr['firstname'],
                     'type_label'     => $rcr['request_type'] === 'withdraw' ? 'Rückzug' : 'Bewerbsänderung',
@@ -129,6 +130,7 @@ function show(array $p): void {
             $history[] = [
                 'date'           => $r['created_at'] ?? '',
                 'kind'           => 'registration',
+                'rid'            => $r['id'],
                 'lastname'       => $r['lastname'],
                 'firstname'      => $r['firstname'],
                 'type_label'     => 'Nennung',

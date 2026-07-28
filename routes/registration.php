@@ -219,6 +219,30 @@ function reject_comp(array $p): void {
     redirect('tournament/' . $r['tournament_id'] . '#tab-registrations');
 }
 
+// ── Admin: Nennungseinträge löschen ─────────────────────────────────────────────
+
+function delete(array $p): void {
+    csrf_verify();
+    $rid = (int)$p['id'];
+    $r   = db_fetch("SELECT * FROM registration WHERE id=?", [$rid]);
+    if (!$r) { redirect(''); return; }
+    require_admin();
+    db_execute("DELETE FROM registration WHERE id=?", [$rid]);
+    flash('success', 'Nennung von ' . trim($r['firstname'] . ' ' . $r['lastname']) . ' gelöscht.');
+    redirect('tournament/' . $r['tournament_id'] . '#tab-registrations');
+}
+
+function delete_all(array $p): void {
+    csrf_verify();
+    $tid = (int)$p['id'];
+    $t   = db_fetch("SELECT id FROM tournament WHERE id=?", [$tid]);
+    if (!$t) { redirect(''); return; }
+    require_admin();
+    $n = db_execute("DELETE FROM registration WHERE tournament_id=?", [$tid]);
+    flash('success', $n > 0 ? "$n Nennungseintrag(e) gelöscht." : 'Keine Nennungseinträge vorhanden.');
+    redirect('tournament/' . $tid . '#tab-registrations');
+}
+
 // ── Magic-Link: Link anfordern ────────────────────────────────────────────────
 
 function request_link(array $p): void {

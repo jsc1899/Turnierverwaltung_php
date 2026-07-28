@@ -18,6 +18,13 @@
         <i class="bi bi-filetype-csv me-1"></i>CSV
       </a>
     </div>
+    <?php if (is_admin() && ($registrations || $history)): ?>
+    <form method="post" action="<?= url('tournament/' . $t['id'] . '/registrations/delete-all') ?>"
+          data-confirm="Wirklich ALLE Nennungseinträge dieses Turniers unwiderruflich löschen?">
+      <?= csrf_field() ?>
+      <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash3 me-1"></i>Alle löschen</button>
+    </form>
+    <?php endif; ?>
   </div>
 </div>
 
@@ -40,8 +47,8 @@
           <div class="text-muted" style="font-size:.75rem"><i class="bi bi-clock me-1"></i><?= e($r['created_at']) ?></div>
         </div>
         <?php $pend_count = count(array_filter($item['competitions'], fn($c) => $c['status'] === 'pending')); ?>
-        <?php if ($pend_count > 1): ?>
         <div class="d-flex gap-1 flex-shrink-0">
+          <?php if ($pend_count > 1): ?>
           <form method="post" action="<?= url('registration/' . $r['id'] . '/confirm') ?>">
             <?= csrf_field() ?>
             <button class="btn btn-success btn-sm" title="Alle bestätigen"><i class="bi bi-check-all"></i> Alle</button>
@@ -51,8 +58,15 @@
             <?= csrf_field() ?>
             <button class="btn btn-outline-danger btn-sm"><i class="bi bi-x-lg"></i> Alle</button>
           </form>
+          <?php endif; ?>
+          <?php if (is_admin()): ?>
+          <form method="post" action="<?= url('registration/' . $r['id'] . '/delete') ?>"
+                data-confirm="Nennungseintrag von <?= e($r['lastname']) ?> <?= e($r['firstname']) ?> unwiderruflich löschen?">
+            <?= csrf_field() ?>
+            <button class="btn btn-outline-danger btn-sm" title="Nennungseintrag löschen"><i class="bi bi-trash3"></i></button>
+          </form>
+          <?php endif; ?>
         </div>
-        <?php endif; ?>
       </div>
       <?php foreach ($item['competitions'] as $comp): ?>
       <div class="d-flex align-items-center gap-2 mb-1 ps-2">
@@ -170,7 +184,7 @@
   <div class="table-responsive">
     <table class="table table-sm table-hover align-middle mb-0" data-sortable>
       <thead class="table-light">
-        <tr><th>Datum</th><th>Name</th><th>Typ</th><th class="no-sort">Bewerbe</th><th class="text-center">Status</th></tr>
+        <tr><th>Datum</th><th>Name</th><th>Typ</th><th class="no-sort">Bewerbe</th><th class="text-center">Status</th><?php if (is_admin()): ?><th class="no-sort text-center">Aktion</th><?php endif; ?></tr>
       </thead>
       <tbody>
         <?php foreach ($history as $h): ?>
@@ -212,6 +226,15 @@
               <?= $h['overall_status'] === 'confirmed' ? 'bestätigt' : 'abgelehnt' ?>
             </span>
           </td>
+          <?php if (is_admin()): ?>
+          <td class="text-center">
+            <form method="post" action="<?= url('registration/' . $h['rid'] . '/delete') ?>"
+                  data-confirm="Nennungseintrag von <?= e($h['lastname']) ?> <?= e($h['firstname']) ?> unwiderruflich löschen?">
+              <?= csrf_field() ?>
+              <button class="btn btn-outline-danger btn-sm py-0 px-2" title="Nennungseintrag löschen"><i class="bi bi-trash3"></i></button>
+            </form>
+          </td>
+          <?php endif; ?>
         </tr>
         <?php endforeach; ?>
       </tbody>
