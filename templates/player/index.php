@@ -726,7 +726,7 @@ ob_start(); ?>
           <div class="tab-content px-3 pt-3 pb-2">
             <!-- Tab: Stammdaten -->
             <div class="tab-pane fade show active" id="profileTabStamm" role="tabpanel">
-              <form method="post" id="profileEditForm" action="#" class="js-ajax" data-refresh="#tab-spieler">
+              <form method="post" id="profileEditForm" action="#" class="js-ajax" data-refresh="#tab-spieler" data-modal-close>
                 <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
                 <div class="row g-3">
                   <div class="col-sm-6">
