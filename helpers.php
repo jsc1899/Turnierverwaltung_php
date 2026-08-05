@@ -62,6 +62,16 @@ function redirect_back(string $fallback = ''): never {
 
 // ── Output-Escaping ────────────────────────────────────────────────────────────
 
+// Einheitlicher Seitentitel: hängt den Vereinszusatz an, sofern nicht schon vorhanden.
+// Wird von _base.php und den eigenständigen Monitor-Layouts verwendet.
+const SITE_TITLE_SUFFIX = ' - Union WABS Saxen';
+
+function page_title(string $title = ''): string {
+    $title = trim($title);
+    if ($title === '') $title = 'Turnierverwaltung';
+    return str_ends_with($title, SITE_TITLE_SUFFIX) ? $title : $title . SITE_TITLE_SUFFIX;
+}
+
 function e(mixed $val): string {
     return htmlspecialchars((string)$val, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
