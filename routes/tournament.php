@@ -15,7 +15,10 @@ function index(array $p): void {
     } else {
         $tournaments = db_fetchall("SELECT * FROM tournament WHERE is_public=1 ORDER BY sort_order ASC, event_date DESC, id DESC");
     }
-    render('tournament/index', ['page_title' => 'Turniere', 'tournaments' => $tournaments]);
+    render('tournament/index', [
+        'page_title'  => 'Turnierverwaltung - Union WABS Saxen',
+        'tournaments' => $tournaments,
+    ]);
 }
 
 function new_tournament(array $p): void {
