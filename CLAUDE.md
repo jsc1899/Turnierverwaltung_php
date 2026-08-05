@@ -37,7 +37,13 @@ Composer-Pakete: `phpmailer/phpmailer`, `mpdf/mpdf`, `chillerlan/php-qrcode ^5.0
 
 ## Konfiguration
 
-Alle Einstellungen in `config.php` als Konstanten aus Umgebungsvariablen mit lokalen Fallback-Werten. Keine `.env`-Datei — Umgebungsvariablen setzen oder Fallback-Werte direkt bearbeiten. Ohne `MAIL_HOST` werden E-Mail-Bestätigungslinks statt versendet in der UI angezeigt (Flash).
+Alle Einstellungen in `config.php` als Konstanten aus Umgebungsvariablen mit lokalen Fallback-Werten.
+`config.php` liest zusätzlich eine optionale **`.env`** im Projektverzeichnis ein (nur für Schlüssel,
+die noch nicht als echte Umgebungsvariable gesetzt sind — echte ENV-Variablen gewinnen). **Achtung
+beim lokalen Testen:** Wenn die `.env` einen `MAIL_HOST` setzt, werden auch lokal **echte E-Mails
+versendet**. Zum gefahrlosen Testen den Server mit einem unerreichbaren Host starten
+(`$env:MAIL_HOST='127.0.0.1'; $env:MAIL_PORT='1'`). Ohne `MAIL_HOST` werden E-Mail-Bestätigungslinks
+statt versendet in der UI angezeigt (Flash).
 
 Wichtige Konstanten: `SECRET_KEY`, `ADMIN_EMAIL`, `DB_*`, `MAIL_*`, `APP_URL`, `UPLOAD_DIR`.
 
@@ -145,6 +151,10 @@ HMAC-SHA256-Tokens im Format `base64url(payload).base64url(timestamp).base64url(
 ### E-Mail (`lib/mail.php`)
 
 `send_mail(to, subject, html_body)` kapselt PHPMailer. Wenn `MAIL_HOST` leer ist (Dev), wird false zurückgegeben und der Aufrufer zeigt den Link per Flash in der UI an. `MAIL_TLS=true` → STARTTLS auf dem konfigurierten Port; `false` → SMTPS.
+
+**Absender & Signatur**: Konstante `MAIL_SIGNATURE = 'Union WABS Saxen - Turnierverwaltung'`. `send_mail()`
+hängt `mail_signature_html()` an **jeden** Mailtext an und setzt denselben Text als Absendernamen
+(`setFrom(MAIL_FROM, MAIL_SIGNATURE)`) — neue Mailfunktionen brauchen daher keine eigene Signatur.
 
 ### KO-Bracket-Logik (`lib/ko_bracket.php`)
 
@@ -302,10 +312,21 @@ angelegt (`created=true`). Dedup: Doppel über Paar (beide Reihenfolgen), Team �
 
 ### Registrierungs-Workflow
 
-1. Spieler sendet öffentliches Formular → `registration`-Zeile (status=pending) + `registration_competition`-Zeilen
+1. Spieler sendet öffentliches Formular → `registration`-Zeile (status=pending) + `registration_competition`-Zeilen.
+   Anschließend informiert `_notify_new_registration()` alle **Turnier-Editoren** (`tournament_editor`)
+   und **alle Admins** (`user.role='admin'` + `ADMIN_EMAIL`) per Mail (`send_new_registration_mail()`,
+   Empfänger via `_tournament_notify_recipients()`, dedupliziert). Empfängeradressen werden dem
+   öffentlichen Nenner **nie** angezeigt — bei Versandfehlern nur `error_log()`.
 2. Admin bestätigt/lehnt ab auf der Turnierseite → nach Bestätigung wird automatisch ein Magic-Link per E-Mail gesendet
 3. Spieler nutzt Magic-Link (`/nennung/verwalten/{token}`) zum Abmelden oder Beantragen von Bewerbs-Änderungen
-4. Änderungsanträge erzeugen `registration_change_request` + `registration_change_competition`-Zeilen
+4. Änderungsanträge erzeugen `registration_change_request` + `registration_change_competition`-Zeilen.
+   Ausgangslage („unverändert") ist `_registration_baseline_cids()`: bereits zugeteilte Bewerbe
+   (`competition_player`/`competition_double`) **plus** die genannten, noch nicht abgelehnten
+   `registration_competition`-Bewerbe — eine noch **unbestätigte** Nennung zählt also bereits als
+   Zuordnung und ist im Formular vorausgewählt (Badge „Genannt, noch nicht bestätigt"). Bewerbe mit
+   geschlossener Nennung sind im Formular deaktiviert und werden serverseitig wieder als unverändert
+   ergänzt. Ergibt sich daraus **keine** Änderung, wird **kein** Antrag gespeichert (Hinweis
+   „Es wurden keine Änderungen vorgenommen …"); reine Doppelpartner-Änderungen werden direkt gespeichert.
 5. Admin bearbeitet Änderungsanträge auf der Turnierseite
 
 ### Datenbankschema (wichtige Tabellen)
@@ -315,7 +336,7 @@ angelegt (`created=true`). Dedup: Doppel über Paar (beide Reihenfolgen), Team �
 | `tournament` | Oberste Ebene |
 | `competition` | Disziplin innerhalb eines Turniers; `phase`: setup→group→ko→done; `mode`: groups_ko/groups_cross/ko_only/double_ko; `show_seeding`, `seeding_order` ('desc'=höhere Stärke stärker / 'asc'=niedrigere Stärke stärker (Tennis) / 'random'=komplett zufällige Gruppen-/KO-Auslosung ohne Setzung); `show_byes` (spielfreie Teilnehmer im Gruppen-Spielplan anzeigen); `force_byes` (jedem Teilnehmer ≥1 spielfreie Runde garantieren, auch bei gerader Anzahl — Phantom-Slot, wirkt bei Auslosung); `num_courts` (Anzahl Spielplätze, 0 = aus); `team_result_mode` (Team-Begegnungsergebnis: 'wins' = je Einzelsieg 1 Punkt, 'sum' = Einzelergebnisse aufsummieren, 'total' = nur Gesamtergebnis eingeben — bei 'sum'/'total' entfallen die Einzel-Spalten; bei 'total' werden im Spielplan/Web keine Einzelspiele erfasst, nur das Gesamtergebnis, Match-Cards/Teampläne behalten aber `team_size` Einzelspiel-Felder); `match_card_mode` (nur Teambewerbe, Match-Cards-Layout: 'fields' = mit Spielerfeldern (nummerierte Einzelspiel-Zeilen, Default) / 'compact' = ohne Spielerfelder — kompaktes Layout je Mannschaft mit Score-Spalten 1..team_size + Summe, gekreuzten Unterschriften und Bahn/Anspiel/Runde-Zeile, `_match_card_team_compact_html()` in `lib/pdf.php`; Anspiel = Start-Nr. des Anwurf-Teams); `cross_config` (Modus groups_cross: pro Rang-Paar 'x'=Kreuz/'s'=getrennt, CSV); `kickoff_enabled` (Team: Anwurf je Gruppen-Begegnung zufällig & ausgeglichen auslosen); `standings_order` (Tabellenreihung: 'h2h'=Punkte→Direktvergleich→Differenz / 'diff'=Punkte→Differenz→Direktvergleich); `points_mode` (Punktevergabe: '2-1-0' Default / '3-1-0' / '3-2-1' = Sieg-Unentsch.-Niederl.); `schedule_enabled`/`schedule_duration`/`schedule_start` (Zeitplan: rundenbasierte Uhrzeiten — nur aktivierbar bei `num_courts>0` UND `show_byes`; Spieldauer/Runde in Min. + Startzeit HH:MM; Runde N startet `Startzeit+(N−1)·Spieldauer`, nur Gruppenphase) |
 | `player` | Globales Spielerregister |
-| `player_skill` | Spielstärke pro Sport (PK: player_id + sport) |
+| `player_skill` | Spielstärke pro Sport (PK: player_id + sport). Weicht die bewerbs-spezifische Spielstärke davon ab, zeigt die Teilnehmerliste des Bewerbs einen **Aktualisieren-Button** (Registerwert übernehmen) — für **alle** Sportarten, aber nur wenn im Register für diesen Sport tatsächlich ein Wert hinterlegt ist (`player_has_sport_skill()`), sonst würde der Default 0 bzw. 10 (Tennis) falsche Abweichungen melden |
 | `competition_player` | Einem Bewerb zugeordnete Spieler (mit bewerbs-spezifischer Spielstärke) |
 | `grp` | Benannte Gruppen (A, B, C…) innerhalb eines Bewerbs; `courts` = komma-separierte Platzliste der Gruppe; `pause_start`/`pause_duration` = optionale Gruppen-Pause (nur bei aktivem Zeitplan+Spielrunden): eingeplant an der ersten Rundengrenze ≥ `pause_start`, Runden danach um die Dauer verschoben — angezeigt als „Pause · HH:MM–HH:MM Uhr" in Spielplan/Teamplänen/Bahnplänen (`group_round_time()`/`group_pause_window()` in `helpers.php`) |
 | `group_player` | Spieler in einer Gruppe |

@@ -36,8 +36,20 @@
           </span>
           <?php endforeach; ?>
         </div>
-        <?php else: ?>
+        <?php elseif (empty($item['pending_names'])): ?>
         <div class="mb-3 text-muted small">Derzeit keinen Bewerben zugeordnet.</div>
+        <?php endif; ?>
+
+        <!-- Genannt, aber vom Veranstalter noch nicht bestätigt -->
+        <?php if (!empty($item['pending_names'])): ?>
+        <div class="mb-3">
+          <div class="text-muted small mb-1">Genannt, noch nicht bestätigt:</div>
+          <?php foreach ($item['pending_names'] as $pn): ?>
+          <span class="badge bg-warning text-dark me-1">
+            <i class="bi bi-clock me-1"></i><?= e($pn) ?>
+          </span>
+          <?php endforeach; ?>
+        </div>
         <?php endif; ?>
 
         <!-- Aktionen -->
@@ -80,7 +92,7 @@
                 Die Änderung muss vom Veranstalter bestätigt werden.
               </p>
               <?php
-              $current_cids = array_column($item['competitions'], 'id');
+              $current_cids = $item['baseline_cids'];
               foreach ($item['all_comps'] as $ac):
               ?>
               <div class="form-check mb-1">

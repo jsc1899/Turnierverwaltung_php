@@ -2,11 +2,21 @@
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
+// Signatur, die an jeden ausgehenden Mailtext angehängt wird.
+const MAIL_SIGNATURE = 'Union WABS Saxen - Turnierverwaltung';
+
+function mail_signature_html(): string {
+    return '<p style="margin-top:1.5em;color:#666666">--<br>'
+         . htmlspecialchars(MAIL_SIGNATURE, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+         . '</p>';
+}
+
 function send_mail(string $to, string $subject, string $html_body): bool {
     if (!MAIL_HOST) {
         // Dev-Modus: Link in Flash anzeigen
         return false;
     }
+    $html_body .= mail_signature_html();
     require_once __DIR__ . '/../vendor/autoload.php';
     $mail = new PHPMailer(true);
     try {
@@ -18,7 +28,7 @@ function send_mail(string $to, string $subject, string $html_body): bool {
         $mail->SMTPSecure = MAIL_TLS ? PHPMailer::ENCRYPTION_STARTTLS : PHPMailer::ENCRYPTION_SMTPS;
         $mail->Port       = MAIL_PORT;
         $mail->CharSet    = 'UTF-8';
-        $mail->setFrom(MAIL_FROM ?: MAIL_USERNAME, 'Turnierverwaltung');
+        $mail->setFrom(MAIL_FROM ?: MAIL_USERNAME, MAIL_SIGNATURE);
         $mail->addAddress($to);
         $mail->isHTML(true);
         $mail->Subject = $subject;
@@ -113,6 +123,28 @@ function send_change_request_processed_mail(string $to, string $name, string $to
     if (!$sent) {
         flash('info', 'Dev-Mail an ' . e($to) . ': Änderungsantrag für ' . htmlspecialchars($tournament) . ' bearbeitet.', true);
     }
+}
+
+// Benachrichtigung an Turnier-Editoren und Administratoren über eine neue Nennung.
+function send_new_registration_mail(string $to, string $tournament, string $name, string $club,
+                                     string $email, array $comps, int $tid): bool {
+    $link  = url('tournament/' . $tid . '#tab-nennungen');
+    $body  = '<p>Hallo,</p>';
+    $body .= '<p>für das Turnier <strong>' . htmlspecialchars($tournament)
+           . '</strong> ist eine neue Nennung eingegangen:</p>';
+    $body .= '<ul>';
+    $body .= '<li><strong>Name:</strong> ' . htmlspecialchars($name) . '</li>';
+    if ($club !== '')  $body .= '<li><strong>Verein:</strong> ' . htmlspecialchars($club) . '</li>';
+    if ($email !== '') $body .= '<li><strong>E-Mail:</strong> ' . htmlspecialchars($email) . '</li>';
+    $body .= '</ul>';
+    if ($comps) {
+        $body .= '<p><strong>Bewerbe:</strong></p><ul>';
+        foreach ($comps as $c) $body .= '<li>' . htmlspecialchars($c) . '</li>';
+        $body .= '</ul>';
+    }
+    $body .= '<p>Die Nennung wartet auf Bestätigung:</p>'
+           . '<p><a href="' . $link . '">' . $link . '</a></p>';
+    return send_mail($to, 'Turnierverwaltung – neue Nennung: ' . $tournament, $body);
 }
 
 function send_reg_processed_mail(string $to, string $name, string $tournament,

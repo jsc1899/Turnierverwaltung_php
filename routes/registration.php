@@ -109,6 +109,7 @@ function register_form(array $p): void {
                     [(int)$rid, (int)$cid, $pname]
                 );
             }
+            _notify_new_registration($tid, (int)$rid);
             flash('success', 'Nennung erfolgreich eingereicht! Sie erhalten eine Bestätigung vom Veranstalter.');
             redirect('tournament/' . $tid . '/register');
             return;
@@ -350,11 +351,22 @@ function manage_view(array $p): void {
              WHERE c.tournament_id = ? ORDER BY c.name",
             [$r['id'], $r['tournament_id']]
         );
+        // Vorbelegung der Checkboxen = zugeteilte + genannte (noch nicht bestätigte) Bewerbe
+        $baseline_cids = _registration_baseline_cids($r);
+        $assigned_cids = array_map('intval', array_column($rcomps, 'id'));
+        $pending_names = [];
+        foreach ($all_comps as $ac) {
+            if (in_array((int)$ac['id'], $baseline_cids, true) && !in_array((int)$ac['id'], $assigned_cids, true)) {
+                $pending_names[] = $ac['name'];
+            }
+        }
         $items[] = [
-            'reg'          => $r,
-            'competitions' => $rcomps,
-            'pending_req'  => $pending_req,
-            'all_comps'    => $all_comps,
+            'reg'            => $r,
+            'competitions'   => $rcomps,
+            'pending_req'    => $pending_req,
+            'all_comps'      => $all_comps,
+            'baseline_cids'  => $baseline_cids,
+            'pending_names'  => $pending_names,
         ];
     }
 
@@ -430,45 +442,21 @@ function manage_change(array $p): void {
     $t        = db_fetch("SELECT max_competitions, registrations_open FROM tournament WHERE id=?", [$r['tournament_id']]);
     $max_c    = (int)($t['max_competitions'] ?: 1);
 
+    $current_cids = _registration_baseline_cids($r);
+
+    // Bewerbe mit geschlossener Nennung sind im Formular deaktiviert und werden daher nicht
+    // mitgesendet. Bestehende Zuordnungen zu solchen Bewerben gelten als unverändert — sonst
+    // würde ein unverändert abgeschicktes Formular fälschlich eine Abmeldung (bzw. bei allen
+    // geschlossenen Bewerben sogar einen Rückzug) beantragen.
+    foreach ($current_cids as $ccid) {
+        $ccomp = db_fetch("SELECT registrations_open FROM competition WHERE id=?", [(int)$ccid]);
+        if ($ccomp && empty($ccomp['registrations_open']) && !in_array((int)$ccid, $new_cids, true)) {
+            $new_cids[] = (int)$ccid;
+        }
+    }
+
     if (count($new_cids) > $max_c) {
         flash('warning', "Maximal $max_c Bewerb(e) erlaubt.");
-        redirect('nennung/verwalten/' . urlencode($token));
-        return;
-    }
-
-    $player = db_fetch(
-        "SELECT pl.id FROM player pl WHERE pl.name = ? AND pl.firstname = ? LIMIT 1",
-        [$r['lastname'], $r['firstname']]
-    );
-    $current_cids = [];
-    if ($player) {
-        $pid_c = (int)$player['id'];
-        $current_cids = array_column(
-            db_fetchall(
-                "SELECT DISTINCT c.id as competition_id
-                 FROM competition c
-                 WHERE c.tournament_id = ?
-                   AND (
-                     EXISTS (SELECT 1 FROM competition_player cp WHERE cp.competition_id = c.id AND cp.player_id = ?)
-                     OR EXISTS (
-                       SELECT 1 FROM competition_double cd
-                       JOIN `double` d ON d.id = cd.double_id
-                       WHERE cd.competition_id = c.id AND (d.player1_id = ? OR d.player2_id = ?)
-                     )
-                   )",
-                [$r['tournament_id'], $pid_c, $pid_c, $pid_c]
-            ),
-            'competition_id'
-        );
-    }
-
-    if (empty($new_cids)) {
-        // Leere Auswahl = Rückzug
-        db_insert(
-            "INSERT INTO registration_change_request (registration_id, request_type) VALUES (?, 'withdraw')",
-            [$rid]
-        );
-        flash('success', 'Rückzugsantrag eingereicht.');
         redirect('nennung/verwalten/' . urlencode($token));
         return;
     }
@@ -477,21 +465,44 @@ function manage_change(array $p): void {
     $to_remove = array_diff($current_cids, $new_cids);
 
     // Partner-Name für bereits zugeteilte Doppelbewerbe direkt aktualisieren
-    $partner_names  = $_POST['partner_name'] ?? [];
-    $staying_cids   = array_intersect($new_cids, $current_cids);
+    $partner_names   = $_POST['partner_name'] ?? [];
+    $staying_cids    = array_intersect($new_cids, $current_cids);
+    $partner_changed = false;
     foreach ($staying_cids as $stay_cid) {
         $stay_comp = db_fetch("SELECT is_doubles FROM competition WHERE id=?", [$stay_cid]);
         if (!empty($stay_comp['is_doubles'])) {
             $pname = trim($partner_names[$stay_cid] ?? '');
-            db_execute(
-                "UPDATE registration_competition SET partner_name=? WHERE registration_id=? AND competition_id=?",
-                [$pname, $rid, $stay_cid]
+            $old   = db_fetch(
+                "SELECT partner_name FROM registration_competition WHERE registration_id=? AND competition_id=?",
+                [$rid, $stay_cid]
             );
+            if ($old !== null && trim((string)($old['partner_name'] ?? '')) !== $pname) {
+                db_execute(
+                    "UPDATE registration_competition SET partner_name=? WHERE registration_id=? AND competition_id=?",
+                    [$pname, $rid, $stay_cid]
+                );
+                $partner_changed = true;
+            }
         }
     }
 
     if (empty($to_add) && empty($to_remove)) {
-        flash('info', 'Keine Änderung gegenüber aktueller Zuordnung festgestellt.');
+        if ($partner_changed) {
+            flash('success', 'Doppelpartner aktualisiert. Die Bewerbszuordnung bleibt unverändert.');
+        } else {
+            flash('info', 'Es wurden keine Änderungen vorgenommen – es wurde kein Änderungsantrag gespeichert.');
+        }
+        redirect('nennung/verwalten/' . urlencode($token));
+        return;
+    }
+
+    if (empty($new_cids)) {
+        // Leere Auswahl (und tatsächlich vorhandene Zuordnungen) = Rückzug
+        db_insert(
+            "INSERT INTO registration_change_request (registration_id, request_type) VALUES (?, 'withdraw')",
+            [$rid]
+        );
+        flash('success', 'Rückzugsantrag eingereicht.');
         redirect('nennung/verwalten/' . urlencode($token));
         return;
     }
@@ -689,6 +700,48 @@ function _remove_player_from_competition_doubles(int $pid, int $cid): void {
     }
 }
 
+// Ausgangslage einer Nennung für den Selbstverwaltungs-Dialog: bereits zugeteilte Bewerbe
+// (competition_player / competition_double) PLUS die genannten, noch nicht abgelehnten Bewerbe
+// aus registration_competition. Eine noch nicht bestätigte Nennung zählt damit ebenfalls als
+// bestehende Zuordnung — sonst würde ein unverändert abgeschicktes Formular fälschlich einen
+// Änderungsantrag erzeugen.
+function _registration_baseline_cids(array $r): array {
+    $cids   = [];
+    $player = db_fetch(
+        "SELECT pl.id FROM player pl WHERE pl.name = ? AND pl.firstname = ? LIMIT 1",
+        [$r['lastname'], $r['firstname']]
+    );
+    if ($player) {
+        $pid_c = (int)$player['id'];
+        $cids  = array_column(
+            db_fetchall(
+                "SELECT DISTINCT c.id as competition_id
+                 FROM competition c
+                 WHERE c.tournament_id = ?
+                   AND (
+                     EXISTS (SELECT 1 FROM competition_player cp WHERE cp.competition_id = c.id AND cp.player_id = ?)
+                     OR EXISTS (
+                       SELECT 1 FROM competition_double cd
+                       JOIN `double` d ON d.id = cd.double_id
+                       WHERE cd.competition_id = c.id AND (d.player1_id = ? OR d.player2_id = ?)
+                     )
+                   )",
+                [$r['tournament_id'], $pid_c, $pid_c, $pid_c]
+            ),
+            'competition_id'
+        );
+    }
+    $nominated = array_column(
+        db_fetchall(
+            "SELECT competition_id FROM registration_competition
+             WHERE registration_id=? AND status IN ('pending','confirmed')",
+            [(int)$r['id']]
+        ),
+        'competition_id'
+    );
+    return array_values(array_unique(array_map('intval', array_merge($cids, $nominated))));
+}
+
 function _reg_belongs_to_email(array $r, string $email): bool {
     if (!empty($r['email']) && strtolower($r['email']) === $email) return true;
     $player = db_fetch(
@@ -755,6 +808,57 @@ function _update_player_skill_db(int $pid, string $sport, float $skill): void {
              ON DUPLICATE KEY UPDATE skill=VALUES(skill), updated_at=NOW()",
             [$pid, $sport, $skill]
         );
+    }
+}
+
+// Empfänger für Turnier-Benachrichtigungen: zugeordnete Editoren + alle Administratoren
+// (inkl. des fest konfigurierten ADMIN_EMAIL-Kontos). Dedupliziert, Groß-/Kleinschreibung egal.
+function _tournament_notify_recipients(int $tid): array {
+    $rows = db_fetchall(
+        "SELECT DISTINCT u.email FROM user u
+         JOIN tournament_editor te ON te.user_id = u.id AND te.tournament_id = ?
+         WHERE u.email <> ''
+         UNION
+         SELECT DISTINCT u.email FROM user u WHERE u.role = 'admin' AND u.email <> ''",
+        [$tid]
+    );
+    $out = [];
+    foreach ($rows as $row) $out[strtolower(trim($row['email']))] = trim($row['email']);
+    if (defined('ADMIN_EMAIL') && ADMIN_EMAIL) {
+        $out[strtolower(trim(ADMIN_EMAIL))] = trim(ADMIN_EMAIL);
+    }
+    return array_values($out);
+}
+
+// Neue Nennung → Editoren des Turniers und alle Admins per Mail informieren.
+function _notify_new_registration(int $tid, int $rid): void {
+    $recipients = _tournament_notify_recipients($tid);
+    if (!$recipients) return;
+    $t = db_fetch("SELECT name FROM tournament WHERE id=?", [$tid]);
+    $r = db_fetch("SELECT * FROM registration WHERE id=?", [$rid]);
+    if (!$t || !$r) return;
+    $comps = array_column(db_fetchall(
+        "SELECT c.name FROM registration_competition rc
+         JOIN competition c ON c.id = rc.competition_id
+         WHERE rc.registration_id=? ORDER BY c.name",
+        [$rid]
+    ), 'name');
+    $name = trim(($r['firstname'] ?? '') . ' ' . ($r['lastname'] ?? ''));
+    $sent = 0;
+    foreach ($recipients as $to) {
+        if (send_new_registration_mail($to, $t['name'], $name, (string)($r['club'] ?? ''),
+                                       (string)($r['email'] ?? ''), $comps, $tid)) {
+            $sent++;
+        }
+    }
+    if ($sent < count($recipients)) {
+        // Empfängeradressen niemals im öffentlichen Nennformular anzeigen — nur ins Log.
+        error_log('Nennungs-Benachrichtigung (Turnier ' . $tid . ', Nennung ' . $rid . '): '
+                . $sent . '/' . count($recipients) . ' versendet.');
+        if (!MAIL_HOST) {
+            flash('info', 'Dev-Hinweis: Benachrichtigung an die Turnier-Editoren/Admins wurde nicht versendet '
+                        . '(kein MAIL_HOST konfiguriert).');
+        }
     }
 }
 
