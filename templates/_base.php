@@ -277,9 +277,11 @@
         if (form.dataset.refresh) refresh(doc, form.dataset.refresh);
         var alerts = showFlashes(doc);
         var hasErr = alerts.some(function(a) { return a.classList.contains('alert-danger'); });
-        if (!hasErr && form.dataset.modalClose) {
+        // Achtung: data-modal-close steht ohne Wert im HTML → dataset.modalClose ist "" (falsy).
+        // Daher wie bei data-ajax-reset auf !== undefined prüfen, nicht auf Truthiness.
+        if (!hasErr && form.dataset.modalClose !== undefined) {
           var m = form.closest('.modal');
-          if (m && window.bootstrap) { var inst = bootstrap.Modal.getInstance(m); if (inst) inst.hide(); }
+          if (m && window.bootstrap) { bootstrap.Modal.getOrCreateInstance(m).hide(); }
         }
         // Nur explizit markierte Formulare leeren (z.B. „Neu"-Formulare). Edit-Formulare,
         // deren Felder per JS befüllt werden (z.B. Profil-Popup), dürfen NICHT zurückgesetzt
