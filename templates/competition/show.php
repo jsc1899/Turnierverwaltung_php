@@ -715,7 +715,7 @@ ob_start(); ?>
             <?php
               $d_comp  = (float)($d['skill'] ?? 0);
               $d_reg   = (float)($d['registry_skill'] ?? 0);
-              $d_diff  = in_array($t['sport'] ?? '', ['tischtennis', 'tennis']) && abs($d_comp - $d_reg) > 0.049;
+              $d_diff  = !empty($d['registry_has']) && abs($d_comp - $d_reg) > 0.049;
             ?>
             <?php if (($can_edit && !$locked)): ?>
             <div class="d-inline-flex flex-column align-items-center gap-1">
@@ -1047,7 +1047,9 @@ ob_start(); ?>
               $is_tennis   = ($t['sport'] ?? '') === 'tennis';
               $reg_skill   = (float)($pl['registry_skill'] ?? 0);
               $comp_skill  = (float)($pl['skill'] ?? 0);
-              $skill_diff  = in_array($t['sport'] ?? '', ['tischtennis', 'tennis']) && abs($comp_skill - $reg_skill) > 0.049;
+              // Abweichung zum Spielerregister → Aktualisieren-Button (alle Sportarten;
+              // nur wenn im Register überhaupt ein Wert für diesen Sport hinterlegt ist)
+              $skill_diff  = !empty($pl['registry_has']) && abs($comp_skill - $reg_skill) > 0.049;
             ?>
             <?php if (($can_edit && !$locked)): ?>
             <div class="d-inline-flex flex-column align-items-center gap-1">

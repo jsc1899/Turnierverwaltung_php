@@ -464,6 +464,14 @@ function player_sport_skill(int $pid, string $sport): float {
     return $row ? (float)$row['skill'] : 0.0;
 }
 
+// Hat der Spieler im Spielerregister überhaupt einen Eintrag für diesen Sport?
+// Nur dann ist ein Vergleich mit der bewerbs-spezifischen Spielstärke aussagekräftig
+// (sonst liefert player_sport_skill() nur den Default 0 bzw. 10 bei Tennis).
+function player_has_sport_skill(int $pid, string $sport): bool {
+    if ($sport === '') return true;
+    return (bool)db_fetch("SELECT 1 AS x FROM player_skill WHERE player_id=? AND sport=?", [$pid, $sport]);
+}
+
 // ── Doppel-Helper ──────────────────────────────────────────────────────────────
 
 function double_name(int $did): string {

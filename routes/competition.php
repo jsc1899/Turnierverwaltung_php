@@ -653,6 +653,8 @@ function show(array $p): void {
         foreach ($assigned_doubles as &$d) {
             $d['registry_skill'] = _get_player_skill((int)$d['player1_id'], $d_sport)
                                  + _get_player_skill((int)$d['player2_id'], $d_sport);
+            $d['registry_has']   = player_has_sport_skill((int)$d['player1_id'], $d_sport)
+                                && player_has_sport_skill((int)$d['player2_id'], $d_sport);
         }
         unset($d);
         $unassigned_doubles = db_fetchall(
@@ -717,6 +719,7 @@ function show(array $p): void {
         $sport        = $t ? ($t['sport'] ?? '') : '';
         foreach ($assigned as &$pl) {
             $pl['registry_skill'] = _get_player_skill($pl['id'], $sport);
+            $pl['registry_has']   = player_has_sport_skill((int)$pl['id'], $sport);
         }
         unset($pl);
         foreach ($unassigned as $pl) {
