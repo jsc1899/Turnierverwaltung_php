@@ -13,22 +13,24 @@ ob_start(); ?>
           <i class="bi bi-plus-circle me-1"></i>Neues Turnier
         </button>
         <?php endif; ?>
-        <div class="btn-group btn-group-sm" id="status-filter">
-          <button class="btn btn-outline-secondary active" data-filter="all">Alle</button>
-          <button class="btn btn-outline-secondary" data-filter="open">Offen</button>
-          <button class="btn btn-outline-secondary" data-filter="closed">Geschlossen</button>
-          <button class="btn btn-outline-secondary" data-filter="done">Beendet</button>
+        <!-- Mehrfachauswahl: jeder Button ist ein eigener Schalter (kein „Alle" nötig) -->
+        <div class="btn-group btn-group-sm" id="status-filter" role="group" aria-label="Status filtern">
+          <button type="button" class="btn btn-outline-secondary active" data-filter="open"
+                  aria-pressed="true">Offen</button>
+          <button type="button" class="btn btn-outline-secondary active" data-filter="closed"
+                  aria-pressed="true">Geschlossen</button>
+          <button type="button" class="btn btn-outline-secondary" data-filter="done"
+                  aria-pressed="false">Beendet</button>
         </div>
-        <div class="btn-group btn-group-sm" id="sport-filter">
-          <button class="btn btn-outline-secondary active" data-sport="all" title="Alle Sportarten">Alle</button>
-          <button class="btn btn-outline-secondary" data-sport="tischtennis" title="Tischtennis"
-                  style="font-size:1.1rem;padding:.1rem .4rem;line-height:1.4">🏓</button>
-          <button class="btn btn-outline-secondary" data-sport="tennis" title="Tennis"
-                  style="font-size:1.1rem;padding:.1rem .4rem;line-height:1.4">🎾</button>
-          <button class="btn btn-outline-secondary" data-sport="fussball" title="Fußball"
-                  style="font-size:1.1rem;padding:.1rem .4rem;line-height:1.4">⚽</button>
-          <button class="btn btn-outline-secondary" data-sport="cornhole" title="Cornhole"
-                  style="padding:.1rem .4rem">
+        <div class="btn-group btn-group-sm" id="sport-filter" role="group" aria-label="Sportart filtern">
+          <button type="button" class="btn btn-outline-secondary active" data-sport="tischtennis" title="Tischtennis"
+                  aria-pressed="true" style="font-size:1.1rem;padding:.1rem .4rem;line-height:1.4">🏓</button>
+          <button type="button" class="btn btn-outline-secondary active" data-sport="tennis" title="Tennis"
+                  aria-pressed="true" style="font-size:1.1rem;padding:.1rem .4rem;line-height:1.4">🎾</button>
+          <button type="button" class="btn btn-outline-secondary active" data-sport="fussball" title="Fußball"
+                  aria-pressed="true" style="font-size:1.1rem;padding:.1rem .4rem;line-height:1.4">⚽</button>
+          <button type="button" class="btn btn-outline-secondary active" data-sport="cornhole" title="Cornhole"
+                  aria-pressed="true" style="padding:.1rem .4rem">
             <img src="<?= url('static/cornhole_icon.svg') ?>" height="18" alt="Cornhole">
           </button>
         </div>
@@ -42,6 +44,9 @@ ob_start(); ?>
         <i class="bi bi-arrows-move me-1"></i>Reihenfolge ändern
       </button>
       <span id="sort-saved" class="d-none badge bg-success"><i class="bi bi-check2 me-1"></i>Reihenfolge gespeichert</span>
+      <span id="sort-blocked" class="d-none text-muted small">
+        <i class="bi bi-info-circle me-1"></i>Umsortieren erst möglich, wenn alle Turniere sichtbar sind.
+      </span>
     </div>
     <?php endif; ?>
     <div class="row g-3" id="tournament-list" data-reorder-url="<?= url('tournaments/reorder') ?>">
@@ -140,6 +145,9 @@ ob_start(); ?>
         </div>
       </div>
       <?php endforeach; ?>
+    </div>
+    <div id="filter-empty" class="text-muted d-none">
+      Kein Turnier entspricht der aktuellen Auswahl — bitte oben rechts weitere Status oder Sportarten aktivieren.
     </div>
     <?php else: ?>
     <div class="text-muted">Noch keine Turniere angelegt.</div>
@@ -240,34 +248,47 @@ ob_start(); ?>
 $extra_js = <<<'JS'
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
 <script>
+// Status- und Sportfilter sind Mehrfachauswahlen: jeder Button schaltet sich einzeln um.
+// Ein Turnier wird angezeigt, wenn sein Status UND seine Sportart aktiv sind.
 (function() {
   var items = document.querySelectorAll('.tournament-item');
-  var activeStatus = 'all', activeSport = 'all';
-  function isFiltered() { return activeStatus !== 'all' || activeSport !== 'all'; }
-  function applyFilters() {
-    items.forEach(function(item) {
-      var okStatus = activeStatus === 'all' || item.dataset.status === activeStatus;
-      var okSport  = activeSport  === 'all' || item.dataset.sport  === activeSport;
-      item.style.display = (okStatus && okSport) ? '' : 'none';
-    });
-    if (sortable) sortable.option('disabled', !sortReorderActive || isFiltered());
+  var emptyHint = document.getElementById('filter-empty');
+
+  function activeValues(groupSel, dataKey) {
+    return Array.prototype.map.call(
+      document.querySelectorAll(groupSel + ' button.active'),
+      function(b) { return b.dataset[dataKey]; }
+    );
   }
-  document.querySelectorAll('#status-filter button').forEach(function(btn) {
+  function applyFilters() {
+    var okStatuses = activeValues('#status-filter', 'filter');
+    var okSports   = activeValues('#sport-filter', 'sport');
+    var shown = 0, hidden = 0;
+    items.forEach(function(item) {
+      // Turniere ohne hinterlegte Sportart lassen sich über keinen Sport-Button auswählen
+      // und würden sonst dauerhaft verschwinden → sie passieren den Sportfilter immer.
+      var okStatus = okStatuses.indexOf(item.dataset.status) !== -1;
+      var okSport  = !item.dataset.sport || okSports.indexOf(item.dataset.sport) !== -1;
+      var show = okStatus && okSport;
+      item.style.display = show ? '' : 'none';
+      if (show) { shown++; } else { hidden++; }
+    });
+    if (emptyHint) emptyHint.classList.toggle('d-none', shown > 0);
+    // Umsortieren nur bei vollständig sichtbarer Liste — sonst würde die gespeicherte
+    // Reihenfolge der ausgeblendeten Turniere verfälscht.
+    if (sortable) sortable.option('disabled', !sortReorderActive || hidden > 0);
+    var blocked = document.getElementById('sort-blocked');
+    if (blocked) blocked.classList.toggle('d-none', !(sortReorderActive && hidden > 0));
+  }
+  window.applyTournamentFilters = applyFilters;
+  document.querySelectorAll('#status-filter button, #sport-filter button').forEach(function(btn) {
     btn.addEventListener('click', function() {
-      document.querySelectorAll('#status-filter button').forEach(function(b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-      activeStatus = btn.dataset.filter;
+      var on = btn.classList.toggle('active');
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
       applyFilters();
     });
   });
-  document.querySelectorAll('#sport-filter button').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      document.querySelectorAll('#sport-filter button').forEach(function(b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-      activeSport = btn.dataset.sport;
-      applyFilters();
-    });
-  });
+  applyFilters();
 })();
 
 var sortable = null;
@@ -296,7 +317,9 @@ var sortReorderActive = false;
   if (toggleBtn) {
     toggleBtn.addEventListener('click', function() {
       sortReorderActive = !sortReorderActive;
-      sortable.option('disabled', !sortReorderActive);
+      // Über applyFilters, damit die Sperre bei ausgeblendeten Turnieren erhalten bleibt
+      if (window.applyTournamentFilters) { window.applyTournamentFilters(); }
+      else { sortable.option('disabled', !sortReorderActive); }
       list.querySelectorAll('.drag-handle').forEach(function(h) {
         h.classList.toggle('d-none', !sortReorderActive);
       });
