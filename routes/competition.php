@@ -563,6 +563,11 @@ function show(array $p): void {
     if (!$c) { redirect(''); return; }
     $t = db_fetch("SELECT * FROM tournament WHERE id = ?", [$c['tournament_id']]);
     $can_edit   = can_edit_tournament((int)$c['tournament_id']);
+    if (!$t['is_public'] && !$can_edit) {
+        flash('warning', 'Dieses Turnier ist nicht öffentlich sichtbar.');
+        redirect('');
+        return;
+    }
     $can_view_players = $can_edit || (!empty($t['is_public']) && !empty($t['players_public']));
     $is_doubles = !empty($c['is_doubles']);
     $is_team    = !empty($c['is_team']);
@@ -789,6 +794,11 @@ function monitor(array $p): void {
     $c   = db_fetch("SELECT * FROM competition WHERE id = ?", [$cid]);
     if (!$c) { redirect(''); return; }
     $t = db_fetch("SELECT * FROM tournament WHERE id = ?", [$c['tournament_id']]);
+    if (!$t['is_public'] && !can_edit_tournament((int)$c['tournament_id'])) {
+        flash('warning', 'Dieses Turnier ist nicht öffentlich sichtbar.');
+        redirect('');
+        return;
+    }
     $is_doubles = !empty($c['is_doubles']);
     $is_team    = !empty($c['is_team']);
     $data = competition_view_data($c, $is_team, $is_doubles);
