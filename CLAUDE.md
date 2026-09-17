@@ -120,6 +120,16 @@ denen sie zugeordnet sind (Tabelle `tournament_editor`); Admins dürfen alles. M
   Die Turnierliste (`index()`) zeigt Editoren zugeordnete **plus** öffentliche Turniere.
 - Bestehende Turniere ohne Zuordnung sind nur für Admins bearbeitbar (keine Auto-Migration).
 
+**Sichtbarkeit der Spielerlisten** (Turnieroption `tournament.players_public`, Settings-Tab neben
+„Sichtbarkeit"): `0` = nur Admins/Editoren (Default, auch für bestehende Turniere), `1` = öffentlich.
+Betrifft das Teilnehmerregister auf der Bewerbsseite (Register „Spieler/Doppel/Teams") sowie die
+Spielerlisten-Exporte (Turnier + Bewerb, PDF/CSV). Maßgeblich ist `can_view_players(?int $tid)` in
+`auth.php` (Admin/zugeordneter Editor immer; sonst nur bei `is_public=1 AND players_public=1` —
+`is_public` hat Vorrang), Gates `require_players_view(int $tid)` /
+`require_competition_players_view(int $cid)` in `routes/pdf.php`. Die Templates nutzen das vom
+Handler übergebene `$can_view_players`; der Registerinhalt bleibt durchgängig über `$can_edit`
+abgesichert, Gäste sehen dort nur die reine Liste ohne Bearbeiten-Elemente.
+
 **Aktivitätsprotokoll / Audit-Log** (`helpers.php` `audit_log()`, Tabelle `audit_log`): protokolliert
 privilegierte Aktionen (Funktionen, die Gästen nicht offenstehen). Zentrale Funktion `audit_log($status)`
 wird ausschließlich aus den Auth-Gates (`auth.php`) aufgerufen — daher deckt sie automatisch **jede**

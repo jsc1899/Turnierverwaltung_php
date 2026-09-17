@@ -56,6 +56,28 @@ function require_competition_edit(int $cid): void {
     require_tournament_edit($tid);
 }
 
+// ── Sichtbarkeit der Spielerlisten ──────────────────────────────────────────
+// Turnieroption `players_public`: 0 = nur Admins/Editoren, 1 = öffentlich.
+// Greift zusätzlich zu `is_public` (nicht-öffentliche Turniere sind für Gäste
+// ohnehin komplett gesperrt).
+function can_view_players(?int $tid): bool {
+    if ($tid === null) return false;
+    if (can_edit_tournament($tid)) return true;
+    $t = db_fetch("SELECT is_public, players_public FROM tournament WHERE id=?", [$tid]);
+    // Nicht-öffentliche Turniere bleiben für Gäste komplett gesperrt (is_public hat Vorrang).
+    return $t !== null && (int)$t['is_public'] === 1 && (int)$t['players_public'] === 1;
+}
+
+function require_players_view(int $tid): void {
+    if (!can_view_players($tid)) { _audit_deny('Die Spielerliste dieses Turniers ist nicht öffentlich.'); }
+}
+
+function require_competition_players_view(int $cid): void {
+    $tid = competition_tid($cid);
+    if ($tid === null) { http_response_code(404); exit; }
+    require_players_view($tid);
+}
+
 function require_match_edit(int $mid): void {
     $m = db_fetch("SELECT competition_id FROM `match` WHERE id=?", [$mid]);
     if (!$m) { http_response_code(404); exit; }

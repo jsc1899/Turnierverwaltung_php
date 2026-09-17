@@ -174,6 +174,7 @@ function show(array $p): void {
         'change_requests'   => $change_requests,
         'history'           => $history,
         'can_edit'          => $can_edit,
+        'can_view_players'  => $can_edit || (!empty($t['is_public']) && !empty($t['players_public'])),
         'editors'           => $editors,
         'available_editors' => $available_editors,
     ]);
@@ -194,6 +195,7 @@ function settings(array $p): void {
     $event_date       = trim(post('event_date'));
     $max_competitions = max(1, min(5, (int)post('max_competitions', 1)));
     $is_public        = post('is_public') === '1' ? 1 : 0;
+    $players_public   = post('players_public') === '1' ? 1 : 0;
     $show_skill       = post('show_skill') === '1' ? 1 : 0;
     [$registrations_open, $is_done] = _tournament_status(post('tournament_status', 'open'));
 
@@ -223,10 +225,12 @@ function settings(array $p): void {
 
     db_execute(
         "UPDATE tournament SET name=?, organizer=?, sport=?, event_date=?, max_competitions=?,
-         ausschreibung=?, registrations_open=?, is_public=?, is_done=?, banner_image=?, info_url=?, show_skill=?
+         ausschreibung=?, registrations_open=?, is_public=?, is_done=?, banner_image=?, info_url=?, show_skill=?,
+         players_public=?
          WHERE id=?",
         [$name, $organizer, $sport, $event_date, $max_competitions,
          $ausschreibung, $registrations_open, $is_public, $is_done, $banner_image, $info_url, $show_skill,
+         $players_public,
          $p['id']]
     );
     flash('success', 'Einstellungen gespeichert.');

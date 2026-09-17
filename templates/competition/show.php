@@ -158,7 +158,7 @@ ob_start(); ?>
 <?php endif; ?>
 
 <!-- ═══ Registerkarten: Bewerb + Spieler [+ Einstellungen] ═════════════════ -->
-<?php if ($can_edit): /* Gäste/Reader haben nur den Bewerb-Tab → Leiste ausblenden, Inhalt direkt zeigen */ ?>
+<?php if ($can_edit || $can_view_players): /* Gäste/Reader haben nur den Bewerb-Tab → Leiste ausblenden, Inhalt direkt zeigen */ ?>
 <ul class="nav nav-tabs mb-0" id="comp-tabs" role="tablist">
   <li class="nav-item" role="presentation">
     <button class="nav-link active" id="tab-competition-btn"
@@ -166,7 +166,7 @@ ob_start(); ?>
       <i class="bi bi-diagram-3 me-1"></i>Bewerb
     </button>
   </li>
-  <?php if ($can_edit): ?>
+  <?php if ($can_view_players): ?>
   <li class="nav-item" role="presentation">
     <button class="nav-link" id="tab-players-btn"
             data-bs-toggle="tab" data-bs-target="#tab-players" type="button" role="tab">
@@ -199,7 +199,7 @@ ob_start(); ?>
   <?php endif; ?>
 </ul>
 <?php endif; ?>
-<div class="tab-content<?= $can_edit ? ' border border-top-0 rounded-bottom' : '' ?> mb-4">
+<div class="tab-content<?= ($can_edit || $can_view_players) ? ' border border-top-0 rounded-bottom' : '' ?> mb-4">
 
   <?php if ($can_edit): ?>
   <!-- Tab: Monitor -->

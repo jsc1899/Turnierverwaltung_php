@@ -563,6 +563,7 @@ function show(array $p): void {
     if (!$c) { redirect(''); return; }
     $t = db_fetch("SELECT * FROM tournament WHERE id = ?", [$c['tournament_id']]);
     $can_edit   = can_edit_tournament((int)$c['tournament_id']);
+    $can_view_players = $can_edit || (!empty($t['is_public']) && !empty($t['players_public']));
     $is_doubles = !empty($c['is_doubles']);
     $is_team    = !empty($c['is_team']);
 
@@ -756,6 +757,7 @@ function show(array $p): void {
         'page_title' => $c['name'],
         'c' => $c, 't' => $t,
         'can_edit' => $can_edit,
+        'can_view_players' => $can_view_players,
         'import_sources' => $import_sources,
         'is_doubles' => $is_doubles, 'is_team' => $is_team,
         'assigned' => $assigned, 'unassigned' => $unassigned,

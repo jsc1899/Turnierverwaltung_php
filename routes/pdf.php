@@ -86,12 +86,12 @@ function registrations_csv(array $p): void {
 }
 
 function players_csv(array $p): void {
-    require_tournament_edit((int)$p['id']);
+    require_players_view((int)$p['id']);
     generate_tournament_players_csv((int)$p['id']);
 }
 
 function players_pdf(array $p): void {
-    require_tournament_edit((int)$p['id']);
+    require_players_view((int)$p['id']);
     generate_tournament_players_pdf((int)$p['id']);
 }
 
@@ -126,11 +126,11 @@ function teams_registry_csv(array $p): void {
 }
 
 function competition_players_pdf(array $p): void {
-    require_competition_edit((int)$p['id']);
+    require_competition_players_view((int)$p['id']);
     generate_competition_players_pdf((int)$p['id']);
 }
 
 function competition_players_csv(array $p): void {
-    require_competition_edit((int)$p['id']);
+    require_competition_players_view((int)$p['id']);
     generate_competition_players_csv((int)$p['id']);
 }

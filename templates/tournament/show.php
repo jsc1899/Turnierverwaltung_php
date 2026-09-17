@@ -124,7 +124,7 @@ $nennung_badge = $pending_count + $change_count;
         <i class="bi bi-plus-circle me-1"></i>Neuer Bewerb
       </button>
       <?php endif; ?>
-      <?php if ($can_edit && $comp_info): ?>
+      <?php if ($can_view_players && $comp_info): ?>
       <div class="btn-group btn-group-sm ms-auto">
         <span class="btn btn-sm btn-outline-secondary disabled pe-none" style="cursor:default">Spielerliste</span>
         <a href="<?= url('tournament/' . $t['id'] . '/players/pdf') ?>" class="btn btn-outline-danger" target="_blank" title="PDF">
@@ -308,6 +308,14 @@ $nennung_badge = $pending_count + $change_count;
           <option value="1"<?= ($t['is_public'] != 0) ? ' selected' : '' ?>>öffentlich</option>
           <option value="0"<?= ($t['is_public'] == 0) ? ' selected' : '' ?>>nur Admins/Editoren</option>
         </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Spielerlisten</label>
+        <select name="players_public" class="form-select">
+          <option value="1"<?= !empty($t['players_public']) ? ' selected' : '' ?>>öffentlich</option>
+          <option value="0"<?= empty($t['players_public']) ? ' selected' : '' ?>>nur Admins/Editoren</option>
+        </select>
+        <div class="form-text">Teilnehmerregister der Bewerbe und Spielerlisten-Export</div>
       </div>
       <div class="col-12">
       </div>
