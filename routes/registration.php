@@ -64,13 +64,8 @@ function register_form(array $p): void {
 
         if (!$errors) {
             // Check existing assignments
-            $existing_player = null;
-            if ($pass_nr) {
-                $existing_player = db_fetch("SELECT id FROM player WHERE pass_nr=? AND pass_nr!=''", [$pass_nr]);
-            }
-            if (!$existing_player) {
-                $existing_player = db_fetch("SELECT id FROM player WHERE name=? AND firstname=?", [$lastname, $firstname]);
-            }
+            $existing_pid    = _match_player($lastname, $firstname, $pass_nr);
+            $existing_player = $existing_pid ? ['id' => $existing_pid] : null;
             if ($existing_player) {
                 $assigned = db_fetchall(
                     "SELECT c.name, cp.competition_id FROM competition_player cp
@@ -675,15 +670,15 @@ function _remove_player_from_competition_doubles(int $pid, int $cid): void {
             $partner_pid = ((int)$double['player1_id'] === $pid)
                 ? (int)$double['player2_id']
                 : (int)$double['player1_id'];
-            $pl = db_fetch("SELECT name, firstname, pass_nr FROM player WHERE id=?", [$partner_pid]);
+            $pl = db_fetch("SELECT name, firstname FROM player WHERE id=?", [$partner_pid]);
             if (!$pl) continue;
+            // Nur über den Namen — Pass-Nr. allein ist unzuverlässig (Platzhalter wie „weiß ich nicht")
             $partner_reg = db_fetch(
                 "SELECT r.id FROM registration r
                  WHERE r.tournament_id = ? AND r.status IN ('confirmed','pending')
-                   AND ((r.pass_nr != '' AND r.pass_nr = ?)
-                        OR (r.lastname = ? AND r.firstname = ?))
+                   AND r.lastname = ? AND r.firstname = ?
                  LIMIT 1",
-                [$comp['tournament_id'], $pl['pass_nr'], $pl['name'], $pl['firstname']]
+                [$comp['tournament_id'], $pl['name'], $pl['firstname']]
             );
             if ($partner_reg) {
                 db_execute(
@@ -751,33 +746,49 @@ function _reg_belongs_to_email(array $r, string $email): bool {
     return $player !== null;
 }
 
-function _find_or_create_player(array $r): int {
-    $player = null;
-    if ($r['pass_nr']) {
-        $player = db_fetch("SELECT id FROM player WHERE pass_nr=? AND pass_nr!=''", [$r['pass_nr']]);
-    }
-    if (!$player) {
-        $player = db_fetch("SELECT id FROM player WHERE name=? AND firstname=?", [$r['lastname'], $r['firstname']]);
-    }
-    if (!$player) {
-        return (int)db_insert(
-            "INSERT INTO player (name, firstname, club, gender, pass_nr, skill, email) VALUES (?,?,?,?,?,?,?)",
-            [$r['lastname'], $r['firstname'], $r['club'] ?? '', $r['gender'] ?? '',
-             $r['pass_nr'] ?? '', $r['skill'] ?? 0, $r['email'] ?? '']
+// Sucht den Registerspieler zu einer Nennung. Pass-Nr.-Treffer zählen nur, wenn auch der Name
+// übereinstimmt — sonst würden Nennungen mit gleicher (z.B. Platzhalter-)Pass-Nr. wie „weiß ich
+// nicht" einem fremden Spieler zugeordnet und dessen Daten überschrieben. Fallback: Name.
+// $pass_conflict erhält den Spieler, dem die Pass-Nr. bereits unter anderem Namen gehört.
+function _match_player(string $lastname, string $firstname, string $pass_nr, ?array &$pass_conflict = null): ?int {
+    $pass_conflict = null;
+    $pass_nr = trim($pass_nr);
+    if ($pass_nr !== '') {
+        $by_pass = db_fetchall(
+            "SELECT id, name, firstname FROM player WHERE pass_nr=? AND pass_nr!=''", [$pass_nr]
         );
+        foreach ($by_pass as $p) {
+            if (mb_strtolower(trim($p['name'])) === mb_strtolower(trim($lastname))
+                && mb_strtolower(trim($p['firstname'])) === mb_strtolower(trim($firstname))) {
+                return (int)$p['id'];
+            }
+        }
+        if ($by_pass) $pass_conflict = $by_pass[0];
     }
-    return (int)$player['id'];
+    $player = db_fetch("SELECT id FROM player WHERE name=? AND firstname=?", [$lastname, $firstname]);
+    return $player ? (int)$player['id'] : null;
+}
+
+function _find_or_create_player(array $r): int {
+    $conflict = null;
+    $pid = _match_player($r['lastname'], $r['firstname'], (string)($r['pass_nr'] ?? ''), $conflict);
+    if ($conflict) {
+        flash('warning', 'Pass-Nr. „' . $r['pass_nr'] . '" ist bereits Spieler '
+            . trim($conflict['firstname'] . ' ' . $conflict['name'])
+            . ' zugeordnet — ' . trim($r['firstname'] . ' ' . $r['lastname'])
+            . ' wurde ' . ($pid ? 'über den Namen zugeordnet' : 'ohne Pass-Nr. neu angelegt')
+            . '. Bitte Pass-Nr. im Spielerregister prüfen.');
+    }
+    if ($pid) return $pid;
+    return (int)db_insert(
+        "INSERT INTO player (name, firstname, club, gender, pass_nr, skill, email) VALUES (?,?,?,?,?,?,?)",
+        [$r['lastname'], $r['firstname'], $r['club'] ?? '', $r['gender'] ?? '',
+         $conflict ? '' : ($r['pass_nr'] ?? ''), $r['skill'] ?? 0, $r['email'] ?? '']
+    );
 }
 
 function _find_player(array $r): ?int {
-    $player = null;
-    if (!empty($r['pass_nr'])) {
-        $player = db_fetch("SELECT id FROM player WHERE pass_nr=? AND pass_nr!=''", [$r['pass_nr']]);
-    }
-    if (!$player) {
-        $player = db_fetch("SELECT id FROM player WHERE name=? AND firstname=?", [$r['lastname'], $r['firstname']]);
-    }
-    return $player ? (int)$player['id'] : null;
+    return _match_player($r['lastname'], $r['firstname'], (string)($r['pass_nr'] ?? ''));
 }
 
 function _add_player_to_competition(int $pid, int $cid, float $skill = 0): bool {
