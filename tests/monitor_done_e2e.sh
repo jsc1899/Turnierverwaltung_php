@@ -4,6 +4,7 @@
 set -u
 B=http://localhost:8080
 MYSQL="/c/Program Files/MariaDB 12.3/bin/mysql.exe"
+"$MYSQL" -u root turnierverwaltung -e "DELETE FROM rate_limit WHERE ip IN ('::1','127.0.0.1')"   # Test-Isolation: Login-Limit
 W=$(mktemp -d); JAR="$W/jar"; FAILS=0
 ok()  { echo "  ok   $1"; }
 bad() { echo "  FAIL $1"; FAILS=$((FAILS+1)); }
