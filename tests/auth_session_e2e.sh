@@ -28,6 +28,7 @@ trap restore EXIT
 # 1) Deaktivierung durch Admin beendet laufende Editor-Sitzung sofort
 login "$W/ed" dev-editor@local.test
 [ "$(code "$W/ed" $B/players)" = 200 ] && ok "Editor angemeldet: /players 200" || bad "Editor angemeldet: /players 200"
+[ "$(q "SELECT LEFT(password_hash,9) FROM user WHERE id=$EID")" = '$argon2id' ] && ok "Login stellt Hash auf Argon2id um" || bad "Login stellt Hash auf Argon2id um"
 login "$W/ad" dev-admin@local.test
 AC=$(curl -s -b "$W/ad" $B/admin/users | csrf)
 curl -s -b "$W/ad" -o /dev/null --data-urlencode "csrf_token=$AC" $B/admin/user/$EID/active
@@ -45,11 +46,12 @@ login "$W/ed3" dev-editor@local.test
 [ "$(code "$W/ed3" $B/players)" = 200 ] && ok "reaktiviert durch Admin: Anmeldung möglich" || bad "reaktiviert durch Admin: Anmeldung möglich"
 
 # 3) Passwortänderung per Reset-Link beendet andere Sitzungen
-RT=$(php -r 'require "config.php"; require "lib/tokens.php"; echo make_reset_token($argv[1], $argv[2]);' -- dev-editor@local.test "$EHASH")
+CHASH=$(q "SELECT password_hash FROM user WHERE id=$EID")   # aktueller Hash (Login kann ihn auf Argon2id umgestellt haben)
+RT=$(php -r 'require "config.php"; require "lib/tokens.php"; echo make_reset_token($argv[1], $argv[2]);' -- dev-editor@local.test "$CHASH")
 RC=$(curl -s -c "$W/rs" "$B/reset-password?token=$RT" | csrf)
 curl -s -b "$W/rs" -o /dev/null --data-urlencode "csrf_token=$RC" --data-urlencode "password=neuespasswort1" \
   --data-urlencode "password2=neuespasswort1" "$B/reset-password?token=$RT"
-[ "$(q "SELECT password_hash<>'$EHASH' FROM user WHERE id=$EID")" = 1 ] && ok "Reset: Passwort geändert" || bad "Reset: Passwort geändert"
+[ "$(q "SELECT password_hash<>'$CHASH' FROM user WHERE id=$EID")" = 1 ] && ok "Reset: Passwort geändert" || bad "Reset: Passwort geändert"
 [ "$(code "$W/ed3" $B/players)" != 200 ] && ok "Reset: alte Sitzung beendet" || bad "Reset: alte Sitzung beendet"
 restore
 

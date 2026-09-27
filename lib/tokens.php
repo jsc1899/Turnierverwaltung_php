@@ -43,14 +43,26 @@ function verify_email_confirm_token(string $token): ?string {
     return is_string($payload) ? $payload : null;
 }
 
-function make_reset_token(string $email, string $password_hash): string {
-    return make_token(['e' => $email, 'ph' => $password_hash], 'password-reset');
+// Der Reset-Link enthält nicht den Passwort-Hash selbst (landet in Mail-/Proxy-Logs und im
+// Browserverlauf), sondern nur einen HMAC-Fingerabdruck davon. Er wird ungültig, sobald sich
+// das Passwort ändert.
+function _reset_fingerprint(string $password_hash): string {
+    return _b64url_encode(hash_hmac('sha256', $password_hash, SECRET_KEY . '|reset-fp', true));
 }
 
+function make_reset_token(string $email, string $password_hash): string {
+    return make_token(['e' => $email, 'fp' => _reset_fingerprint($password_hash)], 'password-reset');
+}
+
+// Liefert [E-Mail, Fingerabdruck] oder [null, null]
 function verify_reset_token(string $token): array {
     $data = verify_token($token, 'password-reset', 3600); // 1h
-    if (!is_array($data) || empty($data['e'])) return [null, null];
-    return [$data['e'], $data['ph']];
+    if (!is_array($data) || empty($data['e']) || empty($data['fp'])) return [null, null];
+    return [$data['e'], $data['fp']];
+}
+
+function reset_token_matches(?string $fingerprint, string $current_password_hash): bool {
+    return $fingerprint !== null && hash_equals(_reset_fingerprint($current_password_hash), $fingerprint);
 }
 
 // Email-basierter Nennungs-Verwaltungslink (zeigt alle Nennungen dieser Email)

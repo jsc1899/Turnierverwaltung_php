@@ -2,6 +2,9 @@
 <?php
 require_once __DIR__ . '/../lib/mail.php';
 
+// Argon2id-Hash eines unbekannten Zufallspassworts (für gleich lange Login-Antwortzeiten)
+const LOGIN_DUMMY_HASH = '$argon2id$v=19$m=65536,t=4,p=1$UHNVaGRKR3dlcml4YkRobw$ZtEToHg9YFtLhgEmaZQU+SSvzY4wr/P0sKOFCv86Iag';
+
 function login(array $p): void {
     if (is_logged_in()) { redirect(''); }
 
@@ -15,7 +18,16 @@ function login(array $p): void {
         $email    = trim(post('email'));
         $password = post('password');
         $user     = db_fetch("SELECT * FROM user WHERE " . email_match_sql('email'), [$email]);
-        if ($user && user_can_login($user) && password_verify($password, $user['password_hash'])) {
+        // Immer genau einen Passwort-Hash prüfen (bei unbekanntem Konto einen Dummy-Hash) —
+        // sonst verrät die Antwortzeit, ob eine E-Mail-Adresse registriert ist.
+        $pw_ok = password_verify($password, $user['password_hash'] ?? LOGIN_DUMMY_HASH);
+        if ($user && user_can_login($user) && $pw_ok) {
+            // Ältere Hashes (bcrypt) beim Login auf Argon2id umstellen → einheitliche Hashes
+            // (auch Voraussetzung für gleich lange Antwortzeiten mit LOGIN_DUMMY_HASH)
+            if (password_needs_rehash($user['password_hash'], PASSWORD_ARGON2ID)) {
+                db_execute("UPDATE user SET password_hash=? WHERE id=?",
+                           [password_hash($password, PASSWORD_ARGON2ID), $user['id']]);
+            }
             login_user_session($user);
             flash('success', 'Willkommen, ' . e($user['username']) . '!');
             $next = get_param('next', '');
@@ -127,14 +139,14 @@ function forgot_password(array $p): void {
 
 function reset_password(array $p): void {
     $token = get_param('token');
-    [$email, $old_hash] = verify_reset_token($token);
+    [$email, $fingerprint] = verify_reset_token($token);
     if (!$email) {
         flash('danger', 'Ungültiger oder abgelaufener Reset-Link.');
         redirect('login');
         return;
     }
     $user = db_fetch("SELECT * FROM user WHERE " . email_match_sql('email'), [$email]);
-    if (!$user || $user['password_hash'] !== $old_hash) {
+    if (!$user || !reset_token_matches($fingerprint, $user['password_hash'])) {
         flash('danger', 'Dieser Link wurde bereits verwendet.');
         redirect('login');
         return;
