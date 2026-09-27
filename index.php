@@ -101,7 +101,7 @@ if ($method === 'HEAD') $method = 'GET';   // HEAD wie GET routen (nur Header; z
 $routes = [
     // Auth
     ['GET|POST', '/login',            'auth',         'login'],
-    ['GET',      '/logout',           'auth',         'logout'],
+    ['POST',     '/logout',           'auth',         'logout'],   // POST + CSRF (kein Logout per fremdem Link)
     ['GET|POST', '/register',         'auth',         'register'],
     ['GET',      '/confirm',          'auth',         'confirm'],
     ['GET|POST', '/forgot-password',  'auth',         'forgot_password'],
@@ -213,7 +213,7 @@ $routes = [
     ['POST',     '/player/{id}/delete',             'player', 'delete'],
     ['POST',     '/player/{id}/toggle-active',      'player', 'toggle_active_player'],
     ['GET',      '/player/{id}/profile',            'player', 'player_profile_json'],
-    ['GET',      '/player/{id}/sync/{source}',      'player', 'sync_external_skill'],
+    ['POST',     '/player/{id}/sync/{source}',      'player', 'sync_external_skill'],
     ['POST',     '/players/double/new',             'player', 'create_double_global'],
     ['POST',     '/players/double/{did}/edit',      'player', 'edit_double_global'],
     ['POST',     '/players/double/{did}/delete',    'player', 'delete_double_global'],

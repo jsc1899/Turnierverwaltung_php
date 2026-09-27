@@ -39,6 +39,7 @@ function login(array $p): void {
 }
 
 function logout(array $p): void {
+    csrf_verify();
     logout_user_session();
     flash('success', 'Du wurdest abgemeldet.');
     redirect('');

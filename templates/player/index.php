@@ -856,6 +856,12 @@ ob_start(); ?>
 var playerSkillsData = <?= json_encode($player_skills) ?>;
 var sportLabels = {'tischtennis':'Tischtennis','tennis':'Tennis','fussball':'Fußball','cornhole':'Cornhole'};
 var sportDefaults = {'tennis': 10.0};
+// Spielstärke-Sync ändert Daten → POST mit CSRF-Token
+function syncRequest() {
+  var fd = new FormData();
+  fd.append('csrf_token', document.querySelector('meta[name="csrf-token"]').content);
+  return { method: 'POST', body: fd, credentials: 'same-origin' };
+}
 var profileBaseUrl = <?= json_encode(url('player')) ?>;
 
 function calcDoubleSkill() {
@@ -1125,7 +1131,7 @@ document.addEventListener('DOMContentLoaded', function() {
     status.className = 'form-text text-muted';
     status.textContent = 'Abrufen…';
 
-    fetch(profileBaseUrl + '/' + pid + '/sync/ratingscentral')
+    fetch(profileBaseUrl + '/' + pid + '/sync/ratingscentral', syncRequest())
       .then(function(r) { return r.json(); })
       .then(function(d) {
         syncBtn.disabled = false;
@@ -1178,7 +1184,7 @@ document.addEventListener('click', function(e) {
   var icon = btn.querySelector('i');
   btn.disabled = true;
   icon.className = 'bi bi-hourglass-split';
-  fetch(profileBaseUrl + '/' + pid + '/sync/ratingscentral')
+  fetch(profileBaseUrl + '/' + pid + '/sync/ratingscentral', syncRequest())
     .then(function(r) { return r.json(); })
     .then(function(d) {
       btn.disabled = false;
@@ -1220,7 +1226,7 @@ document.addEventListener('DOMContentLoaded', function() {
       statusEl.className = 'small ms-2 text-muted';
       statusEl.textContent = (i + 1) + '/' + total + '…';
       try {
-        var r = await fetch(profileBaseUrl + '/' + pid + '/sync/ratingscentral');
+        var r = await fetch(profileBaseUrl + '/' + pid + '/sync/ratingscentral', syncRequest());
         var d = await r.json();
         if (d.error) {
           errors++;

@@ -77,7 +77,12 @@
             <?php endif; ?>
             <?php endif; ?>
             <li><hr class="dropdown-divider"></li>
-            <li><a class="dropdown-item" href="<?= url('logout') ?>"><i class="bi bi-box-arrow-right me-1"></i>Abmelden</a></li>
+            <li>
+              <form method="post" action="<?= url('logout') ?>" class="m-0">
+                <?= csrf_field() ?>
+                <button type="submit" class="dropdown-item"><i class="bi bi-box-arrow-right me-1"></i>Abmelden</button>
+              </form>
+            </li>
           </ul>
         </li>
         <?php else: ?>

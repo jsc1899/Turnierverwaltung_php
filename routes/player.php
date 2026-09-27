@@ -984,6 +984,7 @@ function _xml_strip_ns(string $xml): string {
 
 function sync_external_skill(array $p): void {
     require_edit();
+    csrf_verify();
     header('Content-Type: application/json; charset=utf-8');
     $pid    = (int)$p['id'];
     $source = $p['source'] ?? '';
