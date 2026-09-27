@@ -416,14 +416,21 @@ function player_profile_json(array $p): void {
     $skills_rows = db_fetchall("SELECT sport, skill FROM player_skill WHERE player_id=?", [$pid]);
     $skills = array_column($skills_rows, 'skill', 'sport');
 
+    // Turniere: Admins alle; Editoren nur öffentliche und ihnen zugeordnete (sonst verriete das
+    // Profil Namen fremder, nicht öffentlicher Turniere/Bewerbe)
+    $u = current_user();
+    $vis_sql = is_admin() ? '1=1'
+        : '(t.is_public = 1 OR t.id IN (SELECT tournament_id FROM tournament_editor WHERE user_id = ?))';
+    $vis_par = is_admin() ? [] : [(int)$u['id']];
+
     $comps = db_fetchall(
         "SELECT t.id as tid, t.name as tname, c.id as cid, c.name as cname, c.phase
          FROM competition_player cp
          JOIN competition c ON c.id=cp.competition_id
          JOIN tournament t ON t.id=c.tournament_id
-         WHERE cp.player_id=?
+         WHERE cp.player_id=? AND $vis_sql
          ORDER BY t.name, c.name",
-        [$pid]
+        array_merge([$pid], $vis_par)
     );
 
     $doubles = db_fetchall(
@@ -441,9 +448,9 @@ function player_profile_json(array $p): void {
              FROM competition_double cd
              JOIN competition c ON c.id=cd.competition_id
              JOIN tournament t ON t.id=c.tournament_id
-             WHERE cd.double_id=?
+             WHERE cd.double_id=? AND $vis_sql
              ORDER BY t.name, c.name",
-            [$dbl['id']]
+            array_merge([$dbl['id']], $vis_par)
         );
     }
     unset($dbl);
@@ -461,8 +468,8 @@ function player_profile_json(array $p): void {
              FROM competition_team ct
              JOIN competition c ON c.id = ct.competition_id
              JOIN tournament t ON t.id = c.tournament_id
-             WHERE ct.team_id = ? ORDER BY t.name, c.name",
-            [$tm['id']]
+             WHERE ct.team_id = ? AND $vis_sql ORDER BY t.name, c.name",
+            array_merge([$tm['id']], $vis_par)
         );
         $teams[] = $tm;
     }
