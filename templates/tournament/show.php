@@ -173,7 +173,7 @@ $nennung_badge = $pending_count + $change_count;
       <?php endif; ?>
     </div>
     <?php if ($comp_info): ?>
-    <?php if ($can_edit && !$locked): ?>
+    <?php if ($can_edit): // Umsortieren auch bei beendeten Turnieren (ändert keine Ergebnisse) ?>
     <div class="d-flex align-items-center gap-2 mb-2">
       <button id="comp-sort-toggle" class="btn btn-outline-secondary btn-sm">
         <i class="bi bi-arrows-move me-1"></i>Reihenfolge ändern
@@ -185,7 +185,7 @@ $nennung_badge = $pending_count + $change_count;
       <?php foreach ($comp_info as $ci): $c = $ci['comp']; ?>
       <div class="col-md-6" data-id="<?= $c['id'] ?>">
         <div class="card shadow-sm h-100">
-          <?php if ($can_edit && !$locked): ?>
+          <?php if ($can_edit): ?>
           <div class="drag-handle d-flex justify-content-center align-items-center py-1 bg-light border-bottom"
                style="cursor:grab;border-radius:calc(var(--bs-card-border-radius) - 1px) calc(var(--bs-card-border-radius) - 1px) 0 0;user-select:none">
             <i class="bi bi-grip-horizontal text-muted"></i>

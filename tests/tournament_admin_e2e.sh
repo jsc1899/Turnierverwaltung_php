@@ -33,6 +33,17 @@ BAN=$(q "SELECT banner_image FROM tournament WHERE id=$TID"); AUS=$(q "SELECT au
 curl -s -b "$JAR" -o /dev/null --data-urlencode "csrf_token=$C" $B/tournament/$TID/delete
 [ ! -f "uploads/$BAN" ] && [ ! -f "uploads/$AUS" ] && ok "Löschen entfernt Banner und Ausschreibung" || bad "Löschen entfernt Banner und Ausschreibung"
 
+# 3) Bewerbe umsortieren auch bei beendetem Turnier (nur Bearbeiter), sonst bleibt es gesperrt
+q "UPDATE tournament SET is_done=1, is_public=1 WHERE id=$T2"
+q "INSERT INTO competition (tournament_id,name) VALUES ($T2,'A'),($T2,'B')"
+PA=$(curl -s -b "$JAR" $B/tournament/$T2)
+echo "$PA" | grep -q 'id="comp-sort-toggle"' && ok "beendet: Umsortieren für Admin" || bad "beendet: Umsortieren für Admin"
+echo "$PA" | grep -q 'data-bs-target="#newCompetitionModal"' && bad "beendet: Neuer Bewerb bleibt gesperrt" || ok "beendet: Neuer Bewerb bleibt gesperrt"
+curl -s $B/tournament/$T2 | grep -q 'id="comp-sort-toggle"' && bad "Gast: kein Umsortieren" || ok "Gast: kein Umsortieren"
+IDS=$(q "SELECT GROUP_CONCAT(id ORDER BY id DESC) FROM competition WHERE tournament_id=$T2")
+curl -s -b "$JAR" -o /dev/null --data-urlencode "csrf_token=$C" -d "ids[]=${IDS%%,*}" -d "ids[]=${IDS##*,}" $B/tournament/$T2/competitions/reorder
+[ "$(q "SELECT GROUP_CONCAT(id ORDER BY sort_order) FROM competition WHERE tournament_id=$T2")" = "$IDS" ] && ok "beendet: Reihenfolge gespeichert" || bad "beendet: Reihenfolge gespeichert"
+
 q "DELETE FROM tournament WHERE id IN ($TID,$T2)"; [ -n "$BAN" ] && rm -f "uploads/$BAN"; [ -n "$AUS" ] && rm -f "uploads/$AUS"
 rm -rf "$W"
 [ $FAILS -eq 0 ] && echo "Alle E2E-Tests ok" || { echo "$FAILS FEHLER"; exit 1; }
