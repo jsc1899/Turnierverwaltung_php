@@ -435,6 +435,10 @@ function manage_change(array $p): void {
     }
 
     $new_cids = array_map('intval', (array)($_POST['competition_ids'] ?? []));
+    // Nur Bewerbe DIESES Turniers (sonst ließen sich Bewerbe fremder, auch nicht öffentlicher Turniere beantragen)
+    $own_cids = array_map('intval', array_column(
+        db_fetchall("SELECT id FROM competition WHERE tournament_id=?", [$r['tournament_id']]), 'id'));
+    $new_cids = array_values(array_unique(array_intersect($new_cids, $own_cids)));
     $t        = db_fetch("SELECT max_competitions, registrations_open FROM tournament WHERE id=?", [$r['tournament_id']]);
     $max_c    = (int)($t['max_competitions'] ?: 1);
 
@@ -588,7 +592,13 @@ function change_confirm_comp(array $p): void {
     if (!$rcr) { redirect(''); return; }
     require_tournament_edit((int)$rcr['tournament_id']);
 
-    $comp_entry = db_fetch("SELECT * FROM registration_change_competition WHERE change_request_id=? AND competition_id=?", [$rcr_id, $cid]);
+    // Nur Bewerbe des Turniers dieses Antrags (Schutz auch für Altanträge mit fremden Bewerben)
+    $comp_entry = db_fetch(
+        "SELECT rcc.* FROM registration_change_competition rcc
+         JOIN competition c ON c.id = rcc.competition_id AND c.tournament_id = ?
+         WHERE rcc.change_request_id=? AND rcc.competition_id=?",
+        [(int)$rcr['tournament_id'], $rcr_id, $cid]
+    );
     if ($comp_entry) {
         if ($comp_entry['action'] === 'add') {
             $r = db_fetch("SELECT * FROM registration WHERE id=?", [$rcr['rid']]);
@@ -926,6 +936,13 @@ function _process_withdraw(int $rid, int $tid): void {
 function _process_change_approve_all(int $rcr_id, int $rid): array {
     $r = db_fetch("SELECT * FROM registration WHERE id=?", [$rid]);
     if (!$r) return [];
+    // Einträge zu Bewerben fremder Turniere (Altanträge) ablehnen statt zuteilen
+    db_execute(
+        "UPDATE registration_change_competition rcc JOIN competition c ON c.id = rcc.competition_id
+         SET rcc.status='rejected'
+         WHERE rcc.change_request_id=? AND rcc.status='pending' AND c.tournament_id <> ?",
+        [$rcr_id, (int)$r['tournament_id']]
+    );
     $entries = db_fetchall(
         "SELECT * FROM registration_change_competition WHERE change_request_id=? AND status='pending'", [$rcr_id]
     );
