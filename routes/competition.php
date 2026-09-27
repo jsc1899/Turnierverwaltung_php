@@ -276,6 +276,19 @@ function competition_view_data(array $c, bool $is_team, bool $is_doubles): array
                         ['rank'=>2,'name'=>$dko_gf['p1name'],'club'=>$dko_gf['p1club']],
                     ];
                 }
+                // Alle übrigen scheiden im Verliererbaum aus: Verlierer derselben LB-Runde teilen
+                // sich einen Rang (LB-Finale → 3, LB-Halbfinale → 4, …), Rang mit Lücken.
+                // Spiele ohne zwei Teilnehmer (Freilos) haben keinen Verlierer.
+                for ($r = $lb_total; $r >= 1; $r--) {
+                    $rank = count($places) + 1;
+                    foreach ($dko_lb[$r]['matches'] ?? [] as $m) {
+                        if (!$m['played'] || empty($m['player1_id']) || empty($m['player2_id'])) continue;
+                        $p1won = $m['score1'] > $m['score2'];
+                        $places[] = ['rank' => $rank,
+                                     'name' => $p1won ? $m['p2name'] : $m['p1name'],
+                                     'club' => ($p1won ? $m['p2club'] : $m['p1club']) ?? ''];
+                    }
+                }
             }
         } elseif ($c['mode'] === 'groups_cross') {
             require_once __DIR__ . '/../lib/placement_bracket.php';
