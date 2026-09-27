@@ -68,12 +68,12 @@ function delete(array $p): void {
 function media(array $p): void {
     $it = _gallery_item_or_404((int)$p['gid']);
     $public = _gallery_require_view((int)$it['tournament_id']);
-    gallery_stream(UPLOAD_DIR . 'gallery/' . (int)$it['tournament_id'] . '/' . $it['filename'], $it['mime'], $public);
+    gallery_stream(GALLERY_DIR . (int)$it['tournament_id'] . '/' . $it['filename'], $it['mime'], $public);
 }
 
 function thumb(array $p): void {
     $it = _gallery_item_or_404((int)$p['gid']);
     $public = _gallery_require_view((int)$it['tournament_id']);
     if (!$it['thumb']) { http_response_code(404); exit; }
-    gallery_stream(UPLOAD_DIR . 'gallery/' . (int)$it['tournament_id'] . '/' . $it['thumb'], 'image/jpeg', $public);
+    gallery_stream(GALLERY_DIR . (int)$it['tournament_id'] . '/' . $it['thumb'], 'image/jpeg', $public);
 }

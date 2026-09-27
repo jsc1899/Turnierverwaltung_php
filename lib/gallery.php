@@ -74,7 +74,7 @@ function gallery_json(array $data, int $code = 200): never {
 // Wurzelverzeichnis der Galerie; sperrt Direktzugriff (uploads/* ist nicht versioniert,
 // daher legt der Code die .htaccess selbst an).
 function gallery_root(): string {
-    $root = UPLOAD_DIR . 'gallery/';
+    $root = GALLERY_DIR;
     if (!is_dir($root)) mkdir($root, 0755, true);
     $ht = $root . '.htaccess';
     if (!is_file($ht)) file_put_contents($ht, "Require all denied\n");
@@ -115,6 +115,26 @@ function gallery_cleanup_tmp(int $max_age = 86400): void {
 
 // ── Bildverarbeitung (GD) ──────────────────────────────────────────────────────
 
+// php.ini-Größenangabe ("128M", "1G", "-1") in Bytes; -1 = unbegrenzt
+function gallery_memory_bytes(string $v): int {
+    $v = trim($v);
+    if ($v === '-1' || $v === '') return PHP_INT_MAX;
+    $n = (int)$v;
+    return match (strtoupper(substr($v, -1))) {
+        'G' => $n * 1024 ** 3,
+        'M' => $n * 1024 ** 2,
+        'K' => $n * 1024,
+        default => $n,
+    };
+}
+
+// memory_limit nur anheben, nie senken (ein höheres Host-Limit bleibt erhalten)
+function gallery_raise_memory_limit(int $bytes): void {
+    if (gallery_memory_bytes((string)ini_get('memory_limit')) < $bytes) {
+        @ini_set('memory_limit', (string)(int)ceil($bytes / 1048576) . 'M');
+    }
+}
+
 function gallery_apply_orientation(\GdImage $img, int $o): \GdImage {
     switch ($o) {
         case 2: imageflip($img, IMG_FLIP_HORIZONTAL); break;
@@ -146,6 +166,19 @@ function gallery_resize(\GdImage $src, int $max, bool $flatten): \GdImage {
 
 // Foto normalisieren (Orientierung, max. Größe, neu kodieren → Metadaten weg) und Vorschau erzeugen.
 function gallery_process_image(string $path, string $mime, string $thumb_path): void {
+    // Vor dem Dekodieren Pixelzahl prüfen: GD braucht ~5 Byte/Pixel (bei Drehung doppelt).
+    // Ein Speicher-Fatal-Error ließe sich nicht abfangen und hinterließe Temp-Dateien.
+    $info = @getimagesize($path);
+    if (!$info) throw new \RuntimeException('Bild konnte nicht gelesen werden.');
+    $pixels = (int)$info[0] * (int)$info[1];
+    if ($pixels > GALLERY_MAX_MEGAPIXELS * 1000000) {
+        throw new \RuntimeException('Bild zu groß (max. ' . GALLERY_MAX_MEGAPIXELS . ' Megapixel).');
+    }
+    $need = $pixels * 8 + 64 * 1024 * 1024;
+    gallery_raise_memory_limit($need);
+    if (gallery_memory_bytes((string)ini_get('memory_limit')) < $need) {
+        throw new \RuntimeException('Bild zu groß für die Verarbeitung am Server.');
+    }
     $src = match ($mime) {
         'image/jpeg' => @imagecreatefromjpeg($path),
         'image/png'  => @imagecreatefrompng($path),
@@ -209,7 +242,6 @@ function gallery_finalize_upload(int $tid, string $upload_id, int $total, string
         $filename = $base . '.' . $kind['ext'];
         $thumb = null;
         if ($kind['type'] === 'image') {
-            ini_set('memory_limit', '512M');   // große Handyfotos (24 MP ≈ 100 MB in GD)
             $thumb = $base . '_t.jpg';
             $files[] = $dir . $thumb;
             gallery_process_image($assembled, $kind['mime'], $dir . $thumb);
@@ -243,7 +275,7 @@ function gallery_items(int $tid): array {
 }
 
 function gallery_delete_item(array $item): void {
-    $dir = UPLOAD_DIR . 'gallery/' . (int)$item['tournament_id'] . '/';
+    $dir = GALLERY_DIR . (int)$item['tournament_id'] . '/';
     foreach ([$item['filename'], $item['thumb']] as $f) {
         if ($f && preg_match('/^[a-f0-9]{32}(_t)?\.[a-z0-9]+$/', $f)) @unlink($dir . $f);
     }
@@ -252,7 +284,7 @@ function gallery_delete_item(array $item): void {
 
 function gallery_delete_tournament_files(int $tid): void {
     if ($tid <= 0) return;
-    gallery_rrmdir(UPLOAD_DIR . 'gallery/' . $tid);
+    gallery_rrmdir(GALLERY_DIR . $tid);
 }
 // ── Auslieferung ───────────────────────────────────────────────────────────────
 

@@ -95,6 +95,26 @@ check('falscher Inhalt abgelehnt', ($r3['ok'] ?? true) === false);
 check('keine Datei angelegt', count(glob(gallery_dir($tid) . '*')) === $before);
 check('Temp nach Fehler entfernt', !is_dir(gallery_tmp_dir($tid, $uid3)));
 
+// 3b) Bild mit zu vielen Pixeln (Dekompressionsbombe) → saubere Fehlermeldung statt Fatal Error
+ini_set('memory_limit', '1G');   // nur zum Erzeugen des Testbildes
+$bomb = imagecreate(16000, 16000); imagecolorallocate($bomb, 255, 255, 255);
+ob_start(); imagepng($bomb, null, 9); $png = ob_get_clean(); imagedestroy($bomb);
+unset($bomb); ini_set('memory_limit', '128M');   // realistisches Host-Limit
+$uid4 = str_repeat('a', 32);
+$n4 = put_parts($tid, $uid4, $png);
+$r4 = gallery_finalize_upload($tid, $uid4, $n4, 'riesig.png', null);
+check('Riesenbild abgelehnt', ($r4['ok'] ?? true) === false && str_contains($r4['error'] ?? '', 'Megapixel'));
+
+echo "gallery_memory_bytes / Limit nur anheben
+";
+check('128M',  gallery_memory_bytes('128M') === 134217728);
+check('1G',    gallery_memory_bytes('1G') === 1073741824);
+check('-1',    gallery_memory_bytes('-1') === PHP_INT_MAX);
+$old = ini_get('memory_limit'); ini_set('memory_limit', '1G');
+gallery_raise_memory_limit(512 * 1024 * 1024);
+check('höheres Limit bleibt', ini_get('memory_limit') === '1G');
+ini_set('memory_limit', $old);
+
 // 4) Löschen eines Mediums
 gallery_delete_item($row);
 check('Datei gelöscht', !is_file(gallery_dir($tid) . $row['filename']));
@@ -110,7 +130,7 @@ check('.htaccess angelegt', str_contains((string)@file_get_contents(gallery_root
 
 // 7) Turnier-Verzeichnis löschen
 gallery_delete_tournament_files($tid);
-check('Turnierverzeichnis entfernt', !is_dir(UPLOAD_DIR . 'gallery/' . $tid));
+check('Turnierverzeichnis entfernt', !is_dir(GALLERY_DIR . $tid));
 db_execute("DELETE FROM tournament WHERE id=?", [$tid]);
 
 echo $fails ? "\n$fails FEHLER\n" : "\nAlle Tests ok\n";

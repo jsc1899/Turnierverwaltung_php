@@ -6,8 +6,14 @@ $uri = $_SERVER['REQUEST_URI'];
 $path = parse_url($uri, PHP_URL_PATH);
 $file = __DIR__ . $path;
 
-// Galerie-Dateien nie statisch ausliefern (Zugriffsprüfung in index.php)
-if (str_starts_with(strtolower($path), '/uploads/gallery')) {
+// Galerie-Dateien nie statisch ausliefern (Zugriffsprüfung in index.php). Geprüft wird der
+// aufgelöste Pfad, damit ./, // oder .. im URL-Pfad die Sperre nicht umgehen.
+$real = realpath($file);
+$gal  = realpath(__DIR__ . '/uploads/gallery');
+if (str_starts_with(strtolower($path), '/uploads/gallery')
+    || ($real !== false && $gal !== false
+        && (strcasecmp($real, $gal) === 0
+            || str_starts_with(strtolower($real), strtolower($gal . DIRECTORY_SEPARATOR))))) {
     require __DIR__ . '/index.php';
     return true;
 }

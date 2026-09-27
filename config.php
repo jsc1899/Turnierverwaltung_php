@@ -57,3 +57,7 @@ define('GALLERY_MAX_VIDEO_MB', (int)(getenv('GALLERY_MAX_VIDEO_MB') ?: 500));
 define('GALLERY_CHUNK_BYTES',  1024 * 1024);   // 1 MB je Upload-Teil (unter üblichem upload_max_filesize)
 define('GALLERY_MAX_EDGE',     2560);          // lange Kante gespeicherter Fotos (px)
 define('GALLERY_THUMB_EDGE',   400);           // lange Kante der Vorschaubilder (px)
+define('GALLERY_MAX_MEGAPIXELS', 50);          // größere Fotos werden abgelehnt (GD-Speicherbedarf)
+// Speicherort der Galerie-Dateien. Liegt er im Webroot (Default), muss der Webserver den
+// Direktzugriff sperren (Apache: .htaccess wird angelegt; nginx: eigene location-Regel nötig).
+define('GALLERY_DIR', rtrim(getenv('GALLERY_DIR') ?: UPLOAD_DIR . 'gallery', '/\\') . '/');

@@ -277,9 +277,13 @@ Fotos/Videos je Turnier (Tabelle `gallery_item`), Reiter **„Galerie“** auf d
   `POST /tournament/{id}/gallery/chunk`; `gallery_finalize_upload()` setzt zusammen, prüft `finfo`
   (Fotos JPG/PNG/WebP/GIF ≤ `GALLERY_MAX_IMAGE_MB`, Videos MP4/WebM/MOV ≤ `GALLERY_MAX_VIDEO_MB`),
   Fotos: EXIF-Orientierung, max. 2560 px, neu kodiert (Metadaten/GPS entfernt), Vorschau 400 px.
-- Dateien unter `uploads/gallery/{tid}/` — **kein Direktzugriff** (`.htaccess` wird von
-  `gallery_root()` angelegt; `index.php`/`router.php` liefern 404). Auslieferung über
-  `GET /gallery/{gid}/media|thumb` mit Range-Support (`gallery_stream()`).
+- Dateien unter `GALLERY_DIR` (Default `uploads/gallery/`, per ENV `GALLERY_DIR` z.B. außerhalb
+  des Webroots) in `{tid}/` — **kein Direktzugriff**: `.htaccess` wird von `gallery_root()` angelegt
+  (nur Apache!), `index.php`/`router.php` prüfen den per `realpath` aufgelösten Pfad (404). Unter
+  **nginx** zusätzlich `location ^~ /uploads/gallery/ { return 404; }` oder `GALLERY_DIR` außerhalb
+  des Webroots. Auslieferung über `GET /gallery/{gid}/media|thumb` mit Range-Support (`gallery_stream()`).
+- Fotos über `GALLERY_MAX_MEGAPIXELS` (50) werden vor dem Dekodieren abgelehnt; `memory_limit` wird
+  bei Bedarf nur angehoben (`gallery_raise_memory_limit()`), nie gesenkt.
 - Audit-Log: beim Chunk-Upload nur der letzte Teil (Target = Dateiname). Turnier-Löschung
   entfernt `uploads/gallery/{tid}/`.
 - Tests: `php tests/gallery_test.php` (Lib, braucht MariaDB), `bash tests/gallery_e2e.sh` (HTTP).

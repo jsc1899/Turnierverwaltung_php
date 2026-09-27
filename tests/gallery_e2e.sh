@@ -40,6 +40,11 @@ expect "Gast Upload verweigert"   "$(curl -s -o /dev/null -w '%{http_code}' -F c
 R=$(curl -s -b "$JAR" -F csrf_token="$CSRF" -F upload_id=$UID_ -F index=0 -F total=1 -F name=a.exe -F size=10 -F chunk=@"$W/part" $B/tournament/$TID/gallery/chunk)
 echo "$R" | grep -q 'Dateityp nicht erlaubt' && ok "Endung abgelehnt" || bad "Endung: $R"
 
+# Direktzugriff auf Galerie-Dateien ist in keiner Schreibweise möglich (auch mit ./ // ..)
+FN=$("$MYSQL" -u root turnierverwaltung -N -e "SELECT filename FROM gallery_item WHERE id=$GID")
+for P in "uploads/gallery/$TID/$FN" "uploads/./gallery/$TID/$FN" "uploads//gallery/$TID/$FN"          "uploads/x/../gallery/$TID/$FN" "static/../uploads/gallery/$TID/$FN" "uploads/./gallery/.htaccess"; do
+  expect "Direktzugriff /$P" "$(curl -s --path-as-is -o /dev/null -w '%{http_code}' "$B/$P")" 404
+done
 curl -s -o /dev/null -b "$JAR" --data-urlencode "csrf_token=$CSRF" --data-urlencode "caption=Finale 2026" $B/gallery/$GID/caption
 expect "Beschriftung gespeichert" "$("$MYSQL" -u root turnierverwaltung -N -e "SELECT caption FROM gallery_item WHERE id=$GID")" "Finale 2026"
 # Nur der letzte Teil des Video-Uploads wird protokolliert (Target beginnt mit dem Dateinamen)

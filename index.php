@@ -62,6 +62,12 @@ if (str_starts_with($uri, '/uploads/')) {
     if ($real === false || $base === false || !str_starts_with($real, $base . DIRECTORY_SEPARATOR)) {
         http_response_code(404); exit;
     }
+    // Aufgelösten Pfad prüfen (Umgehung per ./, // oder .. im URL-Pfad)
+    $gal = realpath(GALLERY_DIR);
+    if ($gal !== false && (strcasecmp($real, $gal) === 0
+            || str_starts_with(strtolower($real), strtolower($gal . DIRECTORY_SEPARATOR)))) {
+        http_response_code(404); exit;
+    }
     if (is_file($file)) {
         $ext  = strtolower(pathinfo($file, PATHINFO_EXTENSION));
         $safe_mimes = [
