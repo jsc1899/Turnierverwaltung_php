@@ -46,7 +46,15 @@ expect "Beschriftung gespeichert" "$("$MYSQL" -u root turnierverwaltung -N -e "S
 N=$("$MYSQL" -u root turnierverwaltung -N -e "SELECT COUNT(*) FROM audit_log WHERE action='gallery.upload_chunk' AND path LIKE '%/tournament/$TID/%' AND target LIKE 'clip.mp4%'")
 expect "Audit: 1 Eintrag je Upload" "$N" 1
 
+# Reiter „Galerie“: Gast sieht ihn bei vorhandenen Medien (ohne Upload), Admin mit Upload
+PG=$(curl -s $B/tournament/$TID); PA=$(curl -s -b "$JAR" $B/tournament/$TID)
+echo "$PG" | grep -q 'id="tab-gallery-btn"' && ok "Gast: Reiter sichtbar" || bad "Gast: Reiter sichtbar"
+echo "$PG" | grep -q 'id="gallery-upload"' && bad "Gast: kein Upload" || ok "Gast: kein Upload"
+echo "$PG" | grep -q "gallery/$GID/media" && ok "Gast: Medium verlinkt" || bad "Gast: Medium verlinkt"
+echo "$PA" | grep -q 'id="gallery-upload"' && ok "Admin: Upload-Bereich" || bad "Admin: Upload-Bereich"
 curl -s -o /dev/null -b "$JAR" --data-urlencode "csrf_token=$CSRF" $B/gallery/$GID/delete
+PG=$(curl -s $B/tournament/$TID)
+echo "$PG" | grep -q 'id="tab-gallery-btn"' && bad "Gast: ohne Medien kein Reiter" || ok "Gast: ohne Medien kein Reiter"
 expect "gelöscht → 404"           "$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" $B/gallery/$GID/media)" 404
 
 "$MYSQL" -u root turnierverwaltung -e "DELETE FROM tournament WHERE id=$TID"

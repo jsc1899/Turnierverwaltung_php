@@ -80,6 +80,17 @@ $nennung_badge = $pending_count + $change_count;
       <?php endif; ?>
     </button>
   </li>
+  <?php if ($gallery || $can_edit): ?>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tab-gallery-btn"
+            data-bs-toggle="tab" data-bs-target="#tab-gallery" type="button" role="tab">
+      <i class="bi bi-images me-1"></i>Galerie
+      <?php if ($gallery): ?>
+      <span class="badge bg-secondary ms-1"><?= count($gallery) ?></span>
+      <?php endif; ?>
+    </button>
+  </li>
+  <?php endif; ?>
   <?php if ($can_edit): ?>
   <li class="nav-item" role="presentation">
     <button class="nav-link" id="tab-registrations-btn"
@@ -474,6 +485,8 @@ $nennung_badge = $pending_count + $change_count;
     </script>
   </div><!-- /tab-monitor -->
   <?php endif; ?>
+
+  <?php if ($gallery || $can_edit) require __DIR__ . '/_gallery.php'; ?>
 
 </div><!-- /tab-content -->
 
