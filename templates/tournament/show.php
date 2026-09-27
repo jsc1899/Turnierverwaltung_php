@@ -132,6 +132,7 @@ $nennung_badge = $pending_count + $change_count;
       <i class="bi bi-gear me-1"></i>Einstellungen
     </button>
   </li>
+  <?php if (empty($t['is_done'])): // bei beendetem Turnier kein Monitor ?>
   <li class="nav-item" role="presentation">
     <button class="nav-link" id="tab-monitor-btn"
             data-bs-toggle="tab" data-bs-target="#tab-monitor" type="button" role="tab">
@@ -139,7 +140,8 @@ $nennung_badge = $pending_count + $change_count;
     </button>
   </li>
   <?php endif; ?>
-  <?php if (!$can_edit): ?>
+  <?php endif; ?>
+  <?php if (!$can_edit && empty($t['is_done'])): ?>
   <li class="nav-item" role="presentation">
     <a class="nav-link" href="<?= url('tournament/' . $t['id'] . '/monitor') ?>" target="_blank">
       <i class="bi bi-display me-1"></i>Monitor
@@ -421,7 +423,7 @@ $nennung_badge = $pending_count + $change_count;
   </div><!-- /tab-settings -->
   <?php endif; ?>
 
-  <?php if ($can_edit): ?>
+  <?php if ($can_edit && empty($t['is_done'])): ?>
   <!-- ── Tab: Monitor ───────────────────────────────────────────────────────── -->
   <div class="tab-pane fade p-3" id="tab-monitor" role="tabpanel">
     <?php $mon_sel = array_filter(array_map('intval', explode(',', (string)($t['monitor_competitions'] ?? '')))); ?>

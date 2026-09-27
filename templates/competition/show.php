@@ -2,6 +2,7 @@
 $phase_labels = ['setup'=>'Einrichtung','group'=>'Gruppenphase','ko'=>'KO-Phase','done'=>'Beendet'];
 $phase_colors = ['setup'=>'bg-secondary','group'=>'bg-warning text-dark','ko'=>'bg-info text-dark','done'=>'bg-success'];
 $locked = ($t && (int)($t['is_done'] ?? 0) === 1) || $c['phase'] === 'done';
+$show_monitor = !($t && (int)($t['is_done'] ?? 0) === 1);   // bei beendetem Turnier kein Monitor
 $court_sg = court_label($t['sport'] ?? '');          // Spielplatz-Bezeichnung je Sportart (Singular)
 $court_pl = court_label($t['sport'] ?? '', true);    // Plural (Einstellungen)
 $sport_icons  = ['tischtennis'=>'🏓','tennis'=>'🎾','fussball'=>'⚽','cornhole'=>'🫘'];
@@ -53,10 +54,12 @@ ob_start(); ?>
   <?php endif; ?>
 
   <div class="ms-auto d-flex gap-2 flex-wrap">
+    <?php if ($show_monitor): ?>
     <a href="<?= url('competition/'.$c['id'].'/monitor') ?>" target="_blank"
        class="btn btn-outline-secondary btn-sm" title="Monitoransicht (Vollbild für Anzeige/Beamer)">
       <i class="bi bi-display"></i>
     </a>
+    <?php endif; ?>
     <?php if ($can_edit): ?>
     <?php if (!$locked && in_array($c['phase'], ['group','ko'], true)): ?>
     <form method="post" action="<?= url('competition/'.$c['id'].'/settings') ?>?action=done">
@@ -189,7 +192,7 @@ ob_start(); ?>
     </button>
   </li>
   <?php endif; ?>
-  <?php if ($can_edit): ?>
+  <?php if ($can_edit && $show_monitor): ?>
   <li class="nav-item" role="presentation">
     <button class="nav-link" id="tab-monitor-btn"
             data-bs-toggle="tab" data-bs-target="#tab-monitor" type="button" role="tab">
@@ -201,7 +204,7 @@ ob_start(); ?>
 <?php endif; ?>
 <div class="tab-content<?= ($can_edit || $can_view_players) ? ' border border-top-0 rounded-bottom' : '' ?> mb-4">
 
-  <?php if ($can_edit): ?>
+  <?php if ($can_edit && $show_monitor): ?>
   <!-- Tab: Monitor -->
   <div class="tab-pane fade p-3" id="tab-monitor" role="tabpanel">
     <form method="post" action="<?= url('competition/'.$c['id'].'/monitor-settings') ?>" class="row g-3 align-items-end">
