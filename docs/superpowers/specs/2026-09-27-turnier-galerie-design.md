@@ -41,16 +41,20 @@ Neue Tabelle in `init_db()` (`CREATE TABLE IF NOT EXISTS`):
 
 ## Speicherung
 
-- Dateien unter `UPLOAD_DIR . 'gallery/{tid}/'`, Chunks temporär unter
-  `UPLOAD_DIR . 'gallery/_tmp/{upload_id}/'`.
-- `uploads/gallery/.htaccess` mit `Require all denied` → kein Direktzugriff (Apache/Live). Die Datei
-  wird vom Code angelegt (`gallery_ensure_root()`), da `uploads/*` nicht versioniert ist.
-  Lokal (`router.php`) und im `/uploads/`-Zweig von `index.php` wird `uploads/gallery/` mit 404
-  abgewiesen.
+- Speicherort `GALLERY_DIR` (Default `UPLOAD_DIR . 'gallery/'`, per ENV/`.env` überschreibbar, auch
+  relativ zum App-Ordner, z.B. `../turnier_gallery` außerhalb des Webroots — so auf dem Live-Server
+  mit nginx). Dateien unter `{GALLERY_DIR}/{tid}/`, Chunks temporär unter
+  `{GALLERY_DIR}/_tmp/{tid}_{upload_id}/`.
+- `{GALLERY_DIR}/.htaccess` mit `Require all denied` → kein Direktzugriff (nur Apache). Die Datei
+  wird vom Code angelegt (`gallery_root()`), da `uploads/*` nicht versioniert ist.
+  `router.php` und der `/uploads/`-Zweig von `index.php` weisen Pfade, die per `realpath` im
+  Galerie-Verzeichnis landen, mit 404 ab (auch `./`, `//`, `..` im URL-Pfad).
 - Löschen eines Mediums entfernt Datei + Vorschaubild. Löschen eines Turniers
-  (`tournament.php delete()`) entfernt das Verzeichnis `gallery/{tid}/` rekursiv (die DB-Zeilen
-  fallen per CASCADE).
+  (`tournament.php delete()`) entfernt `{tid}/` rekursiv sowie unvollständige Uploads
+  `_tmp/{tid}_*` (die DB-Zeilen fallen per CASCADE).
 - Verwaiste Chunk-Verzeichnisse älter als 24 h werden beim nächsten Upload-Start aufgeräumt.
+- Speicherlimit je Turnier `GALLERY_MAX_TOURNAMENT_MB` (Default 5000), geprüft bei Teil 0 und beim
+  Abschluss (`gallery_quota_error()`).
 
 ## Neues Modul `routes/gallery.php` + `lib/gallery.php`
 
@@ -82,14 +86,21 @@ Routen (in `index.php`):
   (nur falls größer) und **immer neu kodieren** (entfernt EXIF-/GPS-Metadaten — Datenschutz bei
   öffentlicher Galerie), Vorschaubild 400 px (JPEG). GIF bleibt unverändert (Animation), bekommt
   aber ein statisches Vorschaubild.
+- Fotos über `GALLERY_MAX_MEGAPIXELS` (50) werden vor dem Dekodieren abgelehnt; `memory_limit` wird
+  bei Bedarf nur angehoben, nie gesenkt.
+- Abschluss per `flock` auf `…/.lock` gesperrt (wiederholter letzter Teil → `{ok:true, done:false,
+  busy:true}`, kein Doppelabschluss); Teile werden nach dem Zusammensetzen sofort gelöscht.
 - Antwort JSON: `{ok:true, done:false}` bzw. `{ok:true, done:true, id:…}` oder
-  `{ok:false, error:"…"}` (deutsche Meldung). Fehler → Temp-Verzeichnis löschen.
+  `{ok:false, error:"…"}` (deutsche Meldung). Fehler → Temp-Verzeichnis löschen. Der Client meldet
+  „fertig“ nur bei `done:true` auf den letzten Teil.
 
 ### Auslieferung (`media`/`thumb`)
 
 - Zugriffsprüfung: Turnier `is_public = 1` oder `can_edit_tournament($tid)`, sonst 404.
 - Header: `Content-Type` = gespeicherter MIME, `X-Content-Type-Options: nosniff`,
-  `Cache-Control: public, max-age=…` (öffentlich) bzw. `private`, `Accept-Ranges: bytes`.
+  `Cache-Control: no-cache` (öffentlich) bzw. `no-cache, private` mit `ETag`/`Last-Modified` und
+  `304` bei `If-None-Match` — Löschen/Verbergen wirkt sofort; ohne `Pragma`/`Expires`/`Set-Cookie`;
+  `Accept-Ranges: bytes`. `HEAD` liefert nur die Header.
 - Range-Requests (`bytes=a-b`, `bytes=a-`, `bytes=-n`) mit `206 Partial Content` für Video-Seeking;
   Streaming in Blöcken mit `fread` (kein vollständiges Einlesen in den Speicher).
 - Session vor dem Streaming schließen (`session_write_close()`), damit parallele Requests nicht
