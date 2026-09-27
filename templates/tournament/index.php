@@ -19,8 +19,8 @@ ob_start(); ?>
                   aria-pressed="true">Offen</button>
           <button type="button" class="btn btn-outline-secondary active" data-filter="closed"
                   aria-pressed="true">Geschlossen</button>
-          <button type="button" class="btn btn-outline-secondary" data-filter="done"
-                  aria-pressed="false">Beendet</button>
+          <button type="button" class="btn btn-outline-secondary active" data-filter="done"
+                  aria-pressed="true">Beendet</button>
         </div>
         <div class="btn-group btn-group-sm" id="sport-filter" role="group" aria-label="Sportart filtern">
           <button type="button" class="btn btn-outline-secondary active" data-sport="tischtennis" title="Tischtennis"
