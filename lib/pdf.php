@@ -20,9 +20,32 @@ function csv_row(array $cells): array {
     return array_map('csv_safe', $cells);
 }
 
+// App-eigener Temp-Ordner (0700) für mPDF und QR-Codes — nicht das allgemeine, von allen
+// Benutzern beschreibbare /tmp (dort ließen sich Dateien mit vorhersagbarem Namen unterschieben).
+function pdf_private_tmp_dir(): string {
+    $dir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'turnier_' . substr(hash('sha256', __DIR__), 0, 12);
+    if (!is_dir($dir)) @mkdir($dir, 0700, true);
+    return $dir;
+}
+
+// QR-Code-SVG unter zufälligem Namen ablegen; wird am Ende des Requests gelöscht
+function pdf_qr_tempfile(string $svg): string {
+    $f = pdf_private_tmp_dir() . DIRECTORY_SEPARATOR . 'qr_' . bin2hex(random_bytes(12)) . '.svg';
+    file_put_contents($f, $svg);
+    $GLOBALS['__pdf_tmp_files'][] = $f;
+    static $registered = false;
+    if (!$registered) { register_shutdown_function('pdf_tmp_cleanup'); $registered = true; }
+    return $f;
+}
+
+function pdf_tmp_cleanup(): void {
+    foreach ($GLOBALS['__pdf_tmp_files'] ?? [] as $f) @unlink($f);
+    $GLOBALS['__pdf_tmp_files'] = [];
+}
+
 function mpdf(array $opts = []): \Mpdf\Mpdf {
-    $tempDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'mpdf_tmp';
-    if (!is_dir($tempDir)) mkdir($tempDir, 0777, true);
+    $tempDir = pdf_private_tmp_dir() . DIRECTORY_SEPARATOR . 'mpdf';
+    if (!is_dir($tempDir)) @mkdir($tempDir, 0700, true);
     return new \Mpdf\Mpdf(array_merge([
         'mode'       => 'utf-8',
         'format'     => 'A4',
@@ -74,8 +97,7 @@ function generate_aushang_pdf(int $tid): void {
             'eccLevel'     => \chillerlan\QRCode\Common\EccLevel::M,
         ]);
         $svg    = (new \chillerlan\QRCode\QRCode($qr_opts))->render($tour_url);
-        $qr_tmp = sys_get_temp_dir() . '/qr_aushang_' . $tid . '.svg';
-        file_put_contents($qr_tmp, $svg);
+        $qr_tmp = pdf_qr_tempfile($svg);
         $qr_html = '<img src="' . $qr_tmp . '" style="width:55mm;height:55mm;">';
     } catch (\Throwable) {
         $qr_html = '';
@@ -211,8 +233,7 @@ function generate_competition_aushang_pdf(int $cid): void {
             'eccLevel'   => \chillerlan\QRCode\Common\EccLevel::M,
         ]);
         $svg    = (new \chillerlan\QRCode\QRCode($qr_opts))->render($comp_url);
-        $qr_tmp = sys_get_temp_dir() . '/qr_comp_aushang_' . $cid . '.svg';
-        file_put_contents($qr_tmp, $svg);
+        $qr_tmp = pdf_qr_tempfile($svg);
         $qr_src = $qr_tmp;
     } catch (\Throwable) {
         $qr_src = '';
