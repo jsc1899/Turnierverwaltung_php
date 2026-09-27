@@ -214,17 +214,68 @@ function recompute_double_ko(int $cid): void {
     }
 
     // Re-propagate LB rounds 1..lb_total
+    $wb1_counts = [];
+    foreach (db_fetchall("SELECT * FROM `match` WHERE competition_id=? AND bracket='W' AND ko_round=1 ORDER BY ko_position", [$cid]) as $m) {
+        $wb1_counts[(int)$m['ko_position']] = ($m[$p1col] ? 1 : 0) + ($m[$p2col] ? 1 : 0);
+    }
+    $live = _dko_lb_live($cap, $wb1_counts);
     for ($r = 1; $r <= $lb_total; $r++) {
         $matches = db_fetchall(
-            "SELECT * FROM `match` WHERE competition_id=? AND bracket='L' AND ko_round=? AND played=1 ORDER BY ko_position",
+            "SELECT * FROM `match` WHERE competition_id=? AND bracket='L' AND ko_round=? ORDER BY ko_position",
             [$cid, $r]
         );
         foreach ($matches as $m) {
-            if (!$m[$p1col] || !$m[$p2col]) continue;
+            $pos = (int)$m['ko_position'];
+            // Freilos im Verliererbaum: nur ein Platz kann je besetzt werden (Folge von Freilosen im
+            // Gewinnerbaum) → vorhandenen Teilnehmer direkt weiterrücken, sonst bliebe alles hängen.
+            if (($live[$r][$pos] ?? 0) === 1 && ($m[$p1col] xor $m[$p2col])) {
+                $solo = (int)($m[$p1col] ?: $m[$p2col]);
+                db_execute("UPDATE `match` SET played=1, score1=?, score2=? WHERE id=?",
+                           [$m[$p1col] ? 1 : 0, $m[$p1col] ? 0 : 1, $m['id']]);
+                dko_advance($cid, $cap, 'L', $r, $pos, $solo, null, true, $is_doubles, $is_team);
+                continue;
+            }
+            if (!$m['played'] || !$m[$p1col] || !$m[$p2col]) continue;
             $winner = (int)($m['score1'] > $m['score2'] ? $m[$p1col] : $m[$p2col]);
-            dko_advance($cid, $cap, 'L', $r, (int)$m['ko_position'], $winner, null, false, $is_doubles, $is_team);
+            dko_advance($cid, $cap, 'L', $r, $pos, $winner, null, false, $is_doubles, $is_team);
         }
     }
+}
+
+// Wie viele Plätze jedes LB-Spiels überhaupt je besetzt werden können (0/1/2) — ergibt sich allein
+// aus der Auslosung: Ein Spiel liefert einen Verlierer nur mit 2 Teilnehmern, einen Sieger ab 1.
+// Quellen der LB-Plätze spiegeln dko_advance():
+//   LB R1  Pos q: Platz 1 ← Verlierer WB R1 Pos q, Platz 2 ← Verlierer WB R1 Pos (n_wb1-1-q)
+//   LB R2k Pos q: Platz 1 ← Sieger LB R(2k-1) Pos q, Platz 2 ← Verlierer WB R(k+1) Pos (cnt-1-q)
+//   LB R2k+1 Pos q: Plätze ← Sieger LB R2k Pos 2q / 2q+1
+function _dko_lb_live(int $cap, array $wb1_counts): array {
+    $k = (int)log($cap, 2);
+    $lb_total = 2 * ($k - 1);
+    // WB: Teilnehmerzahl je Spiel
+    $wb = [1 => []];
+    for ($p = 0; $p < ($cap >> 1); $p++) $wb[1][$p] = $wb1_counts[$p] ?? 0;
+    for ($r = 2; $r <= $k; $r++) {
+        for ($p = 0; $p < ($cap >> $r); $p++) {
+            $wb[$r][$p] = (($wb[$r - 1][2 * $p] ?? 0) >= 1 ? 1 : 0) + (($wb[$r - 1][2 * $p + 1] ?? 0) >= 1 ? 1 : 0);
+        }
+    }
+    $wb_loser = fn(int $r, int $p): int => (($wb[$r][$p] ?? 0) === 2) ? 1 : 0;
+    $lb = [];
+    $n_wb1 = $cap >> 1;
+    for ($r = 1; $r <= $lb_total; $r++) {
+        for ($q = 0; $q < dko_lb_round_count($cap, $r); $q++) {
+            if ($r === 1) {
+                $lb[$r][$q] = $wb_loser(1, $q) + $wb_loser(1, $n_wb1 - 1 - $q);
+            } elseif ($r % 2 === 0) {
+                $wr  = intdiv($r, 2) + 1;
+                $cnt = $cap >> $wr;
+                $lb[$r][$q] = (($lb[$r - 1][$q] ?? 0) >= 1 ? 1 : 0) + $wb_loser($wr, $cnt - 1 - $q);
+            } else {
+                $lb[$r][$q] = (($lb[$r - 1][2 * $q] ?? 0) >= 1 ? 1 : 0) + (($lb[$r - 1][2 * $q + 1] ?? 0) >= 1 ? 1 : 0);
+            }
+        }
+    }
+    return $lb;
 }
 
 function _maybe_set_done_dko(int $cid): void {
