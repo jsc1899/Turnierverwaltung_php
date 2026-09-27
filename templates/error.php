@@ -1,3 +1,4 @@
+<?php if (!defined('APP_BOOT') && PHP_SAPI !== 'cli') { http_response_code(404); exit; } // nur über index.php ?>
 <?php
 $page_title = 'Fehler ' . ($code ?? 404);
 $content = '<div class="text-center py-5">

@@ -1,3 +1,4 @@
+<?php if (!defined('APP_BOOT') && PHP_SAPI !== 'cli') { http_response_code(404); exit; } // nur über index.php ?>
 <?php
 ob_start(); ?>
 <h2 class="mb-1"><i class="bi bi-file-text me-2"></i>Impressum</h2>

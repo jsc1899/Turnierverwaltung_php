@@ -1,3 +1,4 @@
+<?php if (!defined('APP_BOOT') && PHP_SAPI !== 'cli') { http_response_code(404); exit; } // nur über index.php ?>
 <?php
 $sport_icons = ['tischtennis'=>'🏓','tennis'=>'🎾','fussball'=>'⚽','cornhole'=>null];
 // Fußball und Cornhole werden im Register nicht verwaltet — nur TT und Tennis anzeigen

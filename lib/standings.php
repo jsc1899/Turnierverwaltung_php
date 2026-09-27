@@ -1,3 +1,4 @@
+<?php if (!defined('APP_BOOT') && PHP_SAPI !== 'cli') { http_response_code(404); exit; } // nur über index.php ?>
 <?php
 
 // Gibt IDs aller Teilnehmer zurück, die am offenen Gleichstand an der Aufstiegsgrenze beteiligt sind.

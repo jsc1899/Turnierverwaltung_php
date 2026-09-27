@@ -1,3 +1,4 @@
+<?php if (!defined('APP_BOOT') && PHP_SAPI !== 'cli') { http_response_code(404); exit; } // nur über index.php ?>
 <div class="d-flex gap-1 align-items-center sport-picker">
   <?php $cur = $sport_current ?? ''; ?>
   <input type="hidden" name="sport" class="sport-val" value="<?= e($cur) ?>">

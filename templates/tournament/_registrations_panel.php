@@ -1,3 +1,4 @@
+<?php if (!defined('APP_BOOT') && PHP_SAPI !== 'cli') { http_response_code(404); exit; } // nur über index.php ?>
 <div class="d-flex align-items-center gap-2 mb-3 mt-2">
   <h5 class="mb-0">
     Nennungen

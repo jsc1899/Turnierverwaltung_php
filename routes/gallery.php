@@ -1,3 +1,4 @@
+<?php if (!defined('APP_BOOT') && PHP_SAPI !== 'cli') { http_response_code(404); exit; } // nur über index.php ?>
 <?php
 // Turnier-Galerie: Upload (Chunks), Beschriftung, Löschen, Auslieferung.
 require_once __DIR__ . '/../lib/gallery.php';

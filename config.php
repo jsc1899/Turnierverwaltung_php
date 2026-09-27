@@ -1,3 +1,4 @@
+<?php if (!defined('APP_BOOT') && PHP_SAPI !== 'cli') { http_response_code(404); exit; } // nur über index.php ?>
 <?php
 // .env-Dateien in dieser Reihenfolge: zuerst eine Ebene ÜBER dem App-Ordner (außerhalb des
 // Webroots, nicht per URL abrufbar — empfohlen), dann im App-Ordner. Ein Wert wird nur gesetzt,
@@ -28,19 +29,49 @@ function _env_path(string $value, string $app_dir): string {
     return $app_dir . '/' . $value;
 }
 
-foreach (_env_files(__DIR__) as $_env_file) _env_load_file($_env_file);
-unset($_env_file);
+// Die innere .env (im App-Ordner) wäre unter nginx öffentlich abrufbar → nur lokal verwenden
+// (CLI bzw. localhost). Auf dem Server gehört sie eine Ebene höher.
+function _env_inner_allowed(string $sapi, string $host): bool {
+    if ($sapi === 'cli') return true;
+    $h = strtolower(preg_replace('/:\d+$/', '', trim($host)));
+    return in_array($h, ['localhost', '127.0.0.1', '[::1]'], true);
+}
+
+// Unsicherer SECRET_KEY? Liefert eine Beschreibung des Problems oder null.
+function _secret_key_problem(string $key): ?string {
+    if (in_array($key, ['change-me-in-production', 'hier-einen-langen-zufaelligen-string-eintragen', ''], true)) {
+        return 'SECRET_KEY ist ein Platzhalter';
+    }
+    if (strlen($key) < 32) return 'SECRET_KEY ist kürzer als 32 Zeichen';
+    return null;
+}
+
+// Fehler nie ausgeben (Pfade/Interna); index.php schaltet sie lokal wieder ein
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+
+$_inner_ok = _env_inner_allowed(PHP_SAPI, (string)($_SERVER['HTTP_HOST'] ?? ''));
+foreach (_env_files(__DIR__) as $_env_file) {
+    if ($_env_file === __DIR__ . '/.env' && !$_inner_ok) {
+        error_log('WARNUNG: .env im App-Ordner wird ignoriert (öffentlich abrufbar) – bitte eine Ebene höher verschieben.');
+        continue;
+    }
+    _env_load_file($_env_file);
+}
+unset($_env_file, $_inner_ok);
 
 // Konfiguration — auf dem Server anpassen
 $_sk = getenv('SECRET_KEY') ?: 'change-me-in-production';
-if ($_sk === 'change-me-in-production') {
+if (($_sk_problem = _secret_key_problem($_sk)) !== null) {
     $_app_url = getenv('APP_URL') ?: '';
-    if ($_app_url && strpos($_app_url, 'localhost') === false && php_sapi_name() !== 'cli') {
+    $_is_placeholder = str_contains($_sk_problem, 'Platzhalter');
+    if ($_is_placeholder && $_app_url && strpos($_app_url, 'localhost') === false && php_sapi_name() !== 'cli') {
         die('Konfigurationsfehler: SECRET_KEY muss als Umgebungsvariable gesetzt werden.');
     }
-    error_log('WARNING: SECRET_KEY is set to the insecure default value.');
-    unset($_app_url);
+    error_log('WARNUNG: ' . $_sk_problem . ' (unsicher).');
+    unset($_app_url, $_is_placeholder);
 }
+unset($_sk_problem);
 define('SECRET_KEY', $_sk);
 unset($_sk);
 define('ADMIN_EMAIL',   getenv('ADMIN_EMAIL')   ?: 'juergen.schlager@gmx.net');

@@ -1,3 +1,4 @@
+<?php if (!defined('APP_BOOT') && PHP_SAPI !== 'cli') { http_response_code(404); exit; } // nur über index.php ?>
 <?php
 // Reiter „Galerie“ der Turnierseite (eingebunden aus tournament/show.php).
 // Erwartet: $t, $gallery, $can_edit.

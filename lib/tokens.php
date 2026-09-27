@@ -1,3 +1,4 @@
+<?php if (!defined('APP_BOOT') && PHP_SAPI !== 'cli') { http_response_code(404); exit; } // nur über index.php ?>
 <?php
 // HMAC-basierte Tokens — Ersatz für Python's itsdangerous.URLSafeTimedSerializer
 // Format: base64url(payload_json) . "." . base64url(timestamp) . "." . base64url(signature)

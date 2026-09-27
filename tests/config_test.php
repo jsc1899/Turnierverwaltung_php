@@ -35,5 +35,18 @@ check('absolut Unix',   _env_path('/data/gal', '/srv/app') === '/data/gal');
 check('absolut Win',    _env_path('C:\data\gal', 'C:\app') === 'C:\data\gal');
 check('GALLERY_DIR endet mit /', str_ends_with(GALLERY_DIR, '/'));
 
-echo $fails ? "\n$fails FEHLER\n" : "\nAlle Tests ok\n";
+echo "_env_inner_allowed: innere .env nur lokal\n";
+check('CLI erlaubt',              _env_inner_allowed('cli', '') === true);
+check('localhost erlaubt',        _env_inner_allowed('cli-server', 'localhost:8080') === true);
+check('127.0.0.1 erlaubt',        _env_inner_allowed('fpm-fcgi', '127.0.0.1') === true);
+check('Live-Host nicht erlaubt',  _env_inner_allowed('fpm-fcgi', 'turniere.union-saxen.at') === false);
+check('Subdomain-Trick nicht',    _env_inner_allowed('fpm-fcgi', 'localhost.evil.at') === false);
+
+echo "_secret_key_problem\n";
+check('Default erkannt',          _secret_key_problem('change-me-in-production') !== null);
+check('.env.example erkannt',     _secret_key_problem('hier-einen-langen-zufaelligen-string-eintragen') !== null);
+check('zu kurz erkannt',          _secret_key_problem('kurz') !== null);
+check('64 Hex ok',                _secret_key_problem(str_repeat('ab', 32)) === null);
+
+echo $fails ?"\n$fails FEHLER\n" : "\nAlle Tests ok\n";
 exit($fails ? 1 : 0);

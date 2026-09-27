@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+define('APP_BOOT', true);   // interne Dateien (lib/, routes/, templates/ …) nur über index.php ausführbar
 require_once __DIR__ . '/config.php';
 
 $_dev = str_contains(APP_URL, 'localhost');
@@ -23,9 +24,10 @@ session_set_cookie_params([
 session_start();
 
 // Security-Header
+header_remove('X-Powered-By');   // PHP-Version nicht preisgeben
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
-header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; img-src 'self' data: blob:");
+header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/ https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/ https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/ https://fonts.googleapis.com; font-src 'self' https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/ https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'");
 header('Referrer-Policy: strict-origin-when-cross-origin');
 header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
 if (str_starts_with(APP_URL, 'https://')) {
