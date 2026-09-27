@@ -84,6 +84,14 @@ function fmtdate(string $val): string {
 
 // ── Request-Helpers ────────────────────────────────────────────────────────────
 
+// SQL-Bedingung für E-Mail-Identität: Groß/Klein egal, Akzente/Umlaute GENAU. Die Spalten-
+// Kollation (utf8mb4_uca1400_ai_ci) ist akzent-unabhängig ('max@x.at' = 'mäx@x.at') — über eine
+// solche Variante ließen sich sonst Reset-/Magic-Links für fremde Konten an eigene Adressen holen.
+// Verwendung: "... WHERE " . email_match_sql('u.email'), Parameter = die E-Mail-Adresse.
+function email_match_sql(string $col): string {
+    return "LOWER($col) COLLATE utf8mb4_bin = LOWER(CAST(? AS CHAR CHARACTER SET utf8mb4)) COLLATE utf8mb4_bin";
+}
+
 function post(string $key, mixed $default = ''): mixed {
     return $_POST[$key] ?? $default;
 }

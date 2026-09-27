@@ -13,7 +13,7 @@ function login(array $p): void {
         }
         $email    = trim(post('email'));
         $password = post('password');
-        $user     = db_fetch("SELECT * FROM user WHERE email = ?", [$email]);
+        $user     = db_fetch("SELECT * FROM user WHERE " . email_match_sql('email'), [$email]);
         if ($user && $user['confirmed'] && password_verify($password, $user['password_hash'])) {
             login_user_session($user);
             flash('success', 'Willkommen, ' . e($user['username']) . '!');
@@ -54,7 +54,7 @@ function register(array $p): void {
             flash('danger', 'Passwort muss mindestens 8 Zeichen haben.');
         } elseif ($pw !== $pw2) {
             flash('danger', 'Passwörter stimmen nicht überein.');
-        } elseif (db_fetch("SELECT id FROM user WHERE email = ?", [$email])
+        } elseif (db_fetch("SELECT id FROM user WHERE " . email_match_sql('email'), [$email])
                || db_fetch("SELECT id FROM user WHERE username = ?", [$username])) {
             flash('danger', 'Registrierung konnte nicht abgeschlossen werden. Bitte Angaben prüfen.');
         } else {
@@ -88,7 +88,7 @@ function confirm(array $p): void {
         redirect('login');
         return;
     }
-    $rows = db_execute("UPDATE user SET confirmed = 1 WHERE email = ? AND confirmed = 0", [$email]);
+    $rows = db_execute("UPDATE user SET confirmed = 1 WHERE " . email_match_sql('email') . " AND confirmed = 0", [$email]);
     if ($rows > 0) {
         flash('success', 'E-Mail-Adresse bestätigt. Du kannst dich jetzt anmelden.');
     } else {
@@ -106,10 +106,11 @@ function forgot_password(array $p): void {
             return;
         }
         $email = trim(post('email'));
-        $user  = db_fetch("SELECT * FROM user WHERE email = ? AND confirmed = 1", [$email]);
+        $user  = db_fetch("SELECT * FROM user WHERE " . email_match_sql('email') . " AND confirmed = 1", [$email]);
         if ($user) {
-            $token = make_reset_token($email, $user['password_hash']);
-            send_reset_mail($email, $token);
+            // Link immer an die hinterlegte Adresse, nie an die eingegebene
+            $token = make_reset_token($user['email'], $user['password_hash']);
+            send_reset_mail($user['email'], $token);
         }
         // Immer gleiche Antwort (kein User-Enumeration)
         flash('info', 'Falls die E-Mail-Adresse bekannt ist, wurde ein Link gesendet.');
@@ -127,7 +128,7 @@ function reset_password(array $p): void {
         redirect('login');
         return;
     }
-    $user = db_fetch("SELECT * FROM user WHERE email = ?", [$email]);
+    $user = db_fetch("SELECT * FROM user WHERE " . email_match_sql('email'), [$email]);
     if (!$user || $user['password_hash'] !== $old_hash) {
         flash('danger', 'Dieser Link wurde bereits verwendet.');
         redirect('login');
@@ -144,7 +145,7 @@ function reset_password(array $p): void {
             flash('danger', 'Passwörter stimmen nicht überein.');
         } else {
             $hash = password_hash($pw, PASSWORD_ARGON2ID);
-            db_execute("UPDATE user SET password_hash = ? WHERE email = ?", [$hash, $email]);
+            db_execute("UPDATE user SET password_hash = ? WHERE id = ?", [$hash, $user['id']]);
             flash('success', 'Passwort erfolgreich geändert. Du kannst dich jetzt anmelden.');
             redirect('login');
             return;

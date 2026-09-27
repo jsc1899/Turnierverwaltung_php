@@ -447,6 +447,6 @@ function init_db(): void {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"); } catch (\PDOException $e) {}
 
     // Admin-Rolle sicherstellen
-    db_execute("UPDATE user SET role = 'admin' WHERE email = ?", [ADMIN_EMAIL]);
+    db_execute("UPDATE user SET role = 'admin' WHERE " . email_match_sql('email'), [ADMIN_EMAIL]);
 
 }

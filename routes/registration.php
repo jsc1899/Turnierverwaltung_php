@@ -254,7 +254,7 @@ function request_link(array $p): void {
             $exists = db_fetch(
                 "SELECT r.id FROM registration r
                  JOIN tournament t ON t.id = r.tournament_id
-                 WHERE LOWER(r.email) = ? AND t.is_done = 0 LIMIT 1",
+                 WHERE " . email_match_sql('r.email') . " AND t.is_done = 0 LIMIT 1",
                 [$email]
             );
             if ($exists) {
@@ -307,10 +307,10 @@ function manage_view(array $p): void {
          FROM registration r
          JOIN tournament t ON t.id = r.tournament_id
          WHERE t.is_done = 0
-           AND (LOWER(r.email) = ?
+           AND (" . email_match_sql('r.email') . "
              OR EXISTS (
                SELECT 1 FROM player pl
-               WHERE LOWER(pl.email) = ? AND pl.name = r.lastname AND pl.firstname = r.firstname
+               WHERE " . email_match_sql('pl.email') . " AND pl.name = r.lastname AND pl.firstname = r.firstname
              ))
          ORDER BY r.created_at DESC",
         [$email, $email]
@@ -740,7 +740,7 @@ function _registration_baseline_cids(array $r): array {
 function _reg_belongs_to_email(array $r, string $email): bool {
     if (!empty($r['email']) && strtolower($r['email']) === $email) return true;
     $player = db_fetch(
-        "SELECT id FROM player WHERE name=? AND firstname=? AND LOWER(email)=?",
+        "SELECT id FROM player WHERE name=? AND firstname=? AND " . email_match_sql('email'),
         [$r['lastname'], $r['firstname'], $email]
     );
     return $player !== null;
