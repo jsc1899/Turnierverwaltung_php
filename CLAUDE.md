@@ -292,7 +292,12 @@ Fotos/Videos je Turnier (Tabelle `gallery_item`), Reiter **„Galerie“** auf d
 - Fotos über `GALLERY_MAX_MEGAPIXELS` (50) werden vor dem Dekodieren abgelehnt; `memory_limit` wird
   bei Bedarf nur angehoben (`gallery_raise_memory_limit()`), nie gesenkt.
 - Audit-Log: beim Chunk-Upload nur der letzte Teil (Target = Dateiname). Turnier-Löschung
-  entfernt `uploads/gallery/{tid}/`.
+  entfernt `{GALLERY_DIR}/{tid}/` und unvollständige Uploads `_tmp/{tid}_*`.
+- Abschluss gesperrt per `flock` auf `_tmp/…/.lock` (wiederholter letzter Teil → `busy`, kein
+  Doppelabschluss); Teile werden nach dem Zusammensetzen sofort gelöscht. Speicherlimit je Turnier
+  `GALLERY_MAX_TOURNAMENT_MB` (Default 5000, `gallery_quota_error()`, geprüft bei Teil 0 und beim Abschluss).
+- Auslieferung mit `Cache-Control: no-cache` + ETag/304 (sofort wirksam beim Löschen/Verbergen),
+  ohne Pragma/Expires/Set-Cookie.
 - Tests: `php tests/gallery_test.php` (Lib, braucht MariaDB), `bash tests/gallery_e2e.sh` (HTTP).
 
 ### Mail an Teilnehmer (Turnierseite)

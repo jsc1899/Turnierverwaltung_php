@@ -174,7 +174,7 @@ function gallery_process_image(string $path, string $mime, string $thumb_path): 
     if ($pixels > GALLERY_MAX_MEGAPIXELS * 1000000) {
         throw new \RuntimeException('Bild zu groß (max. ' . GALLERY_MAX_MEGAPIXELS . ' Megapixel).');
     }
-    $need = $pixels * 8 + 64 * 1024 * 1024;
+    $need = memory_get_usage() + $pixels * 8 + 64 * 1024 * 1024;   // bereits belegter Speicher zählt mit
     gallery_raise_memory_limit($need);
     if (gallery_memory_bytes((string)ini_get('memory_limit')) < $need) {
         throw new \RuntimeException('Bild zu groß für die Verarbeitung am Server.');
@@ -216,6 +216,16 @@ function gallery_finalize_upload(int $tid, string $upload_id, int $total, string
     for ($i = 0; $i < $total; $i++) {
         if (!is_file($tmp . $i . '.part')) return ['ok' => true, 'done' => false];
     }
+    // Sperre: wird der letzte Teil erneut gesendet (Netzwerk-Wiederholung), während der erste
+    // Abschluss noch läuft, darf nur einer zusammensetzen und speichern.
+    $lock = @fopen($tmp . '.lock', 'c');
+    if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) {
+        if ($lock) fclose($lock);
+        return ['ok' => true, 'done' => false, 'busy' => true];
+    }
+    for ($i = 0; $i < $total; $i++) {   // erneut prüfen: ein anderer Abschluss kann gerade fertig geworden sein
+        if (!is_file($tmp . $i . '.part')) { flock($lock, LOCK_UN); fclose($lock); return ['ok' => true, 'done' => false]; }
+    }
     @set_time_limit(300);
     $files = [];
     try {
@@ -225,6 +235,7 @@ function gallery_finalize_upload(int $tid, string $upload_id, int $total, string
             $in = fopen($tmp . $i . '.part', 'rb');
             stream_copy_to_stream($in, $out);
             fclose($in);
+            @unlink($tmp . $i . '.part');   // Platz sofort freigeben
         }
         fclose($out);
 
@@ -236,6 +247,8 @@ function gallery_finalize_upload(int $tid, string $upload_id, int $total, string
             $mb = $kind['type'] === 'video' ? GALLERY_MAX_VIDEO_MB : GALLERY_MAX_IMAGE_MB;
             return ['ok' => false, 'error' => 'Datei zu groß (max. ' . $mb . ' MB).'];
         }
+        $quota = gallery_quota_error($tid, $size);
+        if ($quota !== null) return ['ok' => false, 'error' => $quota];
 
         $dir  = gallery_dir($tid);
         $base = bin2hex(random_bytes(16));
@@ -264,6 +277,8 @@ function gallery_finalize_upload(int $tid, string $upload_id, int $total, string
         return ['ok' => false, 'error' => 'Upload fehlgeschlagen.'];
     } finally {
         foreach ($files as $f) @unlink($f);
+        flock($lock, LOCK_UN);
+        fclose($lock);
         gallery_rrmdir($tmp);
     }
 }
@@ -282,9 +297,18 @@ function gallery_delete_item(array $item): void {
     db_execute("DELETE FROM gallery_item WHERE id=?", [(int)$item['id']]);
 }
 
+// Speicherlimit je Turnier: Fehlermeldung, wenn $add_bytes nicht mehr hineinpasst, sonst null
+function gallery_quota_error(int $tid, int $add_bytes): ?string {
+    $used = (int)(db_fetch("SELECT COALESCE(SUM(size), 0) AS s FROM gallery_item WHERE tournament_id=?", [$tid])['s'] ?? 0);
+    if ($used + $add_bytes <= GALLERY_MAX_TOURNAMENT_MB * 1024 * 1024) return null;
+    return 'Speicherlimit der Galerie erreicht (max. ' . GALLERY_MAX_TOURNAMENT_MB . ' MB je Turnier, belegt: '
+         . (int)round($used / 1048576) . ' MB).';
+}
+
 function gallery_delete_tournament_files(int $tid): void {
     if ($tid <= 0) return;
     gallery_rrmdir(GALLERY_DIR . $tid);
+    foreach (glob(GALLERY_DIR . '_tmp/' . $tid . '_*', GLOB_ONLYDIR) ?: [] as $d) gallery_rrmdir($d);   // unvollständige Uploads
 }
 // ── Auslieferung ───────────────────────────────────────────────────────────────
 
@@ -295,11 +319,25 @@ function gallery_stream(string $path, string $mime, bool $public): never {
     $size  = (int)filesize($path);
     $range = gallery_parse_range((string)($_SERVER['HTTP_RANGE'] ?? ''), $size);
 
+    // Kein ungeprüftes Caching: der Browser fragt jedes Mal per ETag nach (304 ist winzig), damit
+    // gelöschte Medien bzw. nicht mehr öffentliche Turniere sofort nicht mehr angezeigt werden.
+    // Pragma/Expires/Set-Cookie aus session_start() gehören nicht in Medien-Antworten.
+    header_remove('Pragma');
+    header_remove('Expires');
+    header_remove('Set-Cookie');
+    $etag = '"' . md5(basename($path) . '|' . $size . '|' . (int)filemtime($path)) . '"';
     header('Content-Type: ' . $mime);
     header('X-Content-Type-Options: nosniff');
     header('Accept-Ranges: bytes');
-    header('Cache-Control: ' . ($public ? 'public, max-age=86400' : 'private, max-age=3600'));
+    header('Cache-Control: ' . ($public ? 'no-cache' : 'no-cache, private'));
+    header('ETag: ' . $etag);
+    header('Last-Modified: ' . gmdate('D, d M Y H:i:s', (int)filemtime($path)) . ' GMT');
     header('Content-Disposition: inline');
+    $inm = (string)($_SERVER['HTTP_IF_NONE_MATCH'] ?? '');
+    if ($inm !== '' && in_array($etag, array_map('trim', explode(',', $inm)), true)) {
+        http_response_code(304);
+        exit;
+    }
     if ($range === false) {
         http_response_code(416);
         header("Content-Range: bytes */$size");

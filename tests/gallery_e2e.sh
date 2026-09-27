@@ -43,6 +43,12 @@ expect "Range ungültig 416"       "$(curl -s -o /dev/null -w '%{http_code}' -b 
 expect "Gast, nicht öffentlich 404" "$(curl -s -o /dev/null -w '%{http_code}' $B/gallery/$GID/media)" 404
 "$MYSQL" -u root turnierverwaltung -e "UPDATE tournament SET is_public=1 WHERE id=$TID"
 expect "Gast, öffentlich 200"     "$(curl -s -o /dev/null -w '%{http_code}' $B/gallery/$GID/media)" 200
+H=$(curl -s -D - -o /dev/null $B/gallery/$GID/media | tr -d '')
+echo "$H" | grep -qi '^cache-control: no-cache' && ok "Cache: no-cache (Revalidierung)" || bad "Cache: no-cache (Revalidierung)"
+echo "$H" | grep -qiE '^(pragma|expires|set-cookie):' && bad "Cache: kein Pragma/Expires/Set-Cookie" || ok "Cache: kein Pragma/Expires/Set-Cookie"
+ET=$(echo "$H" | grep -i '^etag:' | sed -E 's/^[Ee][Tt][Aa][Gg]: *//')
+[ -n "$ET" ] && ok "Cache: ETag vorhanden" || bad "Cache: ETag vorhanden"
+expect "Cache: 304 bei If-None-Match" "$(curl -s -o /dev/null -w '%{http_code}' -H "If-None-Match: $ET" $B/gallery/$GID/media)" 304
 expect "Gast Upload verweigert"   "$(curl -s -o /dev/null -w '%{http_code}' -F csrf_token=x -F upload_id=$UID_ -F index=0 -F total=1 -F name=a.jpg -F size=1 -F chunk=@"$W/part" $B/tournament/$TID/gallery/chunk)" 302
 R=$(curl -s -b "$JAR" -F csrf_token="$CSRF" -F upload_id=$UID_ -F index=0 -F total=1 -F name=a.exe -F size=10 -F chunk=@"$W/part" $B/tournament/$TID/gallery/chunk)
 echo "$R" | grep -q 'Dateityp nicht erlaubt' && ok "Endung abgelehnt" || bad "Endung: $R"

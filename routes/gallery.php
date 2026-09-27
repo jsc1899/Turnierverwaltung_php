@@ -35,7 +35,11 @@ function upload_chunk(array $p): void {
     if (!$f || ($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || (int)$f['size'] > GALLERY_CHUNK_BYTES) {
         gallery_json(['ok' => false, 'error' => 'Upload-Teil fehlerhaft.'], 400);
     }
-    if ($index === 0) gallery_cleanup_tmp();
+    if ($index === 0) {
+        gallery_cleanup_tmp();
+        $quota = gallery_quota_error($tid, $size);   // früh ablehnen, bevor 500 MB übertragen werden
+        if ($quota !== null) gallery_json(['ok' => false, 'error' => $quota], 400);
+    }
     $tmp = gallery_tmp_dir($tid, $upload_id);
     if (!is_dir($tmp)) mkdir($tmp, 0755, true);
     if (!move_uploaded_file($f['tmp_name'], $tmp . $index . '.part')) {

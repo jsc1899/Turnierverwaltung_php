@@ -116,6 +116,35 @@ gallery_raise_memory_limit(512 * 1024 * 1024);
 check('höheres Limit bleibt', ini_get('memory_limit') === '1G');
 ini_set('memory_limit', $old);
 
+// 3c) Paralleler Abschluss: hält ein anderer Request die Sperre, wird nicht doppelt abgeschlossen
+$uid5 = str_repeat('5', 32);
+$n5 = put_parts($tid, $uid5, $jpeg);
+$lockfh = fopen(gallery_tmp_dir($tid, $uid5) . '.lock', 'c');
+flock($lockfh, LOCK_EX);
+$cnt = (int)db_fetch("SELECT COUNT(*) n FROM gallery_item WHERE tournament_id=?", [$tid])['n'];
+$r5 = gallery_finalize_upload($tid, $uid5, $n5, 'parallel.jpg', null);
+check('gesperrt → kein zweiter Abschluss', ($r5['done'] ?? true) === false && !empty($r5['busy']));
+check('gesperrt → keine neue DB-Zeile', (int)db_fetch("SELECT COUNT(*) n FROM gallery_item WHERE tournament_id=?", [$tid])['n'] === $cnt);
+check('gesperrt → Teile bleiben erhalten', is_file(gallery_tmp_dir($tid, $uid5) . '0.part'));
+flock($lockfh, LOCK_UN); fclose($lockfh);
+$r5 = gallery_finalize_upload($tid, $uid5, $n5, 'parallel.jpg', null);
+check('nach Freigabe normal abgeschlossen', ($r5['done'] ?? false) === true);
+
+// 3d) Speicherlimit je Turnier
+check('Limit frei → kein Fehler', gallery_quota_error($tid, 1024) === null);
+db_execute("INSERT INTO gallery_item (tournament_id, type, filename, mime, size) VALUES (?, 'video', 'x.mp4', 'video/mp4', ?)",
+           [$tid, GALLERY_MAX_TOURNAMENT_MB * 1024 * 1024 - 100]);
+check('Limit überschritten → Fehler', str_contains((string)gallery_quota_error($tid, 1024), 'Speicherlimit'));
+$uid6 = str_repeat('6', 32);
+$n6 = put_parts($tid, $uid6, $jpeg);
+$r6 = gallery_finalize_upload($tid, $uid6, $n6, 'zuviel.jpg', null);
+check('Abschluss über Limit abgelehnt', ($r6['ok'] ?? true) === false && str_contains($r6['error'] ?? '', 'Speicherlimit'));
+db_execute("DELETE FROM gallery_item WHERE tournament_id=? AND filename='x.mp4'", [$tid]);
+
+// 3e) Unvollständige Uploads werden mit dem Turnier gelöscht
+$uid7 = str_repeat('7', 32);
+put_parts($tid, $uid7, 'teil');
+
 // 4) Löschen eines Mediums
 gallery_delete_item($row);
 check('Datei gelöscht', !is_file(gallery_dir($tid) . $row['filename']));
@@ -132,6 +161,7 @@ check('.htaccess angelegt', str_contains((string)@file_get_contents(gallery_root
 // 7) Turnier-Verzeichnis löschen
 gallery_delete_tournament_files($tid);
 check('Turnierverzeichnis entfernt', !is_dir(GALLERY_DIR . $tid));
+check('unvollständige Uploads entfernt', !is_dir(gallery_tmp_dir($tid, $uid7)));
 db_execute("DELETE FROM tournament WHERE id=?", [$tid]);
 
 echo $fails ? "\n$fails FEHLER\n" : "\nAlle Tests ok\n";

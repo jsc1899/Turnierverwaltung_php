@@ -216,7 +216,10 @@ $g_data = array_map(fn($g) => [
         fd.append('name', file.name);
         fd.append('size', file.size);
         fd.append('chunk', file.slice(i * CHUNK, (i + 1) * CHUNK), 'chunk');
-        await postChunk(fd);
+        var data = await postChunk(fd);
+        if (i === total - 1 && !data.done) {   // „fertig“ nur bei bestätigtem Abschluss
+          throw new Error(data.busy ? 'Wird noch verarbeitet – Seite gleich neu laden' : 'Upload unvollständig – bitte erneut versuchen');
+        }
         var pct = Math.round((i + 1) / total * 100);
         bar.style.width = pct + '%';
         st.textContent = pct < 100 ? pct + ' %' : 'wird verarbeitet…';
