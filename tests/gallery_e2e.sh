@@ -43,6 +43,10 @@ expect "Range ungültig 416"       "$(curl -s -o /dev/null -w '%{http_code}' -b 
 expect "Gast, nicht öffentlich 404" "$(curl -s -o /dev/null -w '%{http_code}' $B/gallery/$GID/media)" 404
 "$MYSQL" -u root turnierverwaltung -e "UPDATE tournament SET is_public=1 WHERE id=$TID"
 expect "Gast, öffentlich 200"     "$(curl -s -o /dev/null -w '%{http_code}' $B/gallery/$GID/media)" 200
+HD=$(curl -s -I $B/gallery/$GID/media | tr -d '')
+echo "$HD" | head -1 | grep -q ' 200' && ok "HEAD: 200" || bad "HEAD: 200 ($(echo "$HD" | head -1))"
+echo "$HD" | grep -qi "^content-length: $SIZE$" && ok "HEAD: Content-Length" || bad "HEAD: Content-Length"
+expect "HEAD: kein Body" "$(curl -s -X HEAD --max-time 5 -o /dev/null -w '%{size_download}' $B/gallery/$GID/media 2>/dev/null)" 0
 H=$(curl -s -D - -o /dev/null $B/gallery/$GID/media | tr -d '')
 echo "$H" | grep -qi '^cache-control: no-cache' && ok "Cache: no-cache (Revalidierung)" || bad "Cache: no-cache (Revalidierung)"
 echo "$H" | grep -qiE '^(pragma|expires|set-cookie):' && bad "Cache: kein Pragma/Expires/Set-Cookie" || ok "Cache: kein Pragma/Expires/Set-Cookie"

@@ -92,6 +92,7 @@ if (str_starts_with($uri, '/uploads/')) {
 
 // Route-Matching
 $method = $_SERVER['REQUEST_METHOD'];
+if ($method === 'HEAD') $method = 'GET';   // HEAD wie GET routen (nur Header; z.B. Video-Player, Link-Prüfer)
 
 // ── Route-Tabelle ─────────────────────────────────────────────────────────────
 // Jede Route: [method, pattern, handler_file, action]

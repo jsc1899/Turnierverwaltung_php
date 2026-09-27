@@ -350,6 +350,7 @@ function gallery_stream(string $path, string $mime, bool $public): never {
     }
     header('Content-Length: ' . ($end - $start + 1));
 
+    if (($_SERVER['REQUEST_METHOD'] ?? '') === 'HEAD') exit;   // nur Header
     while (ob_get_level()) ob_end_clean();
     @set_time_limit(0);
     $fp = fopen($path, 'rb');
