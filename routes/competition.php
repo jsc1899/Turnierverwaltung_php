@@ -442,6 +442,20 @@ function competition_view_data(array $c, bool $is_team, bool $is_doubles): array
                         $places[] = ['rank' => 3, 'name' => $loser_name, 'club' => $loser_club];
                     }
                 }
+                // Verlierer früherer KO-Runden (Viertelfinale, Achtelfinale, …) teilen sich
+                // je Runde einen Rang: Runde r → Rang r/2+1 (VF → 5, AF → 9, …).
+                // Freilos-Spiele (ein Slot leer) haben keinen echten Verlierer.
+                $early = array_filter(array_keys($rounds_dict), fn($r) => (int)$r >= 8);
+                sort($early);
+                foreach ($early as $r) {
+                    foreach ($rounds_dict[$r] as $s) {
+                        if (!$s['played'] || empty($s['player1_id']) || empty($s['player2_id'])) continue;
+                        $p1won = $s['score1'] > $s['score2'];
+                        $places[] = ['rank' => (int)$r / 2 + 1,
+                                     'name' => $p1won ? $s['p2name'] : $s['p1name'],
+                                     'club' => ($p1won ? $s['p2club'] : $s['p1club']) ?? ''];
+                    }
+                }
             }
         }
         // Nicht-Aufsteiger (Modus groups_ko): hinter den KO-Platzierungen die in der
