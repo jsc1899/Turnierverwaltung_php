@@ -328,6 +328,18 @@ Fotos/Videos je Turnier (Tabelle `gallery_item`), Reiter **„Galerie“** auf d
   ohne Pragma/Expires/Set-Cookie.
 - Tests: `php tests/gallery_test.php` (Lib, braucht MariaDB), `bash tests/gallery_e2e.sh` (HTTP).
 
+### Zugriffszähler (`lib/views.php`, Tabelle `view_log`)
+
+Zählt **Besucher je Tag** (je Besucher, Tag und Objekt einmal) für Turnierseite (`tournament`),
+Bewerbsseite (`competition`, Monitor nicht), Galerie-Reiter (`gallery_tab`, object_id = Turnier) und
+geöffnete Galerie-Medien (`gallery`). Nicht gezählt: angemeldete Admins/Editoren und Bots
+(`view_is_countable()`). **Keine IP gespeichert** — Besucher = täglich wechselnder HMAC
+(`view_visitor_hash()`). Seiten zählen serverseitig in `show()` (`view_record()`), Galerie per
+`navigator.sendBeacon` → `POST /tournament/{id}/gallery/view` bzw. `POST /gallery/{gid}/view`
+(anonym, nur wenn sichtbar). Anzeige nur für Bearbeiter: `view_badge_html(view_counts(...))`
+(„N Aufrufe · M in 7 Tagen“). Löschen von Turnier/Bewerb/Medium entfernt die Zählerdaten
+(`view_delete()`). Tests: `php tests/views_test.php`, `bash tests/views_e2e.sh`.
+
 ### Mail an Teilnehmer (Turnierseite)
 
 Nur für Bearbeiter (`$can_edit`): Link „Mail an Teilnehmer (N)“ in der Infozeile von
@@ -429,4 +441,5 @@ angelegt (`created=true`). Dedup: Doppel über Paar (beide Reihenfolgen), Team �
 | `user` | App-Benutzer mit gehashten Passwörtern und Rolle |
 | `tournament_editor` | Zuordnung Editor↔Turnier (PK: tournament_id + user_id, FK CASCADE) — Editoren mit Bearbeitungsrecht für genau dieses Turnier und seine Bewerbe |
 | `gallery_item` | Galerie-Medien je Turnier: `type` ('image'/'video'), `filename`/`thumb` (zufällige Namen in `uploads/gallery/{tid}/`), `mime`, `original_name`, `caption`, `size`, `uploaded_by` (Snapshot, kein FK) — FK CASCADE auf `tournament` |
+| `view_log` | Zugriffszähler: `object_type` (tournament/competition/gallery/gallery_tab), `object_id`, `day`, `visitor` (täglicher HMAC, keine IP); PK über alle vier Spalten |
 | `audit_log` | Aktivitätsprotokoll privilegierter Aktionen: `user_id`/`username`/`role` (Snapshot, kein FK — überlebt Benutzerlöschung), `method`, `path`, `action` (handler.action), `target` (lesbares betroffenes Objekt), `status` ('ok'/'denied'), `ip`, `created_at` |

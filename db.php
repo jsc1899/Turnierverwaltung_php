@@ -207,6 +207,15 @@ function init_db(): void {
             FOREIGN KEY (user_id)       REFERENCES user(id)        ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+        CREATE TABLE IF NOT EXISTS view_log (
+            object_type VARCHAR(16) NOT NULL,
+            object_id   INT         NOT NULL,
+            day         DATE        NOT NULL,
+            visitor     CHAR(64)    NOT NULL,
+            PRIMARY KEY (object_type, object_id, day, visitor),
+            INDEX idx_view_day (day)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
         CREATE TABLE IF NOT EXISTS gallery_item (
             id            INT AUTO_INCREMENT PRIMARY KEY,
             tournament_id INT NOT NULL,

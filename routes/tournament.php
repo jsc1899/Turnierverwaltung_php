@@ -198,6 +198,16 @@ function show(array $p): void {
     require_once __DIR__ . '/../lib/gallery.php';
     $gallery = gallery_items((int)$p['id']);
 
+    // Zugriffszähler (Anzeige nur für Bearbeiter)
+    require_once __DIR__ . '/../lib/views.php';
+    view_record('tournament', (int)$p['id']);
+    $views = $gallery_tab_views = null; $gallery_views = [];
+    if ($can_edit) {
+        $views             = view_counts('tournament', [(int)$p['id']])[(int)$p['id']];
+        $gallery_tab_views = view_counts('gallery_tab', [(int)$p['id']])[(int)$p['id']];
+        $gallery_views     = view_counts('gallery', array_column($gallery, 'id'));
+    }
+
     render('tournament/show', [
         'page_title'        => $t['name'],
         't'                 => $t,
@@ -210,6 +220,9 @@ function show(array $p): void {
         'editors'           => $editors,
         'available_editors' => $available_editors,
         'gallery'           => $gallery,
+        'views'             => $views,
+        'gallery_tab_views' => $gallery_tab_views,
+        'gallery_views'     => $gallery_views,
         // Adressen nur für Bearbeiter laden/ausgeben (Datenschutz)
         'participant_emails' => $can_edit ? tournament_participant_emails((int)$p['id']) : [],
     ]);
@@ -277,6 +290,12 @@ function delete(array $p): void {
     csrf_verify();
     // Hochgeladene Dateien (Ausschreibung, Banner) mitlöschen — sonst bleiben sie öffentlich abrufbar
     $files = db_fetch("SELECT ausschreibung, banner_image FROM tournament WHERE id = ?", [$p['id']]);
+    // Zählerdaten von Turnier, Bewerben und Galerie-Medien mitlöschen
+    require_once __DIR__ . '/../lib/views.php';
+    view_delete('tournament', [(int)$p['id']]);
+    view_delete('gallery_tab', [(int)$p['id']]);
+    view_delete('competition', array_column(db_fetchall("SELECT id FROM competition WHERE tournament_id=?", [$p['id']]), 'id'));
+    view_delete('gallery', array_column(db_fetchall("SELECT id FROM gallery_item WHERE tournament_id=?", [$p['id']]), 'id'));
     db_execute("DELETE FROM tournament WHERE id = ?", [$p['id']]);
     foreach ([$files['ausschreibung'] ?? '', $files['banner_image'] ?? ''] as $f) {
         if ($f !== '' && preg_match('/^[a-f0-9]{32}\.[a-z0-9]+$/', $f)) @unlink(UPLOAD_DIR . $f);

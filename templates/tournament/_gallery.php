@@ -3,13 +3,19 @@
 // Reiter „Galerie“ der Turnierseite (eingebunden aus tournament/show.php).
 // Erwartet: $t, $gallery, $can_edit.
 $g_data = array_map(fn($g) => [
+    'id'      => (int)$g['id'],
     'type'    => $g['type'],
     'src'     => url('gallery/' . $g['id'] . '/media'),
     'caption' => (string)($g['caption'] ?? ''),
 ], $gallery);
 ?>
   <!-- ── Tab: Galerie ──────────────────────────────────────────────────────── -->
-  <div class="tab-pane fade p-3" id="tab-gallery" role="tabpanel">
+  <div class="tab-pane fade p-3" id="tab-gallery" role="tabpanel"
+       data-view-url="<?= e(url('tournament/' . $t['id'] . '/gallery/view')) ?>"
+       data-item-view-base="<?= e(url('gallery')) ?>">
+    <?php if ($can_edit && !empty($gallery_tab_views)): ?>
+    <div class="mb-2" id="gallery-tab-views"><?= view_badge_html($gallery_tab_views) ?></div>
+    <?php endif; ?>
     <style>
       .gallery-tile { cursor: pointer; }
       .gallery-tile img, .gallery-tile video { object-fit: cover; }
@@ -63,6 +69,11 @@ $g_data = array_map(fn($g) => [
         <div class="small text-muted text-truncate mt-1" title="<?= e($g['caption']) ?>"><?= e($g['caption']) ?></div>
         <?php endif; ?>
         <?php if ($can_edit): ?>
+        <?php $gv = $gallery_views[(int)$g['id']] ?? ['total' => 0, 'week' => 0]; ?>
+        <div class="small text-muted" data-views-gallery="<?= (int)$gv['total'] ?>"
+             title="Besucher je Tag (ohne Admins/Editoren und Bots) · <?= (int)$gv['week'] ?> in 7 Tagen">
+          <i class="bi bi-eye me-1"></i><?= (int)$gv['total'] ?>
+        </div>
         <div class="d-flex gap-1 mt-1">
           <button class="btn btn-outline-secondary btn-sm py-0" type="button" title="Beschriftung ändern"
                   data-bs-toggle="collapse" data-bs-target="#gcap-<?= (int)$g['id'] ?>">
@@ -113,6 +124,14 @@ $g_data = array_map(fn($g) => [
   <script type="application/json" id="gallery-data"><?= json_encode($g_data, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
   <script>
   document.addEventListener('DOMContentLoaded', function () {
+    // ── Zugriffszähler (Galerie-Reiter und geöffnete Medien) ──
+    var pane = document.getElementById('tab-gallery');
+    function beacon(u) { try { navigator.sendBeacon(u); } catch (e) {} }
+    var tabCounted = false;
+    function countTab() { if (!tabCounted) { tabCounted = true; beacon(pane.dataset.viewUrl); } }
+    var tabBtn = document.getElementById('tab-gallery-btn');
+    if (tabBtn) tabBtn.addEventListener('shown.bs.tab', countTab);
+    if (pane.classList.contains('active') || location.hash === '#tab-gallery') countTab();
     // ── Lightbox ──
     var items = JSON.parse(document.getElementById('gallery-data').textContent || '[]');
     var modalEl = document.getElementById('galleryModal');
@@ -123,6 +142,7 @@ $g_data = array_map(fn($g) => [
       function show(i) {
         cur = (i + items.length) % items.length;
         var it = items[cur], el;
+        beacon(pane.dataset.itemViewBase + '/' + it.id + '/view');   // Zugriffszähler
         stage.innerHTML = '';
         if (it.type === 'video') {
           el = document.createElement('video');

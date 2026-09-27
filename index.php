@@ -127,6 +127,8 @@ $routes = [
     ['POST',     '/gallery/{gid}/delete',            'gallery', 'delete'],
     ['GET',      '/gallery/{gid}/media',             'gallery', 'media'],
     ['GET',      '/gallery/{gid}/thumb',             'gallery', 'thumb'],
+    ['POST',     '/gallery/{gid}/view',              'gallery', 'view'],
+    ['POST',     '/tournament/{id}/gallery/view',    'gallery', 'tab_view'],
 
     // Registrations (public + admin)
     ['GET|POST', '/tournament/{id}/register',                        'registration', 'register_form'],

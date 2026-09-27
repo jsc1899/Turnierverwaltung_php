@@ -38,6 +38,7 @@ ob_start(); ?>
       <a href="<?= url('tournament/' . $t['id'] . '/aushang') ?>" target="_blank" class="text-decoration-none">
         <i class="bi bi-printer me-1"></i>Aushang
       </a>
+      <?php if ($can_edit && $views): ?><?= view_badge_html($views) ?><?php endif; ?>
       <?php if ($can_edit && $participant_emails):
         // Neue Mail im lokalen Mailclient: alle Teilnehmer in BCC, Betreff = Turniername
         $mailto = 'mailto:?bcc=' . rawurlencode(implode(',', $participant_emails))

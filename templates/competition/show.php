@@ -55,6 +55,7 @@ ob_start(); ?>
   <?php endif; ?>
   <?php endif; ?>
 
+  <?php if ($can_edit && $views): ?><?= view_badge_html($views) ?><?php endif; ?>
   <div class="ms-auto d-flex gap-2 flex-wrap">
     <?php if ($show_monitor): ?>
     <a href="<?= url('competition/'.$c['id'].'/monitor') ?>" target="_blank"

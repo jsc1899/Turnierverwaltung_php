@@ -599,6 +599,9 @@ function show(array $p): void {
     $can_view_players = $can_edit || (!empty($t['is_public']) && !empty($t['players_public']));
     $is_doubles = !empty($c['is_doubles']);
     $is_team    = !empty($c['is_team']);
+    require_once __DIR__ . '/../lib/views.php';
+    view_record('competition', $cid);
+    $views = $can_edit ? view_counts('competition', [$cid])[$cid] : null;
 
     // Teilnehmer laden (Spieler oder Doppel oder Teams je nach Bewerb-Typ)
     $assigned = $assigned_doubles = $unassigned = $unassigned_doubles = [];
@@ -791,6 +794,7 @@ function show(array $p): void {
         'c' => $c, 't' => $t,
         'can_edit' => $can_edit,
         'can_view_players' => $can_view_players,
+        'views' => $views,
         'import_sources' => $import_sources,
         'is_doubles' => $is_doubles, 'is_team' => $is_team,
         'assigned' => $assigned, 'unassigned' => $unassigned,
@@ -1081,6 +1085,8 @@ function delete(array $p): void {
     $c = db_fetch("SELECT tournament_id FROM competition WHERE id=?", [(int)$p['id']]);
     $tid = $c ? $c['tournament_id'] : null;
     db_execute("DELETE FROM competition WHERE id=?", [(int)$p['id']]);
+    require_once __DIR__ . '/../lib/views.php';
+    view_delete('competition', [(int)$p['id']]);
     redirect($tid ? 'tournament/' . $tid : '');
 }
 

@@ -66,6 +66,8 @@ function delete(array $p): void {
     require_tournament_edit((int)$it['tournament_id']);
     csrf_verify();
     gallery_delete_item($it);
+    require_once __DIR__ . '/../lib/views.php';
+    view_delete('gallery', [(int)$it['id']]);
     flash('info', 'Medium gelöscht.');
     redirect('tournament/' . (int)$it['tournament_id'] . '#tab-gallery');
 }
@@ -81,4 +83,24 @@ function thumb(array $p): void {
     $public = _gallery_require_view((int)$it['tournament_id']);
     if (!$it['thumb']) { http_response_code(404); exit; }
     gallery_stream(GALLERY_DIR . (int)$it['tournament_id'] . '/' . $it['thumb'], 'image/jpeg', $public);
+}
+
+// Zugriffszähler (per navigator.sendBeacon aus der Galerie): Öffnen eines Mediums in der
+// Großansicht bzw. Öffnen des Galerie-Reiters. Anonym und ohne CSRF (reiner Zähler; je Besucher
+// und Tag höchstens einmal) — gezählt wird nur, was der Besucher auch sehen darf.
+function view(array $p): void {
+    $it = _gallery_item_or_404((int)$p['gid']);
+    _gallery_require_view((int)$it['tournament_id']);
+    require_once __DIR__ . '/../lib/views.php';
+    view_record('gallery', (int)$it['id']);
+    http_response_code(204);
+}
+
+function tab_view(array $p): void {
+    $tid = (int)$p['id'];
+    if (!db_fetch("SELECT id FROM tournament WHERE id=?", [$tid])) { http_response_code(404); exit; }
+    _gallery_require_view($tid);
+    require_once __DIR__ . '/../lib/views.php';
+    view_record('gallery_tab', $tid);
+    http_response_code(204);
 }
