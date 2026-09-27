@@ -27,7 +27,7 @@ function new_tournament(array $p): void {
     csrf_verify();
     $name             = trim(post('name'));
     $organizer        = trim(post('organizer'));
-    $sport            = trim(post('sport'));
+    $sport            = valid_sport(trim((string)post('sport')));
     $raw_url          = trim(post('info_url'));
     $parsed           = parse_url($raw_url);
     $info_url         = in_array($parsed['scheme'] ?? '', ['http', 'https']) ? $raw_url : '';
@@ -223,7 +223,7 @@ function settings(array $p): void {
 
     $name             = trim(post('name')) ?: $t['name'];
     $organizer        = trim(post('organizer'));
-    $sport            = trim(post('sport'));
+    $sport            = valid_sport(trim((string)post('sport')));
     $raw_url          = trim(post('info_url'));
     $parsed           = parse_url($raw_url);
     $info_url         = in_array($parsed['scheme'] ?? '', ['http', 'https']) ? $raw_url : '';
@@ -275,7 +275,12 @@ function settings(array $p): void {
 function delete(array $p): void {
     require_tournament_edit((int)$p['id']);
     csrf_verify();
+    // Hochgeladene Dateien (Ausschreibung, Banner) mitlöschen — sonst bleiben sie öffentlich abrufbar
+    $files = db_fetch("SELECT ausschreibung, banner_image FROM tournament WHERE id = ?", [$p['id']]);
     db_execute("DELETE FROM tournament WHERE id = ?", [$p['id']]);
+    foreach ([$files['ausschreibung'] ?? '', $files['banner_image'] ?? ''] as $f) {
+        if ($f !== '' && preg_match('/^[a-f0-9]{32}\.[a-z0-9]+$/', $f)) @unlink(UPLOAD_DIR . $f);
+    }
     require_once __DIR__ . '/../lib/gallery.php';
     gallery_delete_tournament_files((int)$p['id']);
     flash('info', 'Turnier gelöscht.');

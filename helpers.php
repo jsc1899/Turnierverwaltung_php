@@ -366,6 +366,13 @@ function phase_label(string $phase, ?string $mode = null): string {
     }
 }
 
+// Erlaubte Sportarten (tournament.sport); alles andere wird als „keine Angabe“ gespeichert
+const SPORTS = ['tischtennis', 'tennis', 'fussball', 'cornhole'];
+
+function valid_sport(string $sport): string {
+    return in_array($sport, SPORTS, true) ? $sport : '';
+}
+
 function court_label(string $sport = '', bool $plural = false): string {
     $map = [
         'tischtennis' => ['Tisch',       'Tische'],
