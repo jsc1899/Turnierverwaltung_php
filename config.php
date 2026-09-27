@@ -1,22 +1,35 @@
 <?php
-// .env laden (falls vorhanden) — Werte werden nur gesetzt wenn ENV-Variable noch nicht existiert
-$_env_file = __DIR__ . '/.env';
-if (is_file($_env_file)) {
-    foreach (file($_env_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $_line) {
-        $_line = trim($_line);
-        if ($_line === '' || $_line[0] === '#') continue;
-        if (!str_contains($_line, '=')) continue;
-        [$_k, $_v] = explode('=', $_line, 2);
-        $_k = trim($_k);
-        $_v = trim($_v);
-        if ($_k !== '' && getenv($_k) === false) {
-            putenv("$_k=$_v");
-        }
+// .env-Dateien in dieser Reihenfolge: zuerst eine Ebene ÜBER dem App-Ordner (außerhalb des
+// Webroots, nicht per URL abrufbar — empfohlen), dann im App-Ordner. Ein Wert wird nur gesetzt,
+// wenn er noch nicht existiert: echte ENV-Variablen > äußere .env > innere .env.
+function _env_files(string $app_dir): array {
+    $files = [];
+    foreach ([dirname($app_dir) . '/.env', $app_dir . '/.env'] as $f) {
+        if (@is_file($f) && @is_readable($f)) $files[] = $f;
     }
-    unset($_env_file, $_line, $_k, $_v);
-} else {
-    unset($_env_file);
+    return $files;
 }
+
+function _env_load_file(string $file): void {
+    foreach (@file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
+        $line = trim($line);
+        if ($line === '' || $line[0] === '#' || !str_contains($line, '=')) continue;
+        [$k, $v] = explode('=', $line, 2);
+        $k = trim($k);
+        if ($k !== '' && getenv($k) === false) putenv($k . '=' . trim($v));
+    }
+}
+
+// Pfad aus der Konfiguration: relative Angaben (z.B. "../turnier_gallery") gelten ab dem App-Ordner
+function _env_path(string $value, string $app_dir): string {
+    if ($value === '' || $value[0] === '/' || $value[0] === '\\' || preg_match('#^[A-Za-z]:[\\\\/]#', $value)) {
+        return $value;
+    }
+    return $app_dir . '/' . $value;
+}
+
+foreach (_env_files(__DIR__) as $_env_file) _env_load_file($_env_file);
+unset($_env_file);
 
 // Konfiguration — auf dem Server anpassen
 $_sk = getenv('SECRET_KEY') ?: 'change-me-in-production';
@@ -60,4 +73,5 @@ define('GALLERY_THUMB_EDGE',   400);           // lange Kante der Vorschaubilder
 define('GALLERY_MAX_MEGAPIXELS', 50);          // größere Fotos werden abgelehnt (GD-Speicherbedarf)
 // Speicherort der Galerie-Dateien. Liegt er im Webroot (Default), muss der Webserver den
 // Direktzugriff sperren (Apache: .htaccess wird angelegt; nginx: eigene location-Regel nötig).
-define('GALLERY_DIR', rtrim(getenv('GALLERY_DIR') ?: UPLOAD_DIR . 'gallery', '/\\') . '/');
+// Relativ (z.B. GALLERY_DIR=../turnier_gallery) = ab dem App-Ordner, also außerhalb des Webroots.
+define('GALLERY_DIR', rtrim(getenv('GALLERY_DIR') ? _env_path(getenv('GALLERY_DIR'), __DIR__) : UPLOAD_DIR . 'gallery', '/\\') . '/');

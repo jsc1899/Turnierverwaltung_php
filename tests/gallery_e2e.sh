@@ -16,6 +16,13 @@ curl -s -b "$JAR" -c "$JAR" -o /dev/null --data-urlencode "email=dev-admin@local
 TID=$("$MYSQL" -u root turnierverwaltung -N -e "INSERT INTO tournament (name,is_public) VALUES ('E2E-Galerie',0); SELECT LAST_INSERT_ID();")
 CSRF=$(curl -s -b "$JAR" $B/tournament/$TID | grep -oE 'name="csrf_token" value="[^"]+"' | head -1 | sed -E 's/.*value="([^"]+)".*/\1/')
 
+# Testskripte dürfen per Webserver nichts ausführen (würden sonst Testdaten anlegen)
+BEFORE=$("$MYSQL" -u root turnierverwaltung -N -e "SELECT COUNT(*) FROM tournament")
+for P in tests/gallery_test.php tests/config_test.php; do
+  expect "Web-Aufruf /$P" "$(curl -s -o /dev/null -w '%{http_code}' $B/$P)" 404
+done
+expect "keine Testdaten per Web" "$("$MYSQL" -u root turnierverwaltung -N -e "SELECT COUNT(*) FROM tournament")" "$BEFORE"
+
 # Testvideo: 2,5 MB mit gültigem MP4-Header (ftyp) → 3 Teile
 { printf '\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom'; head -c 2621440 /dev/zero; } > "$W/clip.mp4"
 SIZE=$(stat -c %s "$W/clip.mp4"); CH=1048576; TOTAL=$(( (SIZE + CH - 1) / CH ))

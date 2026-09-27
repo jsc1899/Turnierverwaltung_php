@@ -47,6 +47,13 @@ statt versendet in der UI angezeigt (Flash).
 
 Wichtige Konstanten: `SECRET_KEY`, `ADMIN_EMAIL`, `DB_*`, `MAIL_*`, `APP_URL`, `UPLOAD_DIR`.
 
+**Produktion (nginx, keine `.htaccess`-Wirkung):** nginx liefert jede Datei im App-Ordner direkt aus.
+Die `.env` gehört daher **eine Ebene über den App-Ordner** (außerhalb des Webroots) — `config.php` liest
+zuerst `../.env`, dann `./.env` (echte ENV > äußere > innere). Pfade wie `GALLERY_DIR` dürfen relativ
+zum App-Ordner angegeben werden (`GALLERY_DIR=../turnier_gallery`). Test-Skripte unter `tests/` brechen
+bei Nicht-CLI-Aufruf mit 404 ab (`PHP_SAPI !== 'cli'`) — neue Test-Skripte ebenso absichern.
+Tests: `php tests/config_test.php`.
+
 ## Architektur
 
 ### Request-Lifecycle

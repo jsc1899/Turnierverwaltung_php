@@ -1,6 +1,7 @@
 <?php
 // CLI-Tests der Galerie-Lib: php tests/gallery_test.php  (MariaDB muss laufen)
 declare(strict_types=1);
+if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }   // nie per Webserver ausführen
 chdir(__DIR__ . '/..');
 require 'config.php'; require 'db.php'; require 'helpers.php'; require 'auth.php';
 require 'lib/gallery.php';
