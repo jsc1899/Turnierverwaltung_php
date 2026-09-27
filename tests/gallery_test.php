@@ -44,5 +44,74 @@ check('start>=size',  gallery_parse_range('bytes=1000-', 1000) === false);
 check('start>end',    gallery_parse_range('bytes=50-10', 1000) === false);
 check('multi → ganz', gallery_parse_range('bytes=0-1,5-9', 1000) === null);
 
+echo "Upload-Finalisierung (DB + Dateisystem)\n";
+$tid = (int)db_insert("INSERT INTO tournament (name) VALUES ('Galerie-Test')");
+
+// Hilfsfunktion: Datei in Teile zerlegen wie der Browser
+function put_parts(int $tid, string $uid, string $data): int {
+    $dir = gallery_tmp_dir($tid, $uid);
+    @mkdir($dir, 0755, true);
+    $parts = str_split($data, GALLERY_CHUNK_BYTES);
+    foreach ($parts as $i => $p) file_put_contents($dir . $i . '.part', $p);
+    return count($parts);
+}
+
+// 1) Hochformat-JPEG mit EXIF-Orientierung 6, größer als GALLERY_MAX_EDGE
+$img = imagecreatetruecolor(4000, 3000);
+imagefilledrectangle($img, 0, 0, 3999, 1499, imagecolorallocate($img, 255, 0, 0)); // obere Hälfte rot
+ob_start(); imagejpeg($img, null, 90); $jpeg = ob_get_clean();
+// APP1/EXIF-Segment mit Orientation=6 (Big Endian) direkt nach SOI einfügen
+$tiff = "MM\x00\x2A\x00\x00\x00\x08" . "\x00\x01" . "\x01\x12\x00\x03\x00\x00\x00\x01\x00\x06\x00\x00" . "\x00\x00\x00\x00";
+$app1 = "Exif\x00\x00" . $tiff;
+$jpeg = "\xFF\xD8\xFF\xE1" . pack('n', strlen($app1) + 2) . $app1 . substr($jpeg, 2);
+$uid1 = str_repeat('b', 32);
+$n = put_parts($tid, $uid1, $jpeg);
+$r = gallery_finalize_upload($tid, $uid1, $n, 'handy.jpg', null);
+check('JPEG gespeichert', ($r['ok'] ?? false) && ($r['done'] ?? false) && !empty($r['id']));
+$row = db_fetch("SELECT * FROM gallery_item WHERE id=?", [$r['id'] ?? 0]);
+[$w, $h] = getimagesize(gallery_dir($tid) . $row['filename']);
+check('gedreht (Hochformat) und verkleinert', $w === 1920 && $h === 2560);
+// Orientierung 6 = 90° im Uhrzeigersinn: die rote obere Hälfte muss rechts liegen
+$saved = imagecreatefromjpeg(gallery_dir($tid) . $row['filename']);
+$rgbR = imagecolorat($saved, 1800, 1280); $rgbL = imagecolorat($saved, 100, 1280);
+check('Drehrichtung korrekt (rot rechts)', (($rgbR >> 16) & 255) > 200 && (($rgbL >> 16) & 255) < 60);
+check('Vorschaubild existiert', is_file(gallery_dir($tid) . $row['thumb']));
+check('EXIF entfernt', empty(@exif_read_data(gallery_dir($tid) . $row['filename'])['Orientation']));
+check('Temp-Verzeichnis entfernt', !is_dir(gallery_tmp_dir($tid, $uid1)));
+
+// 2) Fehlende Teile → noch nicht fertig
+$uid2 = str_repeat('c', 32);
+$dir2 = gallery_tmp_dir($tid, $uid2); @mkdir($dir2, 0755, true);
+file_put_contents($dir2 . '0.part', 'x');
+$r2 = gallery_finalize_upload($tid, $uid2, 2, 'clip.mp4', null);
+check('unvollständig → done=false', $r2 === ['ok' => true, 'done' => false]);
+
+// 3) Getarnte Datei (.jpg mit PHP-Inhalt) → abgelehnt, nichts bleibt zurück
+$uid3 = str_repeat('d', 32);
+$n3 = put_parts($tid, $uid3, "<?php echo 'x';");
+$before = count(glob(gallery_dir($tid) . '*'));
+$r3 = gallery_finalize_upload($tid, $uid3, $n3, 'boese.jpg', null);
+check('falscher Inhalt abgelehnt', ($r3['ok'] ?? true) === false);
+check('keine Datei angelegt', count(glob(gallery_dir($tid) . '*')) === $before);
+check('Temp nach Fehler entfernt', !is_dir(gallery_tmp_dir($tid, $uid3)));
+
+// 4) Löschen eines Mediums
+gallery_delete_item($row);
+check('Datei gelöscht', !is_file(gallery_dir($tid) . $row['filename']));
+check('DB-Zeile gelöscht', db_fetch("SELECT id FROM gallery_item WHERE id=?", [$row['id']]) === null);
+
+// 5) Aufräumen alter Temp-Uploads
+touch($dir2, time() - 90000);
+gallery_cleanup_tmp();
+check('alte Temp-Uploads entfernt', !is_dir($dir2));
+
+// 6) .htaccess-Schutz vorhanden
+check('.htaccess angelegt', str_contains((string)@file_get_contents(gallery_root() . '.htaccess'), 'Require all denied'));
+
+// 7) Turnier-Verzeichnis löschen
+gallery_delete_tournament_files($tid);
+check('Turnierverzeichnis entfernt', !is_dir(UPLOAD_DIR . 'gallery/' . $tid));
+db_execute("DELETE FROM tournament WHERE id=?", [$tid]);
+
 echo $fails ? "\n$fails FEHLER\n" : "\nAlle Tests ok\n";
 exit($fails ? 1 : 0);
