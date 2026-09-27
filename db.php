@@ -206,6 +206,22 @@ function init_db(): void {
             FOREIGN KEY (user_id)       REFERENCES user(id)        ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+        CREATE TABLE IF NOT EXISTS gallery_item (
+            id            INT AUTO_INCREMENT PRIMARY KEY,
+            tournament_id INT NOT NULL,
+            type          VARCHAR(8)   NOT NULL,
+            filename      VARCHAR(64)  NOT NULL,
+            thumb         VARCHAR(64)  NULL DEFAULT NULL,
+            mime          VARCHAR(64)  NOT NULL,
+            original_name VARCHAR(255) NOT NULL DEFAULT '',
+            caption       VARCHAR(255) NULL DEFAULT NULL,
+            size          BIGINT       NOT NULL DEFAULT 0,
+            uploaded_by   INT NULL DEFAULT NULL,
+            created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_gallery_tournament (tournament_id, created_at),
+            FOREIGN KEY (tournament_id) REFERENCES tournament(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
         CREATE TABLE IF NOT EXISTS rate_limit (
             ip         VARCHAR(45) NOT NULL,
             action     VARCHAR(50) NOT NULL,

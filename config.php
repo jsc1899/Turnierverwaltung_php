@@ -50,3 +50,10 @@ define('MAIL_TLS',      (bool)(getenv('MAIL_TLS') !== 'false'));
 // App
 define('APP_URL',   rtrim(getenv('APP_URL') ?: 'http://localhost:8080', '/'));
 define('UPLOAD_DIR', __DIR__ . '/uploads/');
+
+// Galerie (Fotos/Videos je Turnier) — Größen in MB, per ENV überschreibbar
+define('GALLERY_MAX_IMAGE_MB', (int)(getenv('GALLERY_MAX_IMAGE_MB') ?: 25));
+define('GALLERY_MAX_VIDEO_MB', (int)(getenv('GALLERY_MAX_VIDEO_MB') ?: 500));
+define('GALLERY_CHUNK_BYTES',  1024 * 1024);   // 1 MB je Upload-Teil (unter üblichem upload_max_filesize)
+define('GALLERY_MAX_EDGE',     2560);          // lange Kante gespeicherter Fotos (px)
+define('GALLERY_THUMB_EDGE',   400);           // lange Kante der Vorschaubilder (px)

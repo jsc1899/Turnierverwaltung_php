@@ -52,6 +52,10 @@ $uri = '/' . trim(parse_url($uri, PHP_URL_PATH), '/');
 
 // Uploads direkt ausliefern — MIME aus Extension-Whitelist, nicht vom Client
 if (str_starts_with($uri, '/uploads/')) {
+    // Galerie-Dateien nur über /gallery/{id}/media (mit Sichtbarkeitsprüfung)
+    if (str_starts_with(strtolower($uri), '/uploads/gallery/') || strtolower($uri) === '/uploads/gallery') {
+        http_response_code(404); exit;
+    }
     $real = realpath(__DIR__ . $uri);
     $base = realpath(__DIR__ . '/uploads');
     $file = __DIR__ . $uri;
