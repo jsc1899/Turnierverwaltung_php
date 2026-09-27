@@ -2,7 +2,8 @@
 $phase_labels = ['setup'=>'Einrichtung','group'=>'Gruppenphase','ko'=>'KO-Phase','done'=>'Beendet'];
 $phase_colors = ['setup'=>'bg-secondary','group'=>'bg-warning text-dark','ko'=>'bg-info text-dark','done'=>'bg-success'];
 $locked = ($t && (int)($t['is_done'] ?? 0) === 1) || $c['phase'] === 'done';
-$show_monitor = !($t && (int)($t['is_done'] ?? 0) === 1);   // bei beendetem Turnier kein Monitor
+// Monitor: Bearbeiter immer; Gäste nur, solange das Turnier nicht beendet ist
+$show_monitor = $can_edit || !($t && (int)($t['is_done'] ?? 0) === 1);
 $court_sg = court_label($t['sport'] ?? '');          // Spielplatz-Bezeichnung je Sportart (Singular)
 $court_pl = court_label($t['sport'] ?? '', true);    // Plural (Einstellungen)
 $sport_icons  = ['tischtennis'=>'🏓','tennis'=>'🎾','fussball'=>'⚽','cornhole'=>'🫘'];
@@ -192,7 +193,7 @@ ob_start(); ?>
     </button>
   </li>
   <?php endif; ?>
-  <?php if ($can_edit && $show_monitor): ?>
+  <?php if ($can_edit): ?>
   <li class="nav-item" role="presentation">
     <button class="nav-link" id="tab-monitor-btn"
             data-bs-toggle="tab" data-bs-target="#tab-monitor" type="button" role="tab">
@@ -204,7 +205,7 @@ ob_start(); ?>
 <?php endif; ?>
 <div class="tab-content<?= ($can_edit || $can_view_players) ? ' border border-top-0 rounded-bottom' : '' ?> mb-4">
 
-  <?php if ($can_edit && $show_monitor): ?>
+  <?php if ($can_edit): ?>
   <!-- Tab: Monitor -->
   <div class="tab-pane fade p-3" id="tab-monitor" role="tabpanel">
     <form method="post" action="<?= url('competition/'.$c['id'].'/monitor-settings') ?>" class="row g-3 align-items-end">

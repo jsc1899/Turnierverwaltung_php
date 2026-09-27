@@ -22,12 +22,17 @@ for who in Gast Admin; do
   q "UPDATE tournament SET is_done=0 WHERE id=$TID"
   has "$(curl -s "${C[@]}" $B/tournament/$TID)"   && ok "$who offen: Turnier-Monitor sichtbar"  || bad "$who offen: Turnier-Monitor sichtbar"
   has "$(curl -s "${C[@]}" $B/competition/$CID)"  && ok "$who offen: Bewerbs-Monitor sichtbar"  || bad "$who offen: Bewerbs-Monitor sichtbar"
-  q "UPDATE tournament SET is_done=1 WHERE id=$TID"
-  PT=$(curl -s "${C[@]}" $B/tournament/$TID); PC=$(curl -s "${C[@]}" $B/competition/$CID)
-  has "$PT" && bad "$who beendet: Turnier-Monitor ausgeblendet" || ok "$who beendet: Turnier-Monitor ausgeblendet"
-  has "$PC" && bad "$who beendet: Bewerbs-Monitor ausgeblendet" || ok "$who beendet: Bewerbs-Monitor ausgeblendet"
-  echo "$PT$PC" | grep -q 'id="tab-monitor' && bad "$who beendet: kein Monitor-Reiter" || ok "$who beendet: kein Monitor-Reiter"
 done
+# Beendet: Gäste sehen keinen Monitor mehr, Admins/zugeordnete Editoren weiterhin
+q "UPDATE tournament SET is_done=1 WHERE id=$TID"
+PT=$(curl -s $B/tournament/$TID); PC=$(curl -s $B/competition/$CID)
+has "$PT" && bad "Gast beendet: Turnier-Monitor ausgeblendet" || ok "Gast beendet: Turnier-Monitor ausgeblendet"
+has "$PC" && bad "Gast beendet: Bewerbs-Monitor ausgeblendet" || ok "Gast beendet: Bewerbs-Monitor ausgeblendet"
+PT=$(curl -s -b "$JAR" $B/tournament/$TID); PC=$(curl -s -b "$JAR" $B/competition/$CID)
+has "$PT" && ok "Admin beendet: Turnier-Monitor sichtbar" || bad "Admin beendet: Turnier-Monitor sichtbar"
+has "$PC" && ok "Admin beendet: Bewerbs-Monitor sichtbar" || bad "Admin beendet: Bewerbs-Monitor sichtbar"
+echo "$PT" | grep -q 'id="tab-monitor"' && ok "Admin beendet: Monitor-Reiter Turnier" || bad "Admin beendet: Monitor-Reiter Turnier"
+echo "$PC" | grep -q 'id="tab-monitor"' && ok "Admin beendet: Monitor-Reiter Bewerb" || bad "Admin beendet: Monitor-Reiter Bewerb"
 
 q "DELETE FROM tournament WHERE id=$TID"
 rm -rf "$W"
