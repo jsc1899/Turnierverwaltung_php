@@ -158,6 +158,34 @@ Nur Admins: Ansicht unter **`GET /admin/audit`** (Menü → Protokoll), Filter A
 
 `ADMIN_EMAIL` in `config.php` ist fest als Admin-Konto hinterlegt. `current_user()` verwendet einen statischen Cache (maximal eine DB-Abfrage pro Request).
 
+### Sicherheitsregeln (Stand Security-Audit 2026-09-27)
+
+Produktion läuft auf **nginx ohne eigene Direktiven**: `.htaccess` wirkt nicht, jede Datei im
+App-Ordner wird statisch ausgeliefert und jede `*.php` direkt ausgeführt. Daher:
+- **Neue PHP-Dateien** (lib/, routes/, templates/, Hilfsdateien) beginnen mit dem Guard
+  `<?php if (!defined('APP_BOOT') && PHP_SAPI !== 'cli') { http_response_code(404); exit; } ?>`
+  (`APP_BOOT` setzt nur `index.php`). CLI-Skripte (`tests/`, `bin/`) brechen bei Nicht-CLI ab.
+- **Geheimnisse/Uploads nie im App-Ordner**: `.env` liegt in `../.env` (die innere `.env` wird nur
+  lokal gelesen, `_env_inner_allowed()`), Galerie in `GALLERY_DIR=../turnier_gallery`.
+- **E-Mail als Identität** immer über `email_match_sql($col)` vergleichen (Groß/Klein egal, Akzente
+  genau — die Spalten-Kollation ist akzent-unabhängig!). Mails an die **hinterlegte** Adresse senden,
+  nie an die eingegebene. Haupt-Admin: `is_main_admin_email()`.
+- **Zustandsändernde Aktionen nur per POST + `csrf_verify()`** (auch Logout, Spielstärke-Sync).
+- **IDs aus Formularen** immer gegen das Turnier/den Bewerb im Pfad prüfen (z.B. Änderungsanträge:
+  nur Bewerbe des eigenen Turniers).
+- **Konten**: `user_can_login()` = bestätigt und nicht `deactivated`; `current_user()` prüft das bei
+  jeder Anfrage sowie `session_version` (Passwortänderung beendet alle Sitzungen). Reset-Tokens
+  enthalten nur einen HMAC-Fingerabdruck des Passwort-Hashs (`reset_token_matches()`).
+- **Rate-Limits**: `rate_limit_check($action, $max, $window, ?$target)` (atomar; mit `$target` pro
+  Ziel-Adresse über alle IPs). Login, Registrierung, Passwort-vergessen, Magic-Link, Nennungsformular
+  (+ Honeypot-Feld `website`).
+- **CSP** in `index.php` erlaubt nur konkrete CDN-Pakete; neue CDN-Einbindungen brauchen einen
+  Eintrag in der CSP **und** `integrity`/`crossorigin` (SRI).
+- `composer.json` → `bin/vendor-cleanup.php` entfernt nach `composer install` direkt aufrufbare
+  vendor-Hilfsskripte.
+- **Tests**: `for t in tests/*_test.php; do php $t; done` (MariaDB) und `for t in tests/*.sh; do bash $t; done`
+  (zusätzlich PHP-Server mit unerreichbarem `MAIL_HOST`).
+
 ### Token-System (`lib/tokens.php`)
 
 HMAC-SHA256-Tokens im Format `base64url(payload).base64url(timestamp).base64url(sig)`. Nicht kompatibel mit Pythons `itsdangerous`. Wrapper:
