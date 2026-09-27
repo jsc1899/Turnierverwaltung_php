@@ -51,5 +51,12 @@ expect "gelöscht → 404"           "$(curl -s -o /dev/null -w '%{http_code}' -
 
 "$MYSQL" -u root turnierverwaltung -e "DELETE FROM tournament WHERE id=$TID"
 rm -rf "$(dirname "$0")/../uploads/gallery/$TID"
+# Turnier-Löschung über die App entfernt das Galerie-Verzeichnis
+TID2=$("$MYSQL" -u root turnierverwaltung -N -e "INSERT INTO tournament (name) VALUES ('E2E-Del'); SELECT LAST_INSERT_ID();")
+D2="$(dirname "$0")/../uploads/gallery/$TID2"; mkdir -p "$D2" && touch "$D2/x.jpg"
+curl -s -o /dev/null -b "$JAR" --data-urlencode "csrf_token=$CSRF" $B/tournament/$TID2/delete
+[ -d "$D2" ] && bad "Turnier-Löschung entfernt Galerie-Verzeichnis" || ok "Turnier-Löschung entfernt Galerie-Verzeichnis"
+rm -rf "$D2"
+
 rm -rf "$W"
 [ $FAILS -eq 0 ] && echo "Alle E2E-Tests ok" || { echo "$FAILS FEHLER"; exit 1; }

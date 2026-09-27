@@ -166,6 +166,9 @@ function show(array $p): void {
         );
     }
 
+    require_once __DIR__ . '/../lib/gallery.php';
+    $gallery = gallery_items((int)$p['id']);
+
     render('tournament/show', [
         'page_title'        => $t['name'],
         't'                 => $t,
@@ -177,6 +180,7 @@ function show(array $p): void {
         'can_view_players'  => $can_edit || (!empty($t['is_public']) && !empty($t['players_public'])),
         'editors'           => $editors,
         'available_editors' => $available_editors,
+        'gallery'           => $gallery,
     ]);
 }
 
@@ -241,6 +245,8 @@ function delete(array $p): void {
     require_tournament_edit((int)$p['id']);
     csrf_verify();
     db_execute("DELETE FROM tournament WHERE id = ?", [$p['id']]);
+    require_once __DIR__ . '/../lib/gallery.php';
+    gallery_delete_tournament_files((int)$p['id']);
     flash('info', 'Turnier gelöscht.');
     redirect('');
 }
