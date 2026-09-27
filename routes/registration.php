@@ -32,6 +32,20 @@ function register_form(array $p): void {
 
     if (is_post()) {
         csrf_verify();
+        // Honeypot: für Menschen unsichtbares Feld — Bots füllen es aus. Unauffällig wie ein
+        // Erfolg antworten, aber nichts speichern und niemanden benachrichtigen.
+        if (trim((string)post('website')) !== '') {
+            flash('success', 'Nennung erfolgreich eingereicht! Sie erhalten eine Bestätigung vom Veranstalter.');
+            redirect('tournament/' . $tid . '/register');
+            return;
+        }
+        // Jede Nennung benachrichtigt alle Editoren/Admins per Mail → Flut begrenzen (großzügig,
+        // damit Vereinsverantwortliche mehrere Spieler hintereinander nennen können)
+        if (!rate_limit_check('register_form', 20, 600)) {
+            flash('danger', 'Zu viele Nennungen in kurzer Zeit. Bitte versuche es in einigen Minuten erneut.');
+            redirect('tournament/' . $tid . '/register');
+            return;
+        }
         $lastname   = trim(post('lastname'));
         $firstname  = trim(post('firstname'));
         $club       = trim(post('club'));
@@ -56,6 +70,7 @@ function register_form(array $p): void {
         if (!$lastname)  $errors[] = 'Nachname erforderlich.';
         if (!$firstname) $errors[] = 'Vorname erforderlich.';
         if (!$email)     $errors[] = 'E-Mail erforderlich.';
+        elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Bitte eine gültige E-Mail-Adresse angeben.';
         if ($skill <= 0) $errors[] = 'Spielstärke erforderlich (muss größer als 0 sein).';
         if (!$comp_ids)  $errors[] = 'Mindestens ein Bewerb muss ausgewählt werden.';
         elseif (count($comp_ids) > $max_c) $errors[] = "Maximal $max_c Bewerb(e) erlaubt.";

@@ -14,6 +14,11 @@
     <?php else: ?>
     <form method="post">
       <?= csrf_field() ?>
+      <!-- Honeypot gegen Spam-Bots: für Menschen unsichtbar, muss leer bleiben -->
+      <div style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden" aria-hidden="true">
+        <label for="reg-website">Website (bitte leer lassen)</label>
+        <input type="text" name="website" id="reg-website" value="" tabindex="-1" autocomplete="off">
+      </div>
       <div class="card shadow-sm mb-4">
         <div class="card-header fw-semibold"><i class="bi bi-person me-1"></i>Persönliche Daten</div>
         <div class="card-body">
