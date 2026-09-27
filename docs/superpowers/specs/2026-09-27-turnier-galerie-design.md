@@ -43,9 +43,10 @@ Neue Tabelle in `init_db()` (`CREATE TABLE IF NOT EXISTS`):
 
 - Dateien unter `UPLOAD_DIR . 'gallery/{tid}/'`, Chunks temporär unter
   `UPLOAD_DIR . 'gallery/_tmp/{upload_id}/'`.
-- `uploads/gallery/.htaccess` mit `Require all denied` → kein Direktzugriff (Apache/Live).
-  Lokal (`router.php`) wird `uploads/gallery/` ebenfalls nicht statisch ausgeliefert, sondern an
-  `index.php` weitergereicht (404).
+- `uploads/gallery/.htaccess` mit `Require all denied` → kein Direktzugriff (Apache/Live). Die Datei
+  wird vom Code angelegt (`gallery_ensure_root()`), da `uploads/*` nicht versioniert ist.
+  Lokal (`router.php`) und im `/uploads/`-Zweig von `index.php` wird `uploads/gallery/` mit 404
+  abgewiesen.
 - Löschen eines Mediums entfernt Datei + Vorschaubild. Löschen eines Turniers
   (`tournament.php delete()`) entfernt das Verzeichnis `gallery/{tid}/` rekursiv (die DB-Zeilen
   fallen per CASCADE).
@@ -60,15 +61,16 @@ Routen (in `index.php`):
 | POST | `/tournament/{id}/gallery/chunk` | `upload_chunk` | `require_tournament_edit` |
 | POST | `/gallery/{gid}/caption` | `caption` | `require_tournament_edit` (Turnier des Mediums) |
 | POST | `/gallery/{gid}/delete` | `delete` | `require_tournament_edit` |
-| GET | `/gallery/{gid}/file` | `file` | öffentlich bzw. Bearbeiter |
+| GET | `/gallery/{gid}/media` | `media` | öffentlich bzw. Bearbeiter |
 | GET | `/gallery/{gid}/thumb` | `thumb` | öffentlich bzw. Bearbeiter |
 
 ### Chunk-Upload-Protokoll
 
-- JS zerlegt jede Datei in 2-MB-Stücke und sendet sie sequenziell als `multipart/form-data`:
+- JS zerlegt jede Datei in 1-MB-Stücke (`GALLERY_CHUNK_BYTES`, unter dem kleinsten üblichen
+  `upload_max_filesize` von 2 MB) und sendet sie sequenziell als `multipart/form-data`:
   `csrf_token`, `upload_id` (32 Hex, clientseitig per `crypto.getRandomValues`), `index`
   (0-basiert), `total`, `name` (Originalname), `size` (Gesamtgröße), `chunk` (Blob).
-- Server validiert: `upload_id` Regex `^[a-f0-9]{32}$`, `index < total`, Chunk ≤ 2 MB + Toleranz,
+- Server validiert: `upload_id` Regex `^[a-f0-9]{32}$`, `index < total`, Chunk ≤ `GALLERY_CHUNK_BYTES`, `total = ceil(size / GALLERY_CHUNK_BYTES)`,
   deklarierte Gesamtgröße ≤ Maximalgröße, Endung in Whitelist.
 - Chunk wird als `{index}.part` abgelegt. Beim letzten Chunk (alle `total` Teile vorhanden):
   Zusammensetzen zu einer Datei, reale Größe prüfen, `finfo` MIME prüfen:
@@ -77,12 +79,13 @@ Routen (in `index.php`):
   - Maximalgrößen als Konstanten in `config.php` (`GALLERY_MAX_IMAGE_MB`,
     `GALLERY_MAX_VIDEO_MB`), per ENV überschreibbar.
 - Fotos (GD): EXIF-Orientierung anwenden (JPEG), auf max. 2560 px lange Kante verkleinern
-  (nur falls größer), Vorschaubild 400 px (JPEG). GIF bleibt unverändert (Animation), bekommt
+  (nur falls größer) und **immer neu kodieren** (entfernt EXIF-/GPS-Metadaten — Datenschutz bei
+  öffentlicher Galerie), Vorschaubild 400 px (JPEG). GIF bleibt unverändert (Animation), bekommt
   aber ein statisches Vorschaubild.
 - Antwort JSON: `{ok:true, done:false}` bzw. `{ok:true, done:true, id:…}` oder
   `{ok:false, error:"…"}` (deutsche Meldung). Fehler → Temp-Verzeichnis löschen.
 
-### Auslieferung (`file`/`thumb`)
+### Auslieferung (`media`/`thumb`)
 
 - Zugriffsprüfung: Turnier `is_public = 1` oder `can_edit_tournament($tid)`, sonst 404.
 - Header: `Content-Type` = gespeicherter MIME, `X-Content-Type-Options: nosniff`,
