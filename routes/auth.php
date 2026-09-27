@@ -15,7 +15,7 @@ function login(array $p): void {
         $email    = trim(post('email'));
         $password = post('password');
         $user     = db_fetch("SELECT * FROM user WHERE " . email_match_sql('email'), [$email]);
-        if ($user && $user['confirmed'] && password_verify($password, $user['password_hash'])) {
+        if ($user && user_can_login($user) && password_verify($password, $user['password_hash'])) {
             login_user_session($user);
             flash('success', 'Willkommen, ' . e($user['username']) . '!');
             $next = get_param('next', '');
@@ -60,8 +60,10 @@ function register(array $p): void {
             flash('danger', 'Registrierung konnte nicht abgeschlossen werden. Bitte Angaben prüfen.');
         } else {
             $hash  = password_hash($pw, PASSWORD_ARGON2ID);
-            $role  = ($email === ADMIN_EMAIL) ? 'admin' : 'viewer';
-            $confirmed = ($email === ADMIN_EMAIL) ? 1 : 0;
+            // Auch die Haupt-Admin-Adresse muss per Mail bestätigt werden — sonst würde, wer sich
+            // (z.B. nach Löschen des Kontos) zuerst damit registriert, ohne Mailzugriff Admin.
+            $role  = is_main_admin_email($email) ? 'admin' : 'viewer';
+            $confirmed = 0;
             db_insert(
                 "INSERT INTO user (username, email, password_hash, role, confirmed) VALUES (?,?,?,?,?)",
                 [$username, $email, $hash, $role, $confirmed]
@@ -89,7 +91,8 @@ function confirm(array $p): void {
         redirect('login');
         return;
     }
-    $rows = db_execute("UPDATE user SET confirmed = 1 WHERE " . email_match_sql('email') . " AND confirmed = 0", [$email]);
+    // Vom Admin deaktivierte Konten werden durch (alte) Bestätigungslinks nicht reaktiviert
+    $rows = db_execute("UPDATE user SET confirmed = 1 WHERE " . email_match_sql('email') . " AND confirmed = 0 AND deactivated = 0", [$email]);
     if ($rows > 0) {
         flash('success', 'E-Mail-Adresse bestätigt. Du kannst dich jetzt anmelden.');
     } else {
@@ -146,7 +149,8 @@ function reset_password(array $p): void {
             flash('danger', 'Passwörter stimmen nicht überein.');
         } else {
             $hash = password_hash($pw, PASSWORD_ARGON2ID);
-            db_execute("UPDATE user SET password_hash = ? WHERE id = ?", [$hash, $user['id']]);
+            // Sitzungsversion erhöhen → alle bestehenden Sitzungen dieses Benutzers enden
+            db_execute("UPDATE user SET password_hash = ?, session_version = session_version + 1 WHERE id = ?", [$hash, $user['id']]);
             flash('success', 'Passwort erfolgreich geändert. Du kannst dich jetzt anmelden.');
             redirect('login');
             return;

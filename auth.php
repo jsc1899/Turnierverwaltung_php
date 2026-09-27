@@ -7,10 +7,27 @@ function current_user(): ?array {
         $user = null;
         if (!empty($_SESSION['user_id'])) {
             $row = db_fetch("SELECT * FROM user WHERE id = ?", [$_SESSION['user_id']]);
-            if ($row) $user = $row;
+            // Sitzung nur gültig, solange das Konto bestätigt, nicht deaktiviert und die
+            // Sitzungsversion aktuell ist (Passwortänderung beendet alle Sitzungen)
+            if ($row && user_can_login($row)
+                && (int)($row['session_version'] ?? 0) === (int)($_SESSION['sv'] ?? 0)) {
+                $user = $row;
+            } else {
+                unset($_SESSION['user_id'], $_SESSION['sv']);
+            }
         }
     }
     return $user;
+}
+
+// Darf sich dieses Konto anmelden? (Mail bestätigt und nicht vom Admin deaktiviert)
+function user_can_login(array $u): bool {
+    return !empty($u['confirmed']) && empty($u['deactivated']);
+}
+
+// Ist $email die fest konfigurierte Haupt-Admin-Adresse? (Groß/Klein egal)
+function is_main_admin_email(string $email): bool {
+    return ADMIN_EMAIL !== '' && strcasecmp(trim($email), trim(ADMIN_EMAIL)) === 0;
 }
 
 function is_logged_in(): bool {
@@ -118,6 +135,7 @@ function require_admin(): void {
 function login_user_session(array $user): void {
     session_regenerate_id(true);
     $_SESSION['user_id'] = $user['id'];
+    $_SESSION['sv']      = (int)($user['session_version'] ?? 0);
     db_execute("UPDATE user SET last_login=NOW() WHERE id=?", [$user['id']]);
 }
 

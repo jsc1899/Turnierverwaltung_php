@@ -419,6 +419,10 @@ function init_db(): void {
         "ALTER TABLE audit_log ADD COLUMN target VARCHAR(255) NOT NULL DEFAULT ''",
         // Sichtbarkeit der Spielerlisten (0 = nur Admins/Editoren, 1 = öffentlich)
         "ALTER TABLE tournament ADD COLUMN players_public TINYINT(1) NOT NULL DEFAULT 0",
+        // Konto vom Admin deaktiviert (unabhängig von der Mailbestätigung) + Sitzungsversion
+        // (wird bei Passwortänderung erhöht → alle bestehenden Sitzungen des Benutzers enden)
+        "ALTER TABLE user ADD COLUMN deactivated TINYINT(1) NOT NULL DEFAULT 0",
+        "ALTER TABLE user ADD COLUMN session_version INT NOT NULL DEFAULT 0",
     ];
     foreach ($migrations as $sql) {
         try { $pdo->exec($sql); } catch (\PDOException $e) { /* Spalte/Typ bereits korrekt */ }

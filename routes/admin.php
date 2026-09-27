@@ -20,7 +20,7 @@ function set_role(array $p): void {
         return;
     }
     $u = db_fetch("SELECT email FROM user WHERE id=?", [$uid]);
-    if ($u && $u['email'] === ADMIN_EMAIL && $role !== 'admin') {
+    if ($u && is_main_admin_email($u['email']) && $role !== 'admin') {
         flash('danger', 'Der Haupt-Admin kann nicht heruntergestuft werden.');
         redirect('admin/users');
         return;
@@ -34,20 +34,26 @@ function toggle_active(array $p): void {
     require_admin();
     csrf_verify();
     $uid = (int)$p['id'];
-    $u   = db_fetch("SELECT email, confirmed FROM user WHERE id=?", [$uid]);
+    $u   = db_fetch("SELECT email, confirmed, deactivated FROM user WHERE id=?", [$uid]);
     if (!$u) {
         flash('danger', 'Benutzer nicht gefunden.');
         redirect('admin/users');
         return;
     }
-    if ($u['email'] === ADMIN_EMAIL) {
+    if (is_main_admin_email($u['email'])) {
         flash('danger', 'Der Haupt-Admin kann nicht deaktiviert werden.');
         redirect('admin/users');
         return;
     }
-    $new = $u['confirmed'] ? 0 : 1;
-    db_execute("UPDATE user SET confirmed=? WHERE id=?", [$new, $uid]);
-    flash('success', $new ? 'Benutzer aktiviert.' : 'Benutzer deaktiviert.');
+    if (user_can_login($u)) {
+        // Deaktivieren: eigene Markierung (alte Bestätigungslinks reaktivieren nicht)
+        db_execute("UPDATE user SET deactivated=1 WHERE id=?", [$uid]);
+        flash('success', 'Benutzer deaktiviert.');
+    } else {
+        // Aktivieren (auch unbestätigte bzw. früher über confirmed=0 deaktivierte Konten)
+        db_execute("UPDATE user SET deactivated=0, confirmed=1 WHERE id=?", [$uid]);
+        flash('success', 'Benutzer aktiviert.');
+    }
     redirect('admin/users');
 }
 
@@ -55,13 +61,13 @@ function resend_confirm(array $p): void {
     require_admin();
     csrf_verify();
     $uid = (int)$p['id'];
-    $u   = db_fetch("SELECT email, confirmed FROM user WHERE id=?", [$uid]);
+    $u   = db_fetch("SELECT email, confirmed, deactivated FROM user WHERE id=?", [$uid]);
     if (!$u) {
         flash('danger', 'Benutzer nicht gefunden.');
         redirect('admin/users');
         return;
     }
-    if ($u['confirmed']) {
+    if ($u['confirmed'] || !empty($u['deactivated'])) {
         flash('info', 'Benutzer ist bereits aktiviert.');
         redirect('admin/users');
         return;
@@ -77,7 +83,7 @@ function delete_user(array $p): void {
     csrf_verify();
     $uid = (int)$p['id'];
     $u   = db_fetch("SELECT email FROM user WHERE id=?", [$uid]);
-    if ($u && $u['email'] === ADMIN_EMAIL) {
+    if ($u && is_main_admin_email($u['email'])) {
         flash('danger', 'Der Haupt-Admin kann nicht gelöscht werden.');
         redirect('admin/users');
         return;

@@ -17,18 +17,18 @@ ob_start(); ?>
           <form method="post" action="<?= url('admin/user/' . $u['id'] . '/role') ?>" class="d-flex gap-2 align-items-center">
             <?= csrf_field() ?>
             <select name="role" class="form-select form-select-sm w-auto"
-                    <?= $u['email'] === ADMIN_EMAIL ? 'disabled' : '' ?>>
+                    <?= is_main_admin_email($u['email']) ? 'disabled' : '' ?>>
               <?php foreach ($role_labels as $val => $label): ?>
               <option value="<?= $val ?>"<?= $u['role'] === $val ? ' selected' : '' ?>><?= $label ?></option>
               <?php endforeach; ?>
             </select>
-            <?php if ($u['email'] !== ADMIN_EMAIL): ?>
+            <?php if (!is_main_admin_email($u['email'])): ?>
             <button class="btn btn-primary btn-sm">Speichern</button>
             <?php endif; ?>
           </form>
         </td>
-        <td data-sort="<?= $u['confirmed'] ? '1' : '0' ?>">
-          <?php if ($u['confirmed']): ?>
+        <td data-sort="<?= user_can_login($u) ? '1' : '0' ?>">
+          <?php if (user_can_login($u)): ?>
           <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Ja</span>
           <?php else: ?>
           <span class="badge bg-secondary"><i class="bi bi-x-circle me-1"></i>Nein</span>
@@ -37,18 +37,18 @@ ob_start(); ?>
         <td class="text-muted small"><?= e($u['created_at'] ?? '') ?></td>
         <td class="text-muted small"><?= $u['last_login'] ? e($u['last_login']) : '<span class="text-secondary">–</span>' ?></td>
         <td>
-          <?php if ($u['email'] !== ADMIN_EMAIL): ?>
+          <?php if (!is_main_admin_email($u['email'])): ?>
           <div class="d-flex gap-1">
             <form method="post" action="<?= url('admin/user/' . $u['id'] . '/active') ?>">
               <?= csrf_field() ?>
-              <?php if ($u['confirmed']): ?>
+              <?php if (user_can_login($u)): ?>
               <button class="btn btn-outline-warning btn-sm" title="Benutzer deaktivieren"
                       data-confirm="Benutzer wirklich deaktivieren?"><i class="bi bi-person-x"></i></button>
               <?php else: ?>
               <button class="btn btn-outline-success btn-sm" title="Benutzer aktivieren"><i class="bi bi-person-check"></i></button>
               <?php endif; ?>
             </form>
-            <?php if (!$u['confirmed']): ?>
+            <?php if (!$u['confirmed'] && empty($u['deactivated'])): ?>
             <form method="post" action="<?= url('admin/user/' . $u['id'] . '/resend') ?>">
               <?= csrf_field() ?>
               <button class="btn btn-outline-primary btn-sm" title="Aktivierungsmail erneut senden"><i class="bi bi-envelope-arrow-up"></i></button>
