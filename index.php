@@ -112,6 +112,13 @@ $routes = [
     ['POST',     '/tournament/{id}/editors/add',           'tournament', 'add_editor'],
     ['POST',     '/tournament/{id}/editors/{uid}/remove',  'tournament', 'remove_editor'],
 
+    // Galerie
+    ['POST',     '/tournament/{id}/gallery/chunk',  'gallery', 'upload_chunk'],
+    ['POST',     '/gallery/{gid}/caption',           'gallery', 'caption'],
+    ['POST',     '/gallery/{gid}/delete',            'gallery', 'delete'],
+    ['GET',      '/gallery/{gid}/media',             'gallery', 'media'],
+    ['GET',      '/gallery/{gid}/thumb',             'gallery', 'thumb'],
+
     // Registrations (public + admin)
     ['GET|POST', '/tournament/{id}/register',                        'registration', 'register_form'],
     ['POST',     '/registration/{id}/confirm',                       'registration', 'confirm_all'],

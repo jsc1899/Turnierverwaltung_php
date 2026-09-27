@@ -254,3 +254,44 @@ function gallery_delete_tournament_files(int $tid): void {
     if ($tid <= 0) return;
     gallery_rrmdir(UPLOAD_DIR . 'gallery/' . $tid);
 }
+// ── Auslieferung ───────────────────────────────────────────────────────────────
+
+// Datei mit Range-Unterstützung (Video-Spulen) blockweise ausliefern.
+function gallery_stream(string $path, string $mime, bool $public): never {
+    if (!is_file($path)) { http_response_code(404); exit; }
+    if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
+    $size  = (int)filesize($path);
+    $range = gallery_parse_range((string)($_SERVER['HTTP_RANGE'] ?? ''), $size);
+
+    header('Content-Type: ' . $mime);
+    header('X-Content-Type-Options: nosniff');
+    header('Accept-Ranges: bytes');
+    header('Cache-Control: ' . ($public ? 'public, max-age=86400' : 'private, max-age=3600'));
+    header('Content-Disposition: inline');
+    if ($range === false) {
+        http_response_code(416);
+        header("Content-Range: bytes */$size");
+        exit;
+    }
+    [$start, $end] = $range ?? [0, $size - 1];
+    if ($range !== null) {
+        http_response_code(206);
+        header("Content-Range: bytes $start-$end/$size");
+    }
+    header('Content-Length: ' . ($end - $start + 1));
+
+    while (ob_get_level()) ob_end_clean();
+    @set_time_limit(0);
+    $fp = fopen($path, 'rb');
+    fseek($fp, $start);
+    $left = $end - $start + 1;
+    while ($left > 0 && !feof($fp) && !connection_aborted()) {
+        $buf = fread($fp, min(1048576, $left));
+        if ($buf === false || $buf === '') break;
+        echo $buf;
+        flush();
+        $left -= strlen($buf);
+    }
+    fclose($fp);
+    exit;
+}

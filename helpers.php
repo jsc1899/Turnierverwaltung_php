@@ -106,6 +106,9 @@ function audit_log(string $status): void {
     static $logged = false;
     $method = $_SERVER['REQUEST_METHOD'] ?? '';
     if ($status === 'ok' && $method !== 'POST') return;
+    // Galerie-Chunk-Upload: nur den letzten Teil protokollieren (sonst ein Eintrag je MB)
+    if ($status === 'ok' && ($GLOBALS['__audit_route'] ?? '') === 'gallery.upload_chunk'
+        && (int)post('index', -1) !== (int)post('total', 0) - 1) return;
     if ($logged) return;
     $logged = true;
     try {
@@ -260,6 +263,11 @@ function _audit_resolve_target(string $handler, string $action, array $params): 
                 default          => '',
             };
 
+        case 'gallery':
+            if ($action === 'upload_chunk') return mb_substr((string)post('name'), 0, 150) . ' → ' . _audit_tname($id);
+            $g = db_fetch("SELECT original_name, tournament_id FROM gallery_item WHERE id=?", [$gid]);
+            return $g ? $g['original_name'] . ' → ' . _audit_tname((int)$g['tournament_id']) : '';
+
         case 'pdf':
             return in_array($action, ['aushang', 'players_pdf', 'players_csv', 'registrations_pdf', 'registrations_csv'], true)
                 ? _audit_tname($id)
@@ -279,6 +287,7 @@ function audit_area_label(string $handler): string {
         'player'       => 'Spielerregister',
         'double'       => 'Doppel',
         'pdf'          => 'Export',
+        'gallery'      => 'Galerie',
     ][$handler] ?? $handler;
 }
 
