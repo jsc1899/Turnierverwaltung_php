@@ -37,6 +37,29 @@ ob_start(); ?>
       <a href="<?= url('tournament/' . $t['id'] . '/aushang') ?>" target="_blank" class="text-decoration-none">
         <i class="bi bi-printer me-1"></i>Aushang
       </a>
+      <?php if ($can_edit && $participant_emails):
+        // Neue Mail im lokalen Mailclient: alle Teilnehmer in BCC, Betreff = Turniername
+        $mailto = 'mailto:?bcc=' . rawurlencode(implode(',', $participant_emails))
+                . '&subject=' . rawurlencode((string)$t['name']);
+        $mail_n = count($participant_emails);
+      ?>
+      <span class="text-nowrap">
+        <a href="<?= e($mailto) ?>" class="text-decoration-none"
+           title="Neue E-Mail im Mailprogramm – alle Teilnehmer als Blindkopie (BCC)">
+          <i class="bi bi-envelope me-1"></i>Mail an Teilnehmer (<?= $mail_n ?>)
+        </a>
+        <button type="button" class="btn btn-link btn-sm p-0 ms-1 align-baseline" id="copy-participant-emails"
+                data-emails="<?= e(implode(', ', $participant_emails)) ?>" title="Alle Adressen in die Zwischenablage kopieren">
+          <i class="bi bi-clipboard"></i>
+        </button>
+      </span>
+      <?php if (strlen($mailto) > 2000): ?>
+      <span class="small text-warning-emphasis">
+        <i class="bi bi-exclamation-triangle me-1"></i>Sehr viele Empfänger – falls das Mailprogramm nicht alle
+        übernimmt, Adressen kopieren und ins BCC-Feld einfügen.
+      </span>
+      <?php endif; ?>
+      <?php endif; ?>
       <?php if ($t['is_done']): ?>
       <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
         <i class="bi bi-flag-fill"></i> beendet
@@ -762,6 +785,21 @@ $nennung_badge = $pending_count + $change_count;
 $extra_js = <<<'JS'
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
 <script>
+// „Mail an Teilnehmer“: alle Adressen in die Zwischenablage (für sehr große Empfängerlisten)
+(function() {
+  var btn = document.getElementById('copy-participant-emails');
+  if (!btn) return;
+  btn.addEventListener('click', function() {
+    var icon = btn.querySelector('i');
+    navigator.clipboard.writeText(btn.dataset.emails).then(function() {
+      icon.className = 'bi bi-clipboard-check text-success';
+      btn.title = 'Adressen kopiert';
+      setTimeout(function() { icon.className = 'bi bi-clipboard'; btn.title = 'Alle Adressen in die Zwischenablage kopieren'; }, 2000);
+    }, function() {
+      window.prompt('Adressen kopieren (Strg+C):', btn.dataset.emails);
+    });
+  });
+})();
 (function() {
   var list = document.getElementById('comp-list');
   if (!list || !list.querySelector('.drag-handle')) return;

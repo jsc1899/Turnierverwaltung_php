@@ -54,6 +54,34 @@ function new_tournament(array $p): void {
     redirect('tournament/' . $tid);
 }
 
+// E-Mail-Adressen aller einem Bewerb des Turniers zugeteilten Spieler (Einzel, beide
+// Doppelpartner, Team-Mitglieder) — gültig, ohne Duplikate (Groß/Klein egal), sortiert.
+function tournament_participant_emails(int $tid): array {
+    $rows = db_fetchall(
+        "SELECT p.email FROM player p WHERE p.id IN (
+             SELECT cp.player_id FROM competition_player cp
+               JOIN competition c ON c.id = cp.competition_id WHERE c.tournament_id = ?
+             UNION SELECT d.player1_id FROM competition_double cd
+               JOIN competition c ON c.id = cd.competition_id
+               JOIN `double` d ON d.id = cd.double_id WHERE c.tournament_id = ?
+             UNION SELECT d.player2_id FROM competition_double cd
+               JOIN competition c ON c.id = cd.competition_id
+               JOIN `double` d ON d.id = cd.double_id WHERE c.tournament_id = ?
+             UNION SELECT tp.player_id FROM competition_team ct
+               JOIN competition c ON c.id = ct.competition_id
+               JOIN team_player tp ON tp.team_id = ct.team_id WHERE c.tournament_id = ?
+         )",
+        [$tid, $tid, $tid, $tid]
+    );
+    $mails = [];
+    foreach ($rows as $r) {
+        $m = trim((string)($r['email'] ?? ''));
+        if ($m !== '' && filter_var($m, FILTER_VALIDATE_EMAIL)) $mails[strtolower($m)] ??= $m;
+    }
+    ksort($mails);
+    return array_values($mails);
+}
+
 function show(array $p): void {
     $t = db_fetch("SELECT * FROM tournament WHERE id = ?", [$p['id']]);
     if (!$t) { redirect(''); return; }
@@ -181,6 +209,8 @@ function show(array $p): void {
         'editors'           => $editors,
         'available_editors' => $available_editors,
         'gallery'           => $gallery,
+        // Adressen nur für Bearbeiter laden/ausgeben (Datenschutz)
+        'participant_emails' => $can_edit ? tournament_participant_emails((int)$p['id']) : [],
     ]);
 }
 

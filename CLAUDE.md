@@ -295,6 +295,16 @@ Fotos/Videos je Turnier (Tabelle `gallery_item`), Reiter **„Galerie“** auf d
   entfernt `uploads/gallery/{tid}/`.
 - Tests: `php tests/gallery_test.php` (Lib, braucht MariaDB), `bash tests/gallery_e2e.sh` (HTTP).
 
+### Mail an Teilnehmer (Turnierseite)
+
+Nur für Bearbeiter (`$can_edit`): Link „Mail an Teilnehmer (N)“ in der Infozeile von
+`tournament/show.php` öffnet per `mailto:?bcc=…&subject=<Turniername>` den lokalen Mailclient.
+Empfänger = `tournament_participant_emails($tid)` (`routes/tournament.php`): alle einem Bewerb
+zugeteilten Spieler (Einzel, beide Doppelpartner, Team-Mitglieder), E-Mail aus dem Spielerregister,
+gültig + dedupliziert (Groß/Klein egal). Adressen werden nur an Bearbeiter ausgegeben. Daneben
+Kopier-Button (Zwischenablage) für Mailclients mit `mailto`-Längenlimit (~2000 Zeichen, Hinweis
+wird angezeigt). Tests: `php tests/tournament_mail_test.php`, `bash tests/tournament_mail_e2e.sh`.
+
 ### PDF- & CSV-Exporte (`lib/pdf.php`)
 
 `mpdf()` Factory setzt immer `tempDir = sys_get_temp_dir() . '/mpdf_tmp'` — unter Windows erforderlich.
