@@ -928,9 +928,18 @@ function _xlsx_build_template(array $headers, array $example, string $sheetName 
     return $data;
 }
 
+// Grenzen gegen manipulierte Dateien (Zip-Bombe, riesige Spaltenindizes → Speicher-Fatal)
+const XLSX_MAX_ENTRY_BYTES = 20 * 1024 * 1024;   // entpackte Größe je XML-Datei
+const XLSX_MAX_COLS        = 100;
+const XLSX_MAX_ROWS        = 5000;
+
 function _xlsx_parse(string $path): array {
     $zip = new ZipArchive();
     if ($zip->open($path) !== true) return [];
+    foreach (['xl/sharedStrings.xml', 'xl/worksheets/sheet1.xml'] as $entry) {
+        $st = $zip->statName($entry);
+        if ($st !== false && (int)$st['size'] > XLSX_MAX_ENTRY_BYTES) { $zip->close(); return []; }
+    }
 
     // Shared strings — strip default namespace so xpath works without prefix
     $ss = [];
@@ -961,10 +970,17 @@ function _xlsx_parse(string $path): array {
     foreach ($sheet->xpath('//row') as $rowEl) {
         $rowData = []; $prevCol = -1;
         foreach ($rowEl->xpath('c') as $cell) {
-            preg_match('/^([A-Z]+)/', (string)$cell['r'], $m);
-            $col = 0;
-            foreach (str_split($m[1]) as $ch) { $col = $col * 26 + (ord($ch) - ord('A') + 1); }
-            $col--;
+            $ref = (string)($cell['r'] ?? '');
+            if ($ref !== '' && preg_match('/^([A-Z]{1,3})\d/', $ref, $m)) {
+                $col = 0;
+                foreach (str_split($m[1]) as $ch) { $col = $col * 26 + (ord($ch) - ord('A') + 1); }
+                $col--;
+            } elseif ($ref === '') {
+                $col = $prevCol + 1;   // ohne Zellbezug (laut Format erlaubt): nächste Spalte
+            } else {
+                continue;              // ungültiger/riesiger Zellbezug (z.B. ZZZZZZZ1)
+            }
+            if ($col >= XLSX_MAX_COLS || $col < 0) continue;
             while ($prevCol < $col - 1) { $rowData[] = ''; $prevCol++; }
             $t = (string)($cell['t'] ?? '');
             $v = (string)($cell->v ?? '');
@@ -979,6 +995,7 @@ function _xlsx_parse(string $path): array {
         }
         if (array_filter($rowData, fn($v) => trim($v) !== '')) {
             $rows[] = $rowData;
+            if (count($rows) >= XLSX_MAX_ROWS) break;
         }
     }
     return $rows;
