@@ -66,7 +66,7 @@ Routen-Muster: `[METHOD, '/pfad/{param}', 'handler_datei', 'action_funktion']`. 
 
 Jede Datei definiert eine oder mehrere Funktionen, die nach Actions benannt sind. Gleichnamige Funktionen in verschiedenen Dateien (z.B. `show()`, `delete()`) sind sicher, weil pro Request nur eine Datei eingebunden wird. Handler rufen zu Beginn `require_edit()` / `require_admin()` auf.
 
-Dateien: `auth.php`, `tournament.php`, `competition.php`, `player.php`, `registration.php`, `match_result.php`, `pdf.php`, `admin.php`.
+Dateien: `auth.php`, `tournament.php`, `competition.php`, `player.php`, `registration.php`, `match_result.php`, `pdf.php`, `admin.php`, `gallery.php`.
 
 ### Datenbank (`db.php`)
 
@@ -267,6 +267,23 @@ max. Serie 2 (bei ungerader Spielzahl das Minimum).
 - Team-Start-Nr.: `team_start_numbers(group_id)` in `lib/standings.php` → `[team_id => 1..N]`,
   sortiert nach `skill DESC, team_id` (pro Gruppe).
 
+### Turnier-Galerie (`lib/gallery.php`, `routes/gallery.php`)
+
+Fotos/Videos je Turnier (Tabelle `gallery_item`), Reiter **„Galerie“** auf der Turnierseite
+(`templates/tournament/_gallery.php`, sichtbar wenn Medien vorhanden oder Bearbeiter).
+- Upload/Beschriften/Löschen: `require_tournament_edit`. Sichtbarkeit wie das Turnier
+  (`is_public` oder Bearbeiter), sonst 404.
+- **Chunk-Upload**: JS sendet 1-MB-Teile (`GALLERY_CHUNK_BYTES`) an
+  `POST /tournament/{id}/gallery/chunk`; `gallery_finalize_upload()` setzt zusammen, prüft `finfo`
+  (Fotos JPG/PNG/WebP/GIF ≤ `GALLERY_MAX_IMAGE_MB`, Videos MP4/WebM/MOV ≤ `GALLERY_MAX_VIDEO_MB`),
+  Fotos: EXIF-Orientierung, max. 2560 px, neu kodiert (Metadaten/GPS entfernt), Vorschau 400 px.
+- Dateien unter `uploads/gallery/{tid}/` — **kein Direktzugriff** (`.htaccess` wird von
+  `gallery_root()` angelegt; `index.php`/`router.php` liefern 404). Auslieferung über
+  `GET /gallery/{gid}/media|thumb` mit Range-Support (`gallery_stream()`).
+- Audit-Log: beim Chunk-Upload nur der letzte Teil (Target = Dateiname). Turnier-Löschung
+  entfernt `uploads/gallery/{tid}/`.
+- Tests: `php tests/gallery_test.php` (Lib, braucht MariaDB), `bash tests/gallery_e2e.sh` (HTTP).
+
 ### PDF- & CSV-Exporte (`lib/pdf.php`)
 
 `mpdf()` Factory setzt immer `tempDir = sys_get_temp_dir() . '/mpdf_tmp'` — unter Windows erforderlich.
@@ -357,4 +374,5 @@ angelegt (`created=true`). Dedup: Doppel über Paar (beide Reihenfolgen), Team �
 | `registration_change_competition` | Bewerbs-spezifische Änderungen in einem Änderungsantrag |
 | `user` | App-Benutzer mit gehashten Passwörtern und Rolle |
 | `tournament_editor` | Zuordnung Editor↔Turnier (PK: tournament_id + user_id, FK CASCADE) — Editoren mit Bearbeitungsrecht für genau dieses Turnier und seine Bewerbe |
+| `gallery_item` | Galerie-Medien je Turnier: `type` ('image'/'video'), `filename`/`thumb` (zufällige Namen in `uploads/gallery/{tid}/`), `mime`, `original_name`, `caption`, `size`, `uploaded_by` (Snapshot, kein FK) — FK CASCADE auf `tournament` |
 | `audit_log` | Aktivitätsprotokoll privilegierter Aktionen: `user_id`/`username`/`role` (Snapshot, kein FK — überlebt Benutzerlöschung), `method`, `path`, `action` (handler.action), `target` (lesbares betroffenes Objekt), `status` ('ok'/'denied'), `ip`, `created_at` |
