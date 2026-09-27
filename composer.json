@@ -9,5 +9,10 @@
         "psr-4": {
             "App\\": "lib/"
         }
+    },
+    "scripts": {
+        "post-autoload-dump": [
+            "@php bin/vendor-cleanup.php"
+        ]
     }
 }
