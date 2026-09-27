@@ -111,7 +111,8 @@ function forgot_password(array $p): void {
         }
         $email = trim(post('email'));
         $user  = db_fetch("SELECT * FROM user WHERE " . email_match_sql('email') . " AND confirmed = 1", [$email]);
-        if ($user) {
+        // zusätzlich max. 3 Reset-Mails je Adresse und Stunde (über alle IPs) — gegen Mail-Fluten
+        if ($user && rate_limit_check('forgot_password_to', 3, 3600, $email)) {
             // Link immer an die hinterlegte Adresse, nie an die eingegebene
             $token = make_reset_token($user['email'], $user['password_hash']);
             send_reset_mail($user['email'], $token);

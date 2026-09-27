@@ -302,35 +302,22 @@ function audit_area_label(string $handler): string {
 
 // ── Rate-Limiting ──────────────────────────────────────────────────────────────
 
-function rate_limit_check(string $action, int $max_attempts = 10, int $window_seconds = 60): bool {
-    $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
-    $row = db_fetch(
-        "SELECT attempts, window_start FROM rate_limit WHERE ip = ? AND action = ?",
-        [$ip, $action]
-    );
-    if (!$row) {
-        db_execute(
-            "INSERT INTO rate_limit (ip, action, attempts, window_start) VALUES (?, ?, 1, NOW())",
-            [$ip, $action]
-        );
-        return true;
-    }
-    $elapsed = time() - strtotime($row['window_start']);
-    if ($elapsed > $window_seconds) {
-        db_execute(
-            "UPDATE rate_limit SET attempts = 1, window_start = NOW() WHERE ip = ? AND action = ?",
-            [$ip, $action]
-        );
-        return true;
-    }
-    if ($row['attempts'] >= $max_attempts) {
-        return false;
-    }
+// Rate-Limit: max. $max_attempts Aufrufe je $window_seconds. Standardmäßig pro IP; mit $target
+// (z.B. Ziel-E-Mail) pro Ziel über alle IPs hinweg — gegen Mail-Fluten an fremde Adressen.
+// Ein einziges atomares Statement (kein SELECT/UPDATE-Rennen bei parallelen Anfragen).
+function rate_limit_check(string $action, int $max_attempts = 10, int $window_seconds = 60, ?string $target = null): bool {
+    $key = $target !== null
+        ? 't:' . substr(hash('sha256', mb_strtolower(trim($target))), 0, 40)
+        : (string)($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0');
     db_execute(
-        "UPDATE rate_limit SET attempts = attempts + 1 WHERE ip = ? AND action = ?",
-        [$ip, $action]
+        "INSERT INTO rate_limit (ip, action, attempts, window_start) VALUES (?, ?, 1, NOW())
+         ON DUPLICATE KEY UPDATE
+           attempts     = IF(window_start < NOW() - INTERVAL ? SECOND, 1, attempts + 1),
+           window_start = IF(window_start < NOW() - INTERVAL ? SECOND, NOW(), window_start)",
+        [$key, $action, $window_seconds, $window_seconds]
     );
-    return true;
+    $row = db_fetch("SELECT attempts FROM rate_limit WHERE ip = ? AND action = ?", [$key, $action]);
+    return $row !== null && (int)$row['attempts'] <= $max_attempts;
 }
 
 // ── Datei-Upload ───────────────────────────────────────────────────────────────

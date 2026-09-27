@@ -273,7 +273,8 @@ function request_link(array $p): void {
                  WHERE " . email_match_sql('r.email') . " AND t.is_done = 0 LIMIT 1",
                 [$email]
             );
-            if ($exists) {
+            // zusätzlich max. 3 Magic-Link-Mails je Adresse und Stunde (über alle IPs)
+            if ($exists && rate_limit_check('request_link_to', 3, 3600, $email)) {
                 $token = make_manage_email_token($email);
                 send_reg_manage_mail($email, $token);
             }
